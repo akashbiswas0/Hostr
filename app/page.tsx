@@ -49,10 +49,10 @@ export default function HomePage() {
       const ev = entity.toJson() as Event;
       const matchesKw =
         !kw ||
-        ev.title.toLowerCase().includes(kw) ||
-        ev.description.toLowerCase().includes(kw);
+        (ev.title ?? "").toLowerCase().includes(kw) ||
+        (ev.description ?? "").toLowerCase().includes(kw);
       const matchesLoc =
-        !loc || ev.location.toLowerCase().includes(loc);
+        !loc || (ev.location ?? "").toLowerCase().includes(loc);
       return matchesKw && matchesLoc;
     });
   }, [rawEvents, filters.keyword, filters.location]);
