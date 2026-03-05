@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { Plus, Hexagon } from "lucide-react";
-import { ConnectButton } from "@/components/ConnectButton";
+import { NavAccountMenu } from "@/components/NavAccountMenu";
 
 interface OrganizerNavProps {
   crumb?: string;
@@ -10,7 +10,7 @@ interface OrganizerNavProps {
 
 export function OrganizerNav({ crumb }: OrganizerNavProps) {
   return (
-    <nav className="sticky top-0 z-50 border-b border-white/5 bg-zinc-950/90 backdrop-blur-md">
+    <nav className="sticky top-0 z-50 border-b border-white/10 bg-transparent backdrop-blur-xl supports-[backdrop-filter]:bg-zinc-950/20">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6">
         {}
         <div className="flex items-center gap-2 text-sm">
@@ -18,8 +18,8 @@ export function OrganizerNav({ crumb }: OrganizerNavProps) {
             href="/"
             className="flex items-center gap-1.5 font-semibold text-white hover:text-violet-300 transition-colors"
           >
-            <Hexagon size={14} className="text-violet-400" strokeWidth={1.5} />
-            OnChain Events
+            <Hexagon size={14} className="text-cyan-300" strokeWidth={1.5} />
+            Hostr
           </Link>
           <span className="text-white/10">/</span>
           <Link
@@ -45,7 +45,7 @@ export function OrganizerNav({ crumb }: OrganizerNavProps) {
             <Plus size={14} />
             Create Event
           </Link>
-          <ConnectButton />
+          <NavAccountMenu />
         </div>
       </div>
     </nav>

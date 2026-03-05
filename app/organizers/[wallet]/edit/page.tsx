@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import toast from "react-hot-toast";
@@ -32,26 +32,24 @@ export default function EditOrganizerPage() {
   const { address, isConnected, isCorrectChain, walletClient } = useWallet();
   const { organizer, entityKey, isLoading } = useOrganizer();
 
-  const [form, setForm] = useState<OrganizerProfile>(EMPTY);
+  const [form, setForm] = useState<OrganizerProfile | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
 
-  
-  useEffect(() => {
-    if (organizer) {
-      setForm({
+  const organizerForm: OrganizerProfile = organizer
+    ? {
         name: organizer.name ?? "",
         bio: organizer.bio ?? "",
         avatarUrl: organizer.avatarUrl ?? "",
         website: organizer.website ?? "",
         twitter: organizer.twitter ?? "",
-      });
-    }
-  }, [organizer]);
+      }
+    : EMPTY;
+  const formValue = form ?? organizerForm;
 
   function set<K extends keyof OrganizerProfile>(key: K, value: OrganizerProfile[K]) {
-    setForm((prev) => ({ ...prev, [key]: value }));
+    setForm((prev) => ({ ...(prev ?? organizerForm), [key]: value }));
   }
 
   
@@ -115,9 +113,9 @@ export default function EditOrganizerPage() {
     setSaved(false);
 
     const payload: OrganizerProfile = {
-      ...form,
-      twitter: form.twitter.replace(/^@/, ""),
-      website: form.website.trim(),
+      ...formValue,
+      twitter: formValue.twitter.replace(/^@/, ""),
+      website: formValue.website.trim(),
     };
 
     const res = await updateOrganizerEntity(walletClient, entityKey, payload);
@@ -134,12 +132,12 @@ export default function EditOrganizerPage() {
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
       {}
-      <nav className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-white/5 bg-zinc-950/90 px-4 backdrop-blur-sm sm:px-6">
+      <nav className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-white/10 bg-transparent px-4 backdrop-blur-xl supports-[backdrop-filter]:bg-zinc-950/20 sm:px-6">
         <Link
           href="/"
           className="text-sm font-semibold text-violet-400 hover:text-violet-300 transition-colors"
         >
-          OnChain Events
+          Hostr
         </Link>
         <Link
           href={`/organizers/${profileWallet}`}
@@ -169,7 +167,7 @@ export default function EditOrganizerPage() {
                 required
                 type="text"
                 placeholder="Satoshi Events"
-                value={form.name}
+                value={formValue.name}
                 onChange={(e) => set("name", e.target.value)}
                 className={inputCls}
               />
@@ -181,7 +179,7 @@ export default function EditOrganizerPage() {
               <textarea
                 rows={4}
                 placeholder="A short bio about yourself or your organization…"
-                value={form.bio}
+                value={formValue.bio}
                 onChange={(e) => set("bio", e.target.value)}
                 className={`${inputCls} resize-none`}
               />
@@ -193,14 +191,14 @@ export default function EditOrganizerPage() {
               <input
                 type="url"
                 placeholder="https://example.com/avatar.png"
-                value={form.avatarUrl}
+                value={formValue.avatarUrl}
                 onChange={(e) => set("avatarUrl", e.target.value)}
                 className={inputCls}
               />
-              {form.avatarUrl && (
+              {formValue.avatarUrl && (
                 <div className="mt-2 flex items-center gap-2">
                   <img
-                    src={form.avatarUrl}
+                    src={formValue.avatarUrl}
                     alt="preview"
                     className="h-10 w-10 rounded-full object-cover ring-2 ring-white/10"
                     onError={(e) => {
@@ -218,7 +216,7 @@ export default function EditOrganizerPage() {
               <input
                 type="text"
                 placeholder="https://yoursite.xyz"
-                value={form.website}
+                value={formValue.website}
                 onChange={(e) => set("website", e.target.value)}
                 className={inputCls}
               />
@@ -234,7 +232,7 @@ export default function EditOrganizerPage() {
                 <input
                   type="text"
                   placeholder="yourhandle"
-                  value={form.twitter.replace(/^@/, "")}
+                  value={formValue.twitter.replace(/^@/, "")}
                   onChange={(e) => set("twitter", e.target.value.replace(/^@/, ""))}
                   className={`${inputCls} pl-7`}
                 />
@@ -268,7 +266,7 @@ export default function EditOrganizerPage() {
             </Link>
             <button
               type="submit"
-              disabled={submitting || saved || !form.name.trim()}
+              disabled={submitting || saved || !formValue.name.trim()}
               className="flex-1 rounded-xl bg-violet-600 py-3 text-sm font-semibold text-white hover:bg-violet-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
               {submitting ? (

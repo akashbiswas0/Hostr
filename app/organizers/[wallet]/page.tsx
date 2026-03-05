@@ -148,12 +148,12 @@ export default function OrganizerProfilePage() {
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
       {/* Top nav strip */}
-      <nav className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-white/5 bg-zinc-950/90 px-4 backdrop-blur-sm sm:px-6">
+      <nav className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-white/10 bg-transparent px-4 backdrop-blur-xl supports-[backdrop-filter]:bg-zinc-950/20 sm:px-6">
         <Link
           href="/"
           className="text-sm font-semibold text-violet-400 hover:text-violet-300 transition-colors"
         >
-          OnChain Events
+          Hostr
         </Link>
         {isOwner && (
           <Link

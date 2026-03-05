@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { Menu, X, Hexagon } from "lucide-react";
 import { ConnectButton } from "./ConnectButton";
+import { NavAccountMenu } from "./NavAccountMenu";
 import { useOrganizer } from "@/hooks/useOrganizer";
 import { useWallet } from "@/hooks/useWallet";
 
@@ -12,9 +13,14 @@ interface NavbarProps {
 }
 
 export function Navbar({ active }: NavbarProps) {
-  const { isConnected } = useWallet();
+  const { address, disconnect, isConnected, isCorrectChain } = useWallet();
   const { isOrganizer } = useOrganizer();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const profileHref = address ? `/organizers/${address.toLowerCase()}` : "/organizer/onboard";
+  const settingsHref =
+    address && isOrganizer
+      ? `/organizers/${address.toLowerCase()}/edit`
+      : "/organizer/onboard";
 
   const linkCls = (name: NavbarProps["active"]) =>
     `text-sm font-medium transition-colors ${
@@ -24,16 +30,16 @@ export function Navbar({ active }: NavbarProps) {
     }`;
 
   return (
-    <nav className="sticky top-0 z-50 border-b border-white/5 bg-zinc-950/90 backdrop-blur-md">
+    <nav className="sticky top-0 z-50 border-b border-white/10 bg-transparent backdrop-blur-xl supports-[backdrop-filter]:bg-zinc-950/20">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6">
         {}
         <Link
           href="/"
           className="flex items-center gap-2 text-base font-bold tracking-tight"
         >
-          <Hexagon size={18} className="text-violet-400" strokeWidth={1.5} />
+          <Hexagon size={18} className="text-cyan-300" strokeWidth={1.5} />
           <span className="text-white">
-            OnChain Events
+            Hostr
           </span>
         </Link>
 
@@ -50,11 +56,6 @@ export function Navbar({ active }: NavbarProps) {
               My RSVPs
             </Link>
           )}
-          {isConnected && isOrganizer && (
-            <Link href="/organizer/dashboard" className={linkCls("dashboard")}>
-              Dashboard
-            </Link>
-          )}
           {isConnected && !isOrganizer && (
             <Link
               href="/organizer/onboard"
@@ -67,12 +68,12 @@ export function Navbar({ active }: NavbarProps) {
 
         {}
         <div className="hidden sm:flex items-center gap-3">
-          <ConnectButton />
+          <NavAccountMenu />
         </div>
 
         {}
         <button
-          className="sm:hidden rounded-lg p-2 text-zinc-400 hover:text-white transition-colors"
+          className="sm:hidden rounded-lg p-2 text-zinc-300 hover:text-white transition-colors"
           onClick={() => setMobileOpen((v) => !v)}
           aria-label="Toggle menu"
         >
@@ -82,7 +83,7 @@ export function Navbar({ active }: NavbarProps) {
 
       {}
       {mobileOpen && (
-        <div className="sm:hidden border-t border-white/5 bg-zinc-950 px-4 pb-4 pt-2 space-y-2">
+        <div className="sm:hidden border-t border-white/10 bg-zinc-950/70 px-4 pb-4 pt-2 backdrop-blur-xl space-y-2">
           <Link
             href="/"
             className="block py-2 text-sm font-medium text-zinc-400 hover:text-white"
@@ -106,15 +107,6 @@ export function Navbar({ active }: NavbarProps) {
               My RSVPs
             </Link>
           )}
-          {isConnected && isOrganizer && (
-            <Link
-              href="/organizer/dashboard"
-              className="block py-2 text-sm font-medium text-zinc-400 hover:text-white"
-              onClick={() => setMobileOpen(false)}
-            >
-              Dashboard
-            </Link>
-          )}
           {isConnected && !isOrganizer && (
             <Link
               href="/organizer/onboard"
@@ -124,9 +116,49 @@ export function Navbar({ active }: NavbarProps) {
               Host an Event
             </Link>
           )}
-          <div className="pt-2">
-            <ConnectButton />
-          </div>
+
+          {isConnected && isCorrectChain && address && (
+            <>
+              <div className="my-2 h-px bg-white/10" />
+              <Link
+                href="/organizer/dashboard"
+                className="block py-2 text-sm font-medium text-zinc-300 hover:text-white"
+                onClick={() => setMobileOpen(false)}
+              >
+                Dashboard
+              </Link>
+              <Link
+                href={profileHref}
+                className="block py-2 text-sm font-medium text-zinc-300 hover:text-white"
+                onClick={() => setMobileOpen(false)}
+              >
+                View Profile
+              </Link>
+              <Link
+                href={settingsHref}
+                className="block py-2 text-sm font-medium text-zinc-300 hover:text-white"
+                onClick={() => setMobileOpen(false)}
+              >
+                Settings
+              </Link>
+              <button
+                type="button"
+                onClick={() => {
+                  disconnect();
+                  setMobileOpen(false);
+                }}
+                className="block w-full py-2 text-left text-sm font-medium text-rose-300 hover:text-rose-200"
+              >
+                Disconnect
+              </button>
+            </>
+          )}
+
+          {(!isConnected || !isCorrectChain) && (
+            <div className="pt-2">
+              <ConnectButton />
+            </div>
+          )}
         </div>
       )}
     </nav>

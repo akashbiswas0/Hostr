@@ -14,8 +14,8 @@ export function Footer() {
           {}
           <div className="text-center sm:text-left">
             <div className="flex items-center gap-1.5 justify-center sm:justify-start">
-              <Hexagon size={14} className="text-violet-400" strokeWidth={1.5} />
-              <p className="text-sm font-semibold text-white">OnChain Events</p>
+              <Hexagon size={14} className="text-cyan-300" strokeWidth={1.5} />
+              <p className="text-sm font-semibold text-white">Hostr</p>
             </div>
             <p className="mt-0.5 text-xs text-zinc-600">
               Decentralised event management · Kaolin Testnet
@@ -49,7 +49,7 @@ export function Footer() {
 
         {}
         <div className="mt-6 flex flex-col items-center gap-1 border-t border-white/5 pt-6 sm:flex-row sm:justify-between">
-          <p className="text-xs text-zinc-700">© 2026 OnChain Events</p>
+          <p className="text-xs text-zinc-700">© 2026 Hostr</p>
           <a
             href={ARKIV_SITE}
             target="_blank"

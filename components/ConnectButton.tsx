@@ -29,8 +29,9 @@ export function ConnectButton({ className }: ConnectButtonProps) {
         disabled={isConnecting}
         className={[
           "inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold",
-          "border-2 border-transparent bg-gradient-to-r from-purple-500 to-pink-500",
-          "text-white hover:opacity-90 shadow-sm",
+          "border border-white/30 bg-transparent",
+          "text-white hover:bg-white/10 hover:border-white/70",
+          "shadow-sm",
           "disabled:opacity-50 disabled:cursor-not-allowed",
           "transition-all duration-150",
           className ?? "",

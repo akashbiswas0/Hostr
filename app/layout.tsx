@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "OnChain Events",
+  title: "Hostr",
   description: "A decentralised event platform built on Arkiv.",
 };
 

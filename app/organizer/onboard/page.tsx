@@ -76,7 +76,7 @@ export default function OnboardPage() {
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
       {}
-      <nav className="border-b border-white/5 bg-zinc-950/80 backdrop-blur-md">
+      <nav className="border-b border-white/10 bg-transparent backdrop-blur-xl supports-[backdrop-filter]:bg-zinc-950/20">
         <div className="mx-auto flex max-w-2xl items-center justify-between px-4 py-3 sm:px-6">
           <Link href="/" className="flex items-center gap-1.5 text-sm text-zinc-400 hover:text-white transition-colors">
             <ArrowLeft size={14} /> Back
