@@ -169,41 +169,48 @@ export async function updateEventDetails(
 }
 
 /**
- * Atomically reads the current rsvpCount attribute from the entity, computes +1 or -1
- * (floored at 0), then writes back the updated attributes via updateEntity.
+ * Updates the rsvpCount attribute on the event entity by deriving the real count
+ * from actual RSVP child entities (source-of-truth approach).
  *
- * NOTE: This uses a read-then-write pattern which is as atomic as the SDK allows
- * (single updateEntity call). In high-concurrency scenarios, two simultaneous
- * increments could read the same value and both write count+1 instead of count+2.
- * This is acceptable for the testnet environment.
+ * The old read-increment-write pattern had a TOCTOU race: two simultaneous RSVPs
+ * could both read rsvpCount=N and both write N+1, silently losing one increment
+ * and corrupting capacity enforcement. By querying the live RSVP entity set and
+ * counting them, concurrent writes all converge to the same correct value instead
+ * of diverging. The `_increment` parameter is retained for API compatibility.
  */
 export async function updateRsvpCount(
   walletClient: WalletArkivClient<Transport, Chain, Account>,
   publicClient: PublicArkivClient,
   entityKey: Hex,
-  increment: boolean,
+  _increment: boolean,
 ): Promise<ArkivResult<{ entityKey: Hex; txHash: Hex }>> {
   try {
-    
-    const entity = await publicClient.getEntity(entityKey)
+    // Fetch the event entity and all its RSVP children in parallel
+    const [entity, rsvpResult] = await Promise.all([
+      publicClient.getEntity(entityKey),
+      publicClient
+        .buildQuery()
+        .where([
+          eq("type", ENTITY_TYPES.RSVP),
+          eq("eventKey", entityKey),
+        ])
+        .withAttributes()
+        .fetch(),
+    ])
 
-    
-    const rsvpAttr = entity.attributes.find((a) => a.key === "rsvpCount")
-    const currentCount = Number(rsvpAttr?.value ?? 0)
-    const newCount = increment
-      ? currentCount + 1
-      : Math.max(0, currentCount - 1)
+    // Count only active RSVPs — exclude "not-going" (cancelled) entries
+    const actualCount = rsvpResult.entities.filter((e) => {
+      const status = e.attributes.find((a) => a.key === "status")?.value
+      return status !== "not-going"
+    }).length
 
-    
     const attrs = entity.attributes.map((a) =>
-      a.key === "rsvpCount" ? { key: "rsvpCount", value: newCount } : a,
+      a.key === "rsvpCount" ? { key: "rsvpCount", value: actualCount } : a,
     )
 
-    
     const eventData = entity.toJson() as Event
     const expiresIn = secondsUntil(eventData.endDate)
 
-    
     const result = await walletClient.updateEntity({
       entityKey,
       payload: entity.payload ?? jsonToPayload(eventData),
