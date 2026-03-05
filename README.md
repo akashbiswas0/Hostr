@@ -195,7 +195,7 @@ Open [http://localhost:3000](http://localhost:3000). No `.env` file required —
 | Framework | Next.js 15 (App Router) |
 | Styling | Tailwind CSS v4 |
 | Blockchain | Arkiv SDK · Kaolin testnet |
-| Wallet | wagmi v3 + ConnectKit |
+| Wallet | wagmi v3 + MetaMask injected connector |
 | Data fetching | TanStack Query v5 |
 | Notifications | react-hot-toast |
 

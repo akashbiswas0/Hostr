@@ -1,6 +1,5 @@
 "use client";
 
-import { ConnectKitButton } from "connectkit";
 import { Wallet } from "lucide-react";
 import { useWallet } from "@/hooks/useWallet";
 
@@ -13,99 +12,91 @@ interface ConnectButtonProps {
 }
 
 export function ConnectButton({ className }: ConnectButtonProps) {
-  const { address, isConnected, isCorrectChain, switchToKaolin, disconnect } =
-    useWallet();
+  const {
+    address,
+    connect,
+    disconnect,
+    isConnected,
+    isConnecting,
+    isCorrectChain,
+    switchToKaolin,
+  } = useWallet();
 
+  if (!isConnected || !address) {
+    return (
+      <button
+        onClick={connect}
+        disabled={isConnecting}
+        className={[
+          "inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold",
+          "border-2 border-transparent bg-gradient-to-r from-purple-500 to-pink-500",
+          "text-white hover:opacity-90 shadow-sm",
+          "disabled:opacity-50 disabled:cursor-not-allowed",
+          "transition-all duration-150",
+          className ?? "",
+        ]
+          .join(" ")
+          .trim()}
+      >
+        {isConnecting ? (
+          <>
+            <Spinner />
+            Connecting…
+          </>
+        ) : (
+          <>
+            <Wallet size={15} />
+            Connect MetaMask
+          </>
+        )}
+      </button>
+    );
+  }
+
+  if (!isCorrectChain) {
+    return (
+      <div className={`flex items-center gap-2 ${className ?? ""}`}>
+        <span className="rounded-full bg-zinc-800 px-3 py-1 font-mono text-xs text-zinc-300">
+          {truncate(address)}
+        </span>
+        <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 border border-amber-200 px-2.5 py-1 text-xs font-medium text-amber-700">
+          <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+          Wrong network
+        </span>
+        <button
+          onClick={switchToKaolin}
+          className="rounded-full bg-amber-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-600 transition-colors"
+        >
+          Switch to Kaolin
+        </button>
+      </div>
+    );
+  }
+
+  const initials = address.slice(2, 4).toUpperCase();
   return (
-    <ConnectKitButton.Custom>
-      {({ isConnecting, show }) => {
-        
-        if (!isConnected || !address) {
-          return (
-            <button
-              onClick={show}
-              disabled={isConnecting}
-              className={[
-                "inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold",
-                "border-2 border-transparent bg-gradient-to-r from-purple-500 to-pink-500",
-                "text-white hover:opacity-90 shadow-sm",
-                "disabled:opacity-50 disabled:cursor-not-allowed",
-                "transition-all duration-150",
-                className ?? "",
-              ]
-                .join(" ")
-                .trim()}
-            >
-              {isConnecting ? (
-                <>
-                  <Spinner />
-                  Connecting…
-                </>
-              ) : (
-                <>
-                  <Wallet size={15} />
-                  Sign in
-                </>
-              )}
-            </button>
-          );
-        }
+    <div className={`flex items-center gap-2 ${className ?? ""}`}>
+      <div className="flex items-center gap-2 rounded-full border border-gray-200 bg-white px-2.5 py-1.5">
+        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-br from-purple-500 to-pink-500 text-[10px] font-bold text-white">
+          {initials}
+        </span>
+        <span className="font-mono text-xs text-gray-700">
+          {truncate(address)}
+        </span>
+      </div>
 
-        
-        if (!isCorrectChain) {
-          return (
-            <div className={`flex items-center gap-2 ${className ?? ""}`}>
-              <span className="rounded-full bg-zinc-800 px-3 py-1 font-mono text-xs text-zinc-300">
-                {truncate(address)}
-              </span>
-              <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 border border-amber-200 px-2.5 py-1 text-xs font-medium text-amber-700">
-                <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
-                Wrong network
-              </span>
-              <button
-                onClick={switchToKaolin}
-                className="rounded-full bg-amber-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-600 transition-colors"
-              >
-                Switch to Kaolin
-              </button>
-            </div>
-          );
-        }
+      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 border border-emerald-200 px-2.5 py-1 text-xs font-medium text-emerald-700">
+        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+        Kaolin
+      </span>
 
-        
-        const initials = address.slice(2, 4).toUpperCase();
-        return (
-          <div className={`flex items-center gap-2 ${className ?? ""}`}>
-            {}
-            <button
-              onClick={show}
-              className="flex items-center gap-2 rounded-full border border-gray-200 bg-white px-2.5 py-1.5 hover:border-gray-300 hover:shadow-sm transition-all"
-            >
-              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-br from-purple-500 to-pink-500 text-[10px] font-bold text-white">
-                {initials}
-              </span>
-              <span className="font-mono text-xs text-gray-700">
-                {truncate(address)}
-              </span>
-            </button>
-
-            {}
-            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 border border-emerald-200 px-2.5 py-1 text-xs font-medium text-emerald-700">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-              Kaolin
-            </span>
-
-            {}
-            <button
-              onClick={disconnect}
-              className="rounded-full border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-500 hover:border-gray-300 hover:text-gray-700 transition-colors"
-            >
-              Disconnect
-            </button>
-          </div>
-        );
-      }}
-    </ConnectKitButton.Custom>
+      <button
+        onClick={disconnect}
+        className="rounded-full border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-500 hover:border-gray-300 hover:text-gray-700 transition-colors"
+      >
+        Disconnect
+      </button>
+    </div>
   );
 }
 
