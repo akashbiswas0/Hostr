@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import toast from "react-hot-toast";
+import { AlertTriangle, Lock, ShieldOff, ArrowLeft, ArrowRight, Check } from "lucide-react";
 
 import { useOrganizer } from "@/hooks/useOrganizer";
 import { useWallet } from "@/hooks/useWallet";
@@ -59,7 +60,9 @@ export default function EditOrganizerPage() {
     return (
       <div className="flex min-h-screen items-center justify-center bg-zinc-950 p-6">
         <div className="text-center space-y-4 max-w-sm">
-          <div className="text-4xl">{isConnected ? "⚠️" : "🔐"}</div>
+          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-zinc-900 border border-white/10 mx-auto">
+            {isConnected ? <AlertTriangle size={24} className="text-amber-400" /> : <Lock size={24} className="text-violet-400" />}
+          </div>
           <h2 className="text-lg font-bold text-white">
             {isConnected ? "Wrong network" : "Wallet required"}
           </h2>
@@ -82,16 +85,18 @@ export default function EditOrganizerPage() {
     return (
       <div className="flex min-h-screen items-center justify-center bg-zinc-950 p-6">
         <div className="text-center space-y-4 max-w-sm">
-          <div className="text-4xl">🚫</div>
+          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-zinc-900 border border-white/10 mx-auto">
+            <ShieldOff size={24} className="text-rose-400" />
+          </div>
           <h2 className="text-lg font-bold text-white">Not authorized</h2>
           <p className="text-sm text-zinc-500">
             You can only edit your own organizer profile.
           </p>
           <Link
             href={`/organizers/${profileWallet}`}
-            className="block text-sm text-violet-400 hover:underline"
+            className="flex items-center gap-1.5 text-sm text-violet-400 hover:underline"
           >
-            ← View profile
+            <ArrowLeft size={14} /> View profile
           </Link>
         </div>
       </div>
@@ -138,9 +143,9 @@ export default function EditOrganizerPage() {
         </Link>
         <Link
           href={`/organizers/${profileWallet}`}
-          className="text-xs text-zinc-500 hover:text-white transition-colors"
+          className="flex items-center gap-1.5 text-xs text-zinc-500 hover:text-white transition-colors"
         >
-          ← Profile
+          <ArrowLeft size={14} /> Profile
         </Link>
       </nav>
 
@@ -247,8 +252,8 @@ export default function EditOrganizerPage() {
           {}
           {saved && (
             <div className="rounded-lg border border-emerald-700/30 bg-emerald-950/20 px-4 py-3">
-              <p className="text-xs text-emerald-400">
-                ✓ Profile saved on-chain. Redirecting…
+              <p className="text-xs text-emerald-400 flex items-center gap-1.5">
+                <Check size={12} /> Profile saved on-chain. Redirecting…
               </p>
             </div>
           )}
@@ -281,9 +286,9 @@ export default function EditOrganizerPage() {
           <p className="text-center text-xs text-zinc-600">
             <Link
               href="/organizer/dashboard"
-              className="text-violet-500 hover:underline"
+              className="flex items-center justify-center gap-1 text-violet-500 hover:underline"
             >
-              → Go to Organizer Dashboard
+              <ArrowRight size={12} /> Go to Organizer Dashboard
             </Link>
           </p>
         </form>

@@ -12,10 +12,13 @@ import type { ArkivResult } from "../types"
 
 const CONTENT_TYPE = "application/json" as const
 
+// Result is rounded DOWN to a multiple of 2 (BLOCK_TIME) so that
+// `expiresIn / BLOCK_TIME` is always an integer when the SDK converts to blocks.
 function expiresInFromEventEnd(eventEndDate: number): number {
   const secondsFromNow =
     eventEndDate - Math.floor(Date.now() / 1_000)
-  return Math.floor(Math.max(secondsFromNow, ExpirationTime.fromHours(1)))
+  const seconds = Math.floor(Math.max(secondsFromNow, ExpirationTime.fromHours(1)))
+  return Math.floor(seconds / 2) * 2
 }
 
 export async function createCheckinEntity(

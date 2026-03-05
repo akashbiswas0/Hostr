@@ -88,13 +88,13 @@ export interface EventCardSkeletonProps {
 
 export function EventCardSkeleton() {
   return (
-    <div className="rounded-2xl bg-white border border-gray-100 shadow-sm overflow-hidden animate-pulse">
-      <div className="h-28 bg-gray-100" />
+    <div className="rounded-2xl bg-zinc-900 border border-white/5 overflow-hidden animate-pulse">
+      <div className="h-28 bg-zinc-800" />
       <div className="p-4 space-y-3">
-        <div className="h-4 w-3/4 rounded-lg bg-gray-100" />
-        <div className="h-3 w-1/2 rounded-lg bg-gray-100" />
-        <div className="h-3 w-2/3 rounded-lg bg-gray-100" />
-        <div className="h-9 rounded-full bg-gray-100 mt-2" />
+        <div className="h-4 w-3/4 rounded-lg bg-zinc-800" />
+        <div className="h-3 w-1/2 rounded-lg bg-zinc-800" />
+        <div className="h-3 w-2/3 rounded-lg bg-zinc-800" />
+        <div className="h-9 rounded-full bg-zinc-800 mt-2" />
       </div>
     </div>
   );
@@ -120,7 +120,7 @@ export function EventCard({ entity, event }: EventCardProps) {
   return (
     <Link
       href={`/events/${entity.key}`}
-      className="group flex flex-col rounded-2xl bg-white border border-gray-100 shadow-sm overflow-hidden hover:shadow-md transition-all duration-200 cursor-pointer"
+      className="group flex flex-col rounded-2xl bg-zinc-900 border border-white/5 overflow-hidden hover:border-white/10 hover:bg-zinc-800/80 transition-all duration-200 cursor-pointer"
     >
       {}
       <div className={`relative h-28 bg-gradient-to-br ${gradient}`}>
@@ -139,7 +139,7 @@ export function EventCard({ entity, event }: EventCardProps) {
       {}
       <div className="flex flex-col flex-1 p-4 gap-3">
         {}
-        <h3 className="font-semibold text-gray-900 text-base leading-snug line-clamp-2 group-hover:text-purple-600 transition-colors">
+        <h3 className="font-semibold text-white text-base leading-snug line-clamp-2 group-hover:text-violet-300 transition-colors">
           {event.title}
         </h3>
 
@@ -148,31 +148,31 @@ export function EventCard({ entity, event }: EventCardProps) {
           <span className="flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-br from-purple-500 to-pink-500 text-[10px] font-bold text-white shrink-0">
             {organizer.slice(0, 2).toUpperCase()}
           </span>
-          <span className={`text-xs truncate ${organizerNameAttr ? "text-gray-700 font-medium" : "text-gray-500 font-mono"}`}>
+          <span className={`text-xs truncate ${organizerNameAttr ? "text-zinc-300 font-medium" : "text-zinc-500 font-mono"}`}>
             {organizer}
           </span>
         </div>
 
         {}
-        <div className="flex items-center gap-1.5 text-xs text-gray-500">
+        <div className="flex items-center gap-1.5 text-xs text-zinc-500">
           <Calendar size={12} className="shrink-0" />
           <span>{formatDate(event.date)}</span>
         </div>
 
         {}
-        <div className="flex items-center gap-1.5 text-xs text-gray-500 truncate">
+        <div className="flex items-center gap-1.5 text-xs text-zinc-500 truncate">
           <MapPin size={12} className="shrink-0" />
           <span className="truncate">{event.location || "Online"}</span>
         </div>
 
         {}
-        <div className="flex items-center gap-1.5 text-xs text-gray-500">
+        <div className="flex items-center gap-1.5 text-xs text-zinc-500">
           <Users size={12} className="shrink-0" />
           <span>
             {rsvpCount} / {event.capacity} attending
           </span>
           {isFull && (
-            <span className="rounded-full bg-rose-50 text-rose-600 text-[10px] font-semibold px-2 py-0.5">
+            <span className="rounded-full bg-rose-900/30 text-rose-400 text-[10px] font-semibold px-2 py-0.5">
               Full
             </span>
           )}
@@ -181,15 +181,15 @@ export function EventCard({ entity, event }: EventCardProps) {
         {}
         <div className="mt-auto pt-2">
           {isEnded ? (
-            <div className="w-full rounded-full bg-gray-100 py-2 text-center text-xs font-semibold text-gray-400">
+            <div className="w-full rounded-full bg-zinc-800 py-2 text-center text-xs font-semibold text-zinc-500">
               Ended
             </div>
           ) : isFull ? (
-            <div className="w-full rounded-full bg-gray-100 py-2 text-center text-xs font-semibold text-gray-500">
+            <div className="w-full rounded-full bg-zinc-800 py-2 text-center text-xs font-semibold text-zinc-400">
               Join Waitlist
             </div>
           ) : (
-            <div className="w-full rounded-full bg-gradient-to-r from-purple-500 to-pink-500 py-2 text-center text-xs font-semibold text-white group-hover:opacity-90 transition-opacity">
+            <div className="w-full rounded-full bg-violet-600 py-2 text-center text-xs font-semibold text-white group-hover:bg-violet-500 transition-colors">
               RSVP
             </div>
           )}

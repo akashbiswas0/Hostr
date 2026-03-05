@@ -1,6 +1,7 @@
 "use client";
 
 import type { Hex } from "viem";
+import { Check, X } from "lucide-react";
 import { ChainLink } from "./ChainLink";
 
 export type TxState = "idle" | "pending" | "success" | "error";
@@ -39,7 +40,7 @@ export function TransactionStatus({
     return (
       <div className="rounded-xl border border-emerald-700/30 bg-emerald-950/20 px-4 py-3 space-y-2">
         <div className="flex items-center gap-2">
-          <span className="text-emerald-400">✓</span>
+          <Check size={14} className="text-emerald-400 shrink-0" />
           <span className="text-sm text-emerald-300 font-medium">{successMessage}</span>
         </div>
         {(entityKey || txHash) && (

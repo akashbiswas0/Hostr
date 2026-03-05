@@ -41,10 +41,10 @@ export const DEFAULT_FILTERS: FilterState = {
 };
 
 const inputCls =
-  "w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-100 transition-colors";
+  "w-full rounded-lg border border-white/10 bg-zinc-800 px-3 py-2 text-sm text-white placeholder-zinc-500 focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500/30 transition-colors";
 
 const selectCls =
-  "w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-100 transition-colors appearance-none cursor-pointer";
+  "w-full rounded-lg border border-white/10 bg-zinc-800 px-3 py-2 text-sm text-white focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500/30 transition-colors appearance-none cursor-pointer";
 
 export function FilterBar({ filters, onChange, onClear, showKeyword = true }: FilterBarProps) {
   const hasFilters =
@@ -60,12 +60,11 @@ export function FilterBar({ filters, onChange, onClear, showKeyword = true }: Fi
   }
 
   return (
-    <div className="rounded-2xl border border-gray-100 bg-gray-50 p-4 shadow-sm">
+    <div className="rounded-2xl border border-white/5 bg-zinc-900 p-4">
       {}
       {showKeyword && (
         <div className="mb-3">
-          <label className="mb-1 block text-xs font-medium text-gray-500">
-            Search events
+          <label className="mb-1 block text-xs font-medium text-zinc-500">
           </label>
           <div className="relative">
             <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-gray-400">
@@ -84,7 +83,7 @@ export function FilterBar({ filters, onChange, onClear, showKeyword = true }: Fi
             {filters.keyword && (
               <button
                 onClick={() => update("keyword", "")}
-                className="absolute inset-y-0 right-2.5 flex items-center text-gray-400 hover:text-gray-700 transition-colors"
+                className="absolute inset-y-0 right-2.5 flex items-center text-zinc-500 hover:text-white transition-colors"
                 aria-label="Clear search"
               >
                 <svg className="h-3.5 w-3.5" viewBox="0 0 12 12" fill="none">
@@ -99,7 +98,7 @@ export function FilterBar({ filters, onChange, onClear, showKeyword = true }: Fi
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
         {}
         <div className="relative">
-          <label className="mb-1 block text-xs font-medium text-gray-500">
+          <label className="mb-1 block text-xs font-medium text-zinc-500">
             Category
           </label>
           <div className="relative">
@@ -121,7 +120,7 @@ export function FilterBar({ filters, onChange, onClear, showKeyword = true }: Fi
 
         {}
         <div>
-          <label className="mb-1 block text-xs font-medium text-gray-500">
+          <label className="mb-1 block text-xs font-medium text-zinc-500">
             Location
           </label>
           <input
@@ -135,7 +134,7 @@ export function FilterBar({ filters, onChange, onClear, showKeyword = true }: Fi
 
         {}
         <div>
-          <label className="mb-1 block text-xs font-medium text-gray-500">
+          <label className="mb-1 block text-xs font-medium text-zinc-500">
             From date
           </label>
           <input
@@ -148,7 +147,7 @@ export function FilterBar({ filters, onChange, onClear, showKeyword = true }: Fi
 
         {}
         <div>
-          <label className="mb-1 block text-xs font-medium text-gray-500">
+          <label className="mb-1 block text-xs font-medium text-zinc-500">
             To date
           </label>
           <input
@@ -161,7 +160,7 @@ export function FilterBar({ filters, onChange, onClear, showKeyword = true }: Fi
 
         {}
         <div className="flex flex-col gap-1">
-          <label className="mb-1 block text-xs font-medium text-gray-500">
+          <label className="mb-1 block text-xs font-medium text-zinc-500">
             Status
           </label>
           <div className="flex gap-2">
@@ -182,7 +181,7 @@ export function FilterBar({ filters, onChange, onClear, showKeyword = true }: Fi
             {hasFilters && (
               <button
                 onClick={onClear}
-                className="shrink-0 rounded-lg border border-gray-200 px-3 py-2 text-xs text-gray-500 hover:border-gray-300 hover:text-gray-800 hover:bg-white transition-colors"
+                className="shrink-0 rounded-lg border border-white/10 px-3 py-2 text-xs text-zinc-500 hover:border-white/20 hover:text-white transition-colors"
                 title="Clear all filters"
               >
                 Clear
@@ -245,11 +244,11 @@ function FilterPill({
   onRemove: () => void;
 }) {
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-full bg-purple-50 px-2.5 py-0.5 text-xs font-medium text-purple-700 ring-1 ring-purple-200">
+    <span className="inline-flex items-center gap-1.5 rounded-full bg-violet-900/30 px-2.5 py-0.5 text-xs font-medium text-violet-300 ring-1 ring-violet-700/40">
       {label}
       <button
         onClick={onRemove}
-        className="hover:text-purple-900 transition-colors"
+        className="hover:text-white transition-colors"
         aria-label={`Remove ${label} filter`}
       >
         <svg
@@ -274,7 +273,7 @@ function ChevronIcon() {
   return (
     <div className="pointer-events-none absolute inset-y-0 right-2.5 flex items-center">
       <svg
-        className="h-3.5 w-3.5 text-gray-400"
+        className="h-3.5 w-3.5 text-zinc-500"
         viewBox="0 0 12 12"
         fill="none"
       >

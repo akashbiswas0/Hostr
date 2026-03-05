@@ -6,6 +6,7 @@ import toast from "react-hot-toast";
 import type { Hex } from "viem";
 import type { Entity } from "@arkiv-network/sdk";
 import { QRCodeSVG } from "qrcode.react";
+import { Lock, AlertTriangle, Calendar, MapPin, Ticket } from "lucide-react";
 
 import { useMyRsvps } from "@/hooks/useRsvp";
 import { useEvent } from "@/hooks/useEvent";
@@ -78,7 +79,9 @@ export default function MyRsvpsPage() {
         {}
         {!isConnected ? (
           <div className="flex flex-col items-center gap-5 rounded-2xl border border-dashed border-white/10 py-20 text-center">
-            <div className="text-4xl">🔐</div>
+            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-zinc-900 border border-white/10">
+              <Lock size={24} className="text-violet-400" />
+            </div>
             <div>
               <p className="text-base font-semibold text-white">
                 Connect your wallet
@@ -91,7 +94,9 @@ export default function MyRsvpsPage() {
           </div>
         ) : !isCorrectChain ? (
           <div className="flex flex-col items-center gap-5 rounded-2xl border border-dashed border-amber-700/30 py-20 text-center">
-            <div className="text-4xl">⚠️</div>
+            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-zinc-900 border border-amber-700/30">
+              <AlertTriangle size={24} className="text-amber-400" />
+            </div>
             <div>
               <p className="text-base font-semibold text-white">Wrong network</p>
               <p className="mt-1 text-sm text-amber-400">
@@ -232,8 +237,8 @@ function RsvpRow({
                 {event.title}
               </Link>
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-zinc-500">
-                <span>📅 {formatDate(event.date)}</span>
-                <span>📍 {event.location}</span>
+                <span className="flex items-center gap-1"><Calendar size={11} /> {formatDate(event.date)}</span>
+                <span className="flex items-center gap-1"><MapPin size={11} /> {event.location}</span>
               </div>
             </>
           ) : (
@@ -357,7 +362,9 @@ function WaitlistPosition({ eventKey, myRsvpKey }: { eventKey: Hex; myRsvpKey: H
 function EmptyState() {
   return (
     <div className="flex flex-col items-center gap-5 rounded-2xl border border-dashed border-white/10 py-20 text-center">
-      <div className="text-4xl">🎟</div>
+      <div className="flex h-16 w-16 items-center justify-center rounded-full bg-zinc-900 border border-white/10">
+        <Ticket size={24} className="text-zinc-500" />
+      </div>
       <div>
         <p className="text-base font-semibold text-white">No RSVPs yet</p>
         <p className="mt-1 text-sm text-zinc-500">
@@ -393,30 +400,4 @@ function LoadingSkeleton() {
   );
 }
 
-function ArrowLeftIcon() {
-  return (
-    <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none">
-      <path
-        d="M10 12L6 8l4-4"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
 
-function ExternalLinkIcon() {
-  return (
-    <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none">
-      <path
-        d="M6 3H3a1 1 0 00-1 1v9a1 1 0 001 1h9a1 1 0 001-1v-3M9 2h5m0 0v5m0-5L7 10"
-        stroke="currentColor"
-        strokeWidth="1.2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}

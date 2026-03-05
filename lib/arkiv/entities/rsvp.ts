@@ -12,10 +12,13 @@ import type { ArkivResult, RSVP, RSVPStatus } from "../types"
 
 const CONTENT_TYPE = "application/json" as const
 
+// Result is rounded DOWN to a multiple of 2 (BLOCK_TIME) so that
+// `expiresIn / BLOCK_TIME` is always an integer when the SDK converts to blocks.
 function expiresInFromEventEnd(eventEndDate: number): number {
   const secondsFromNow =
     eventEndDate - Math.floor(Date.now() / 1_000)
-  return Math.floor(Math.max(secondsFromNow, ExpirationTime.fromHours(1)))
+  const seconds = Math.floor(Math.max(secondsFromNow, ExpirationTime.fromHours(1)))
+  return Math.floor(seconds / 2) * 2
 }
 
 export async function createRsvpEntity(
@@ -158,7 +161,7 @@ export async function confirmRsvp(
       expiresIn: Math.floor(Math.max(
         eventEndDate - Math.floor(Date.now() / 1_000),
         ExpirationTime.fromHours(1),
-      )),
+      ) / 2) * 2,
     })
 
     // Increment event rsvpCount — organizer owns the event so this works
@@ -197,7 +200,7 @@ export async function rejectRsvp(
       expiresIn: Math.floor(Math.max(
         eventEndDate - Math.floor(Date.now() / 1_000),
         ExpirationTime.fromHours(1),
-      )),
+      ) / 2) * 2,
     })
     return { success: true, data: result as { entityKey: Hex; txHash: Hex } }
   } catch (error) {

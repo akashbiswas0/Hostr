@@ -1,0 +1,465 @@
+"use client";
+
+import { useState, useCallback, useRef } from "react";
+import { useParams } from "next/navigation";
+import Link from "next/link";
+import dynamic from "next/dynamic";
+import type { Hex } from "viem";
+import toast from "react-hot-toast";
+import {
+  ArrowLeft,
+  QrCode,
+  KeyRound,
+  CheckCircle2,
+  XCircle,
+  Loader2,
+  User,
+  ShieldOff,
+  Lock,
+  AlertTriangle,
+  ScanLine,
+} from "lucide-react";
+
+import { useEvent } from "@/hooks/useEvent";
+import { useWallet } from "@/hooks/useWallet";
+import { publicClient } from "@/lib/arkiv/client";
+import { hasAttendeeCheckedIn, createCheckinEntity } from "@/lib/arkiv/entities/checkin";
+import { getApprovalForRsvp } from "@/lib/arkiv/entities/rsvp";
+import { OrganizerNav } from "@/components/OrganizerNav";
+import { ConnectButton } from "@/components/ConnectButton";
+import type { RSVP } from "@/lib/arkiv/types";
+
+// Dynamically import the QR scanner so it only loads on the client (requires browser camera API)
+const QrScanner = dynamic(
+  () => import("@/components/QrScanner").then((m) => m.QrScanner),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex items-center justify-center h-52 text-zinc-500 text-sm gap-2">
+        <Loader2 size={16} className="animate-spin" />
+        Loading camera…
+      </div>
+    ),
+  },
+);
+
+// ─── Types ───────────────────────────────────────────────────────────────────
+
+type PageState =
+  | { kind: "idle" }
+  | { kind: "scanning" }
+  | { kind: "manual" }
+  | { kind: "verifying"; rsvpKey: string }
+  | { kind: "success"; attendeeName: string; attendeeWallet: string; txHash: string }
+  | { kind: "already-checked-in"; attendeeName: string }
+  | { kind: "error"; message: string };
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function truncate(addr: string) {
+  if (!addr || addr.length < 10) return addr;
+  return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
+}
+
+function toMs(value: unknown): number {
+  if (!value && value !== 0) return NaN;
+  const str = String(value);
+  if (!str.trim()) return NaN;
+  if (/^\d+$/.test(str)) return Number(str) * 1_000;
+  return Date.parse(str);
+}
+
+const EXPLORER = "https://explorer.kaolin.hoodi.arkiv.network";
+
+// ─── Page ────────────────────────────────────────────────────────────────────
+
+export default function CheckinPage() {
+  const params = useParams();
+  const entityKey = params.entityKey as Hex;
+
+  const { event, entity: eventEntity, isLoading: isEventLoading } = useEvent(entityKey);
+  const { address, isConnected, isCorrectChain, walletClient } = useWallet();
+
+  const [state, setState] = useState<PageState>({ kind: "idle" });
+  const [manualInput, setManualInput] = useState("");
+
+  // Prevent double-processing if the QR scanner fires the callback twice
+  const processingRef = useRef(false);
+
+  // ── Core verify + check-in logic ──────────────────────────────────────────
+  const processRsvpKey = useCallback(
+    async (rawKey: string) => {
+      if (!walletClient || !event) return;
+      if (processingRef.current) return;
+      processingRef.current = true;
+
+      const rsvpKey = rawKey.trim() as Hex;
+      setState({ kind: "verifying", rsvpKey });
+
+      try {
+        // 1. Fetch the RSVP entity from on-chain
+        let rsvpEntity;
+        try {
+          rsvpEntity = await publicClient.getEntity(rsvpKey);
+        } catch {
+          setState({
+            kind: "error",
+            message: "RSVP entity not found. Make sure you scanned the correct QR code.",
+          });
+          return;
+        }
+
+        // 2. Verify it's typed as "rsvp"
+        const typeAttr = rsvpEntity.attributes.find((a) => a.key === "type");
+        if (typeAttr?.value !== "rsvp") {
+          setState({ kind: "error", message: "Invalid QR code — this is not an RSVP entity." });
+          return;
+        }
+
+        // 3. Verify it belongs to THIS event
+        const eventKeyAttr = rsvpEntity.attributes.find((a) => a.key === "eventKey");
+        if ((eventKeyAttr?.value as string)?.toLowerCase() !== entityKey.toLowerCase()) {
+          setState({ kind: "error", message: "This RSVP belongs to a different event." });
+          return;
+        }
+
+        // 4. Check RSVP status — "confirmed" passes immediately.
+        //    "pending" may still be valid if the organizer created an approval entity
+        //    (organizer cannot modify attendee-owned RSVP, so status stays "pending" on-chain).
+        const statusAttr = rsvpEntity.attributes.find((a) => a.key === "status");
+        const status = statusAttr?.value as string;
+
+        if (status === "waitlisted") {
+          setState({ kind: "error", message: "Cannot check in — this RSVP is on the waitlist." });
+          return;
+        }
+
+        if (status !== "confirmed" && status !== "checked-in") {
+          // status is "pending" — check if organizer has approved via approval entity
+          const approvalRes = await getApprovalForRsvp(publicClient, rsvpKey);
+          const isApproved = approvalRes.success && approvalRes.data !== null;
+          if (!isApproved) {
+            setState({
+              kind: "error",
+              message: "Cannot check in — this RSVP has not been approved yet.",
+            });
+            return;
+          }
+          // Approved via approval entity — allow check-in to proceed
+        }
+
+        // 5. Resolve attendee wallet (attribute > entity owner)
+        const walletAttr = rsvpEntity.attributes.find((a) => a.key === "attendeeWallet");
+        const attendeeWallet = ((walletAttr?.value as string) || rsvpEntity.owner || "") as Hex;
+        const rsvpData = rsvpEntity.toJson() as RSVP;
+        const attendeeName = rsvpData.attendeeName || truncate(attendeeWallet);
+
+        // 6. Prevent duplicate check-in
+        const alreadyRes = await hasAttendeeCheckedIn(publicClient, entityKey, attendeeWallet);
+        if (alreadyRes.success && alreadyRes.data) {
+          setState({ kind: "already-checked-in", attendeeName });
+          return;
+        }
+
+        // 7. Write the check-in entity on-chain
+        const endMs = toMs(event.endDate);
+        const endDateSeconds = isNaN(endMs)
+          ? Math.floor(Date.now() / 1_000) + 3_600
+          : Math.floor(endMs / 1_000);
+
+        const res = await createCheckinEntity(walletClient, entityKey, attendeeWallet, endDateSeconds);
+        if (!res.success) throw new Error(res.error);
+
+        toast.success(`${attendeeName} checked in ✓`);
+        setState({
+          kind: "success",
+          attendeeName,
+          attendeeWallet,
+          txHash: res.data.txHash,
+        });
+      } catch (err) {
+        setState({
+          kind: "error",
+          message: err instanceof Error ? err.message : String(err),
+        });
+      } finally {
+        processingRef.current = false;
+      }
+    },
+    [walletClient, event, entityKey],
+  );
+
+  function reset() {
+    setState({ kind: "idle" });
+    setManualInput("");
+  }
+
+  // ── Auth guards ───────────────────────────────────────────────────────────
+
+  if (!isConnected || !isCorrectChain) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-zinc-950 p-6">
+        <div className="text-center space-y-4">
+          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-zinc-900 border border-white/10 mx-auto">
+            {isConnected ? (
+              <AlertTriangle size={24} className="text-amber-400" />
+            ) : (
+              <Lock size={24} className="text-violet-400" />
+            )}
+          </div>
+          <h2 className="text-lg font-bold text-white">
+            {isConnected ? "Wrong network" : "Wallet required"}
+          </h2>
+          <div className="flex justify-center">
+            <ConnectButton />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (isEventLoading) {
+    return (
+      <div className="min-h-screen bg-zinc-950">
+        <OrganizerNav crumb="Check-in" />
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="animate-spin text-violet-400" size={28} />
+        </div>
+      </div>
+    );
+  }
+
+  if (!eventEntity || !event) {
+    return (
+      <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
+        <p className="text-white">Event not found</p>
+      </div>
+    );
+  }
+
+  if (address && eventEntity.owner && eventEntity.owner.toLowerCase() !== address.toLowerCase()) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-zinc-950 p-6">
+        <div className="text-center space-y-3">
+          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-zinc-900 border border-white/10 mx-auto">
+            <ShieldOff size={22} className="text-rose-400" />
+          </div>
+          <p className="text-white font-bold">Organizer access only</p>
+          <Link href="/" className="text-sm text-violet-400 hover:underline">
+            Go home
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  // ── UI ────────────────────────────────────────────────────────────────────
+
+  return (
+    <div className="min-h-screen bg-zinc-950 text-white">
+      <OrganizerNav crumb="Check-in" />
+
+      <div className="mx-auto max-w-lg px-4 py-8 space-y-6">
+        {/* Header */}
+        <div>
+          <Link
+            href={`/organizer/events/${entityKey}/attendees`}
+            className="inline-flex items-center gap-1.5 text-sm text-zinc-500 hover:text-white transition-colors mb-4"
+          >
+            <ArrowLeft size={14} /> Attendees
+          </Link>
+          <h1 className="text-2xl font-bold">Check-in Scanner</h1>
+          <p className="text-zinc-400 text-sm mt-1">{event.title}</p>
+        </div>
+
+        {/* ── State: idle ── */}
+        {state.kind === "idle" && (
+          <div className="space-y-3">
+            <button
+              onClick={() => setState({ kind: "scanning" })}
+              className="w-full flex items-center gap-4 rounded-xl border border-white/10 bg-zinc-900 p-5 hover:border-violet-500/50 hover:bg-zinc-800/80 transition-all text-left"
+            >
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-violet-600/20">
+                <QrCode size={22} className="text-violet-400" />
+              </div>
+              <div>
+                <p className="font-semibold text-white">Scan QR Code</p>
+                <p className="text-sm text-zinc-500 mt-0.5">
+                  Use camera to scan attendee&apos;s QR code
+                </p>
+              </div>
+            </button>
+
+            <button
+              onClick={() => setState({ kind: "manual" })}
+              className="w-full flex items-center gap-4 rounded-xl border border-white/10 bg-zinc-900 p-5 hover:border-violet-500/50 hover:bg-zinc-800/80 transition-all text-left"
+            >
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-zinc-700/40">
+                <KeyRound size={22} className="text-zinc-400" />
+              </div>
+              <div>
+                <p className="font-semibold text-white">Enter RSVP Key</p>
+                <p className="text-sm text-zinc-500 mt-0.5">
+                  Paste the RSVP entity key manually
+                </p>
+              </div>
+            </button>
+          </div>
+        )}
+
+        {/* ── State: scanning ── */}
+        {state.kind === "scanning" && (
+          <div className="space-y-4">
+            <div className="rounded-xl overflow-hidden border border-white/10 bg-zinc-900">
+              <div className="flex items-center gap-2 px-4 py-3 border-b border-white/5">
+                <ScanLine size={16} className="text-violet-400" />
+                <span className="text-sm font-medium">
+                  Point camera at attendee&apos;s QR code
+                </span>
+              </div>
+              <div className="p-4">
+                <QrScanner
+                  onScan={(result) => processRsvpKey(result)}
+                  onError={(err) =>
+                    setState({ kind: "error", message: `Camera error: ${err}` })
+                  }
+                />
+              </div>
+            </div>
+            <button
+              onClick={reset}
+              className="w-full rounded-xl border border-white/10 py-3 text-sm text-zinc-400 hover:text-white hover:border-white/20 transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        )}
+
+        {/* ── State: manual input ── */}
+        {state.kind === "manual" && (
+          <div className="space-y-4">
+            <div className="rounded-xl border border-white/10 bg-zinc-900 p-5 space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-zinc-400 mb-1.5">
+                  RSVP Entity Key
+                </label>
+                <input
+                  type="text"
+                  value={manualInput}
+                  onChange={(e) => setManualInput(e.target.value)}
+                  placeholder="0x…"
+                  className="w-full rounded-lg border border-white/10 bg-zinc-800 px-3 py-2.5 text-sm font-mono text-white placeholder-zinc-600 focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500/50 transition-colors"
+                />
+              </div>
+              <button
+                disabled={!manualInput.trim()}
+                onClick={() => processRsvpKey(manualInput)}
+                className="w-full rounded-xl bg-violet-600 py-3 text-sm font-semibold text-white hover:bg-violet-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                Verify &amp; Check In
+              </button>
+            </div>
+            <button
+              onClick={reset}
+              className="w-full rounded-xl border border-white/10 py-3 text-sm text-zinc-400 hover:text-white hover:border-white/20 transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        )}
+
+        {/* ── State: verifying ── */}
+        {state.kind === "verifying" && (
+          <div className="rounded-xl border border-white/10 bg-zinc-900 p-8 text-center space-y-4">
+            <Loader2 className="animate-spin text-violet-400 mx-auto" size={32} />
+            <div>
+              <p className="font-semibold text-white">Verifying RSVP…</p>
+              <p className="text-xs font-mono text-zinc-600 mt-1 break-all">
+                {state.rsvpKey}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* ── State: success ── */}
+        {state.kind === "success" && (
+          <div className="space-y-4">
+            <div className="rounded-xl border border-emerald-700/30 bg-emerald-950/30 p-6 text-center space-y-3">
+              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500/20 mx-auto">
+                <CheckCircle2 size={32} className="text-emerald-400" />
+              </div>
+              <div>
+                <p className="text-xl font-bold text-white">Checked In!</p>
+                <div className="flex items-center justify-center gap-2 mt-2">
+                  <User size={14} className="text-zinc-400" />
+                  <span className="text-zinc-300 font-medium">{state.attendeeName}</span>
+                </div>
+                <p className="font-mono text-xs text-zinc-600 mt-1">
+                  {truncate(state.attendeeWallet)}
+                </p>
+              </div>
+              <a
+                href={`${EXPLORER}/tx/${state.txHash}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-block text-xs text-violet-400 hover:underline"
+              >
+                View transaction ↗
+              </a>
+            </div>
+            <button
+              onClick={reset}
+              className="w-full rounded-xl bg-violet-600 py-3 text-sm font-semibold text-white hover:bg-violet-500 transition-colors"
+            >
+              Check In Next Attendee
+            </button>
+          </div>
+        )}
+
+        {/* ── State: already checked in ── */}
+        {state.kind === "already-checked-in" && (
+          <div className="space-y-4">
+            <div className="rounded-xl border border-amber-700/30 bg-amber-950/30 p-6 text-center space-y-3">
+              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-amber-500/20 mx-auto">
+                <AlertTriangle size={32} className="text-amber-400" />
+              </div>
+              <div>
+                <p className="text-xl font-bold text-white">Already Checked In</p>
+                <p className="text-zinc-400 text-sm mt-1">
+                  {state.attendeeName} was already checked in.
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={reset}
+              className="w-full rounded-xl border border-white/10 py-3 text-sm text-zinc-400 hover:text-white transition-colors"
+            >
+              Scan Another
+            </button>
+          </div>
+        )}
+
+        {/* ── State: error ── */}
+        {state.kind === "error" && (
+          <div className="space-y-4">
+            <div className="rounded-xl border border-rose-700/30 bg-rose-950/30 p-6 text-center space-y-3">
+              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-rose-500/20 mx-auto">
+                <XCircle size={32} className="text-rose-400" />
+              </div>
+              <div>
+                <p className="text-xl font-bold text-white">Check-in Failed</p>
+                <p className="text-zinc-400 text-sm mt-2">{state.message}</p>
+              </div>
+            </div>
+            <button
+              onClick={reset}
+              className="w-full rounded-xl border border-white/10 py-3 text-sm text-zinc-400 hover:text-white transition-colors"
+            >
+              Try Again
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

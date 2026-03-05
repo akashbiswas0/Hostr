@@ -11,23 +11,23 @@ const CONFIG: Record<
 > = {
   draft: {
     label: "Draft",
-    dot: "bg-gray-400",
-    badge: "bg-gray-100 text-gray-500",
+    dot: "bg-zinc-500",
+    badge: "bg-zinc-800/60 text-zinc-400 ring-1 ring-zinc-700/50",
   },
   upcoming: {
     label: "Upcoming",
-    dot: "bg-purple-400",
-    badge: "bg-purple-50 text-purple-700",
+    dot: "bg-violet-400",
+    badge: "bg-violet-900/30 text-violet-300 ring-1 ring-violet-700/40",
   },
   live: {
-    label: "Full",
-    dot: "bg-emerald-400",
-    badge: "bg-emerald-50 text-emerald-700",
+    label: "Live",
+    dot: "bg-emerald-400 animate-pulse",
+    badge: "bg-emerald-900/30 text-emerald-300 ring-1 ring-emerald-700/40",
   },
   ended: {
     label: "Ended",
-    dot: "bg-gray-300",
-    badge: "bg-gray-100 text-gray-400",
+    dot: "bg-zinc-600",
+    badge: "bg-zinc-800/60 text-zinc-500 ring-1 ring-zinc-700/50",
   },
 };
 

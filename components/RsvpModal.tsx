@@ -5,6 +5,7 @@ import type { Hex } from "viem";
 import type { Entity } from "@arkiv-network/sdk";
 import toast from "react-hot-toast";
 import { QRCodeSVG } from "qrcode.react";
+import { X, Lock, AlertTriangle, Clock, CheckCircle2, XCircle, ExternalLink, Link as LinkIcon, ArrowRight } from "lucide-react";
 
 import { useWallet } from "@/hooks/useWallet";
 import { publicClient } from "@/lib/arkiv/client";
@@ -191,7 +192,7 @@ export function RsvpModal({
           className="absolute right-4 top-4 text-zinc-500 hover:text-white transition-colors"
           aria-label="Close"
         >
-          <XIcon />
+          <X size={18} />
         </button>
 
         {}
@@ -211,17 +212,6 @@ export function RsvpModal({
         )}
 
         {step === "submitting" && <SubmittingStep isFull={isFull} requiresRsvp={requiresRsvp} />}
-
-        {step === "success" && (
-          <SuccessStep
-            isFull={isFull}
-            requiresRsvp={requiresRsvp}
-            isOffline={isOffline}
-            txHash={txHash}
-            rsvpEntityKey={rsvpEntityKey}
-            onClose={onClose}
-          />
-        )}
 
         {step === "success" && (
           <SuccessStep
@@ -287,15 +277,17 @@ function FormStep({
         </h2>
         {isFull && (
           <div className="mt-2 flex items-center gap-2 rounded-lg bg-amber-950/40 border border-amber-700/30 px-3 py-2">
+            <AlertTriangle size={13} className="text-amber-400 shrink-0" />
             <span className="text-amber-400 text-xs font-medium">
-              ⚠ Event is at capacity. You'll be added to the waitlist.
+              Event is at capacity. You'll be added to the waitlist.
             </span>
           </div>
         )}
         {!isFull && requiresRsvp && (
           <div className="mt-2 flex items-center gap-2 rounded-lg bg-violet-950/40 border border-violet-700/30 px-3 py-2">
+            <Lock size={13} className="text-violet-300 shrink-0" />
             <span className="text-violet-300 text-xs font-medium">
-              🔒 Attendance requires organizer approval. Your request will be reviewed.
+              Attendance requires organizer approval. Your request will be reviewed.
             </span>
           </div>
         )}
@@ -379,13 +371,14 @@ function FormStep({
           <button
             type="submit"
             disabled={!name || !email}
-            className="w-full rounded-xl bg-violet-600 py-3 text-sm font-semibold text-white hover:bg-violet-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-lg shadow-violet-900/30"
+            className="w-full rounded-xl bg-violet-600 py-3 text-sm font-semibold text-white hover:bg-violet-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-lg shadow-violet-900/30 flex items-center justify-center gap-2"
           >
             {isFull
-              ? "Join Waitlist →"
+              ? "Join Waitlist"
               : requiresRsvp
-              ? "Send Request →"
-              : "Confirm RSVP →"}
+              ? "Send Request"
+              : "Confirm RSVP"}
+            <ArrowRight size={14} />
           </button>
         </form>
       )}
@@ -407,7 +400,7 @@ function SubmittingStep({ isFull, requiresRsvp }: { isFull: boolean; requiresRsv
         <div className="absolute inset-0 rounded-full border-2 border-violet-500/20" />
         <div className="absolute inset-0 rounded-full border-2 border-transparent border-t-violet-500 animate-spin" />
         <div className="absolute inset-2 rounded-full bg-violet-900/30 flex items-center justify-center">
-          <span className="text-lg">⛓</span>
+          <LinkIcon size={16} className="text-violet-400" />
         </div>
       </div>
       <div className="text-center">
@@ -442,14 +435,18 @@ function SuccessStep({
   return (
     <div className="p-8 flex flex-col items-center gap-5">
       {/* Icon */}
-      <div className={`flex h-16 w-16 items-center justify-center rounded-full text-3xl ${
+      <div className={`flex h-16 w-16 items-center justify-center rounded-full ${
         isPending
           ? "bg-violet-900/40 border border-violet-600/30"
           : isFull
           ? "bg-amber-900/40 border border-amber-600/30"
           : "bg-emerald-900/40 border border-emerald-600/30"
       }`}>
-        {isPending ? "⏳" : isFull ? "⏰" : "✅"}
+        {isPending
+          ? <Clock size={26} className="text-violet-300" />
+          : isFull
+          ? <Clock size={26} className="text-amber-300" />
+          : <CheckCircle2 size={26} className="text-emerald-300" />}
       </div>
 
       <div className="text-center space-y-1">
@@ -494,8 +491,8 @@ function SuccessStep({
             <span className="text-zinc-400 group-hover:text-white transition-colors">
               View transaction
             </span>
-            <span className="font-mono text-violet-400 group-hover:text-violet-300 transition-colors">
-              {txHash.slice(0, 10)}… ↗
+            <span className="font-mono text-violet-400 group-hover:text-violet-300 transition-colors inline-flex items-center gap-1">
+              {txHash.slice(0, 10)}… <ExternalLink size={10} />
             </span>
           </a>
         )}
@@ -509,8 +506,8 @@ function SuccessStep({
             <span className="text-zinc-400 group-hover:text-white transition-colors">
               View RSVP entity
             </span>
-            <span className="font-mono text-violet-400 group-hover:text-violet-300 transition-colors">
-              {rsvpEntityKey.slice(0, 10)}… ↗
+            <span className="font-mono text-violet-400 group-hover:text-violet-300 transition-colors inline-flex items-center gap-1">
+              {rsvpEntityKey.slice(0, 10)}… <ExternalLink size={10} />
             </span>
           </a>
         )}
@@ -539,8 +536,8 @@ function ErrorStep({
 }) {
   return (
     <div className="p-8 flex flex-col items-center gap-5">
-      <div className="flex h-16 w-16 items-center justify-center rounded-full bg-red-900/30 border border-red-700/30 text-3xl">
-        ❌
+      <div className="flex h-16 w-16 items-center justify-center rounded-full bg-red-900/30 border border-red-700/30">
+        <XCircle size={28} className="text-red-400" />
       </div>
 
       <div className="text-center">
@@ -574,17 +571,4 @@ function ErrorStep({
   );
 }
 
-// ─── Icons ────────────────────────────────────────────────────────────────────
-
-function XIcon() {
-  return (
-    <svg className="h-5 w-5" viewBox="0 0 20 20" fill="none">
-      <path
-        d="M5 5l10 10M15 5L5 15"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
+// No custom XIcon needed — using lucide X directly

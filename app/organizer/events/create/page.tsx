@@ -4,6 +4,7 @@ import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import toast from "react-hot-toast";
+import { AlertTriangle, Lock, ClipboardList, Image as ImageIcon, ArrowLeft, ArrowRight, Check } from "lucide-react";
 
 import { useOrganizer } from "@/hooks/useOrganizer";
 import { useWallet } from "@/hooks/useWallet";
@@ -113,7 +114,9 @@ export default function CreateEventPage() {
     return (
       <div className="flex min-h-screen items-center justify-center bg-zinc-950 p-6">
         <div className="text-center space-y-4 max-w-sm">
-          <div className="text-4xl">{isConnected ? "⚠️" : "🔐"}</div>
+          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-zinc-900 border border-white/10 mx-auto">
+            {isConnected ? <AlertTriangle size={24} className="text-amber-400" /> : <Lock size={24} className="text-violet-400" />}
+          </div>
           <h2 className="text-lg font-bold text-white">
             {isConnected ? "Wrong network" : "Wallet required"}
           </h2>
@@ -134,16 +137,18 @@ export default function CreateEventPage() {
     return (
       <div className="flex min-h-screen items-center justify-center bg-zinc-950 p-6">
         <div className="text-center space-y-4 max-w-sm">
-          <div className="text-4xl">📋</div>
+          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-zinc-900 border border-white/10 mx-auto">
+            <ClipboardList size={24} className="text-violet-400" />
+          </div>
           <h2 className="text-lg font-bold text-white">Set up your profile first</h2>
           <p className="text-sm text-zinc-400">
             You need an organizer profile to create events.
           </p>
           <Link
             href="/organizer/onboard"
-            className="inline-block rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-violet-500 transition-colors"
+            className="inline-block rounded-lg bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-violet-500 transition-colors"
           >
-            Create Profile →
+            Create Profile <ArrowRight size={14} className="inline" />
           </Link>
         </div>
       </div>
@@ -239,14 +244,13 @@ function StepIndicator({ current }: { current: number }) {
             <div className="flex items-center gap-2 shrink-0">
               <div
                 className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold transition-colors ${
-                  done
-                    ? "bg-emerald-600 text-white"
-                    : active
-                      ? "bg-violet-600 text-white"
-                      : "bg-zinc-800 text-zinc-500"
+                  done ? "bg-emerald-600 text-white"
+                  : active
+                    ? "bg-violet-600 text-white"
+                    : "bg-zinc-800 text-zinc-500"
                 }`}
               >
-                {done ? "✓" : n}
+                {done ? <Check size={12} /> : n}
               </div>
               <span
                 className={`text-xs font-medium hidden sm:block ${
@@ -317,7 +321,7 @@ function Step1({
               onClick={() => fileInputRef.current?.click()}
               className="flex w-full flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-white/10 py-8 text-zinc-500 hover:border-violet-600/50 hover:text-zinc-400 transition-colors"
             >
-              <span className="text-2xl">🖼️</span>
+              <ImageIcon size={24} className="text-zinc-600" />
               <span className="text-sm">Click to upload cover image</span>
               <span className="text-xs">PNG, JPG, WebP — max 2 MB</span>
             </button>
@@ -409,7 +413,7 @@ function Step1({
           disabled={!valid}
           className="rounded-xl bg-violet-600 px-6 py-2.5 text-sm font-semibold text-white hover:bg-violet-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
         >
-          Next: When & Where →
+          Next: When &amp; Where <ArrowRight size={14} className="inline" />
         </button>
       </div>
     </div>
@@ -531,14 +535,14 @@ function Step2({
           onClick={onBack}
           className="rounded-xl border border-white/10 px-5 py-2.5 text-sm text-zinc-400 hover:text-white transition-colors"
         >
-          ← Back
+          <span className="flex items-center gap-1.5"><ArrowLeft size={14} /> Back</span>
         </button>
         <button
           onClick={onNext}
           disabled={!valid}
           className="rounded-xl bg-violet-600 px-6 py-2.5 text-sm font-semibold text-white hover:bg-violet-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
         >
-          Review →
+          <span className="flex items-center gap-1.5">Review <ArrowRight size={14} /></span>
         </button>
       </div>
     </div>
@@ -616,7 +620,7 @@ function Step3({
                 : "border-amber-700/40 bg-amber-950/20 text-amber-300"
             }`}
           >
-            {publishNow ? "✓ Publish immediately (Upcoming)" : "Save as Draft"}
+            {publishNow ? <><Check size={12} className="inline" /> Publish immediately (Upcoming)</> : "Save as Draft"}
             <span className="text-zinc-500">(click to toggle)</span>
           </button>
         </ReviewRow>
@@ -640,7 +644,7 @@ function Step3({
           disabled={submitting}
           className="rounded-xl border border-white/10 px-5 py-2.5 text-sm text-zinc-400 hover:text-white transition-colors disabled:opacity-40"
         >
-          ← Back
+          <span className="flex items-center gap-1.5"><ArrowLeft size={14} /> Back</span>
         </button>
         <button
           onClick={onSubmit}
@@ -648,14 +652,11 @@ function Step3({
           className="rounded-xl bg-violet-600 px-6 py-2.5 text-sm font-semibold text-white hover:bg-violet-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-lg shadow-violet-900/30"
         >
           {submitting ? (
-            <span className="flex items-center gap-2">
-              <SpinnerIcon />
-              Saving to blockchain…
-            </span>
+            <span className="flex items-center gap-2"><SpinnerIcon />Saving to blockchain…</span>
           ) : publishNow ? (
-            "Publish Event →"
+            <span className="flex items-center gap-1.5">Publish Event <ArrowRight size={14} /></span>
           ) : (
-            "Save as Draft →"
+            <span className="flex items-center gap-1.5">Save as Draft <ArrowRight size={14} /></span>
           )}
         </button>
       </div>

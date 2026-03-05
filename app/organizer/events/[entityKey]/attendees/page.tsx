@@ -7,6 +7,7 @@ import type { Hex } from "viem";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import type { Entity } from "@arkiv-network/sdk";
+import { AlertTriangle, Lock, ShieldOff, ArrowLeft, Download, Check, ScanLine } from "lucide-react";
 import { useEvent } from "@/hooks/useEvent";
 import { useWallet } from "@/hooks/useWallet";
 import { publicClient } from "@/lib/arkiv/client";
@@ -260,7 +261,9 @@ export default function AttendeesPage() {
     return (
       <div className="flex min-h-screen items-center justify-center bg-zinc-950 p-6">
         <div className="text-center space-y-4">
-          <div className="text-4xl">{isConnected ? "⚠️" : "🔐"}</div>
+          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-zinc-900 border border-white/10 mx-auto">
+            {isConnected ? <AlertTriangle size={24} className="text-amber-400" /> : <Lock size={24} className="text-violet-400" />}
+          </div>
           <h2 className="text-lg font-bold text-white">
             {isConnected ? "Wrong network" : "Wallet required"}
           </h2>
@@ -277,8 +280,8 @@ export default function AttendeesPage() {
       <div className="flex min-h-screen items-center justify-center bg-zinc-950 p-6">
         <div className="text-center space-y-3">
           <p className="text-white font-bold">Event not found</p>
-          <Link href="/organizer/dashboard" className="text-sm text-violet-400 hover:underline">
-            ← Dashboard
+          <Link href="/organizer/dashboard" className="flex items-center justify-center gap-1.5 text-sm text-violet-400 hover:underline">
+            <ArrowLeft size={14} /> Dashboard
           </Link>
         </div>
       </div>
@@ -293,13 +296,15 @@ export default function AttendeesPage() {
     return (
       <div className="flex min-h-screen items-center justify-center bg-zinc-950 p-6">
         <div className="text-center space-y-3">
-          <div className="text-4xl">🚫</div>
+          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-zinc-900 border border-white/10 mx-auto">
+            <ShieldOff size={22} className="text-rose-400" />
+          </div>
           <p className="text-white font-bold">Not authorized</p>
           <p className="text-sm text-zinc-400">
             Only the event owner can manage attendees.
           </p>
-          <Link href="/organizer/dashboard" className="text-sm text-violet-400 hover:underline">
-            ← Dashboard
+          <Link href="/organizer/dashboard" className="flex items-center justify-center gap-1.5 text-sm text-violet-400 hover:underline">
+            <ArrowLeft size={14} /> Dashboard
           </Link>
         </div>
       </div>
@@ -365,9 +370,9 @@ export default function AttendeesPage() {
           <div>
             <Link
               href="/organizer/dashboard"
-              className="text-sm text-zinc-500 hover:text-white transition-colors"
+              className="flex items-center gap-1.5 text-sm text-zinc-500 hover:text-white transition-colors"
             >
-              ← Dashboard
+              <ArrowLeft size={14} /> Dashboard
             </Link>
             <h1 className="mt-2 text-2xl font-bold truncate">
               {event?.title ?? "Attendees"}
@@ -399,10 +404,16 @@ export default function AttendeesPage() {
             </div>
             <button
               onClick={handleExport}
-              className="rounded-lg border border-white/10 px-3 py-2 text-xs font-medium text-zinc-300 hover:border-white/20 hover:text-white transition-colors"
+              className="rounded-lg border border-white/10 px-3 py-2 text-xs font-medium text-zinc-300 hover:border-white/20 hover:text-white transition-colors flex items-center gap-1.5"
             >
-              ↓ Export CSV
+              <Download size={13} /> Export CSV
             </button>
+            <Link
+              href={`/organizer/events/${entityKey}/checkin`}
+              className="rounded-lg border border-violet-700/40 bg-violet-950/30 px-3 py-2 text-xs font-medium text-violet-300 hover:bg-violet-900/40 hover:text-white transition-colors flex items-center gap-1.5"
+            >
+              <ScanLine size={13} /> Check-in Scanner
+            </Link>
           </div>
         </div>
 
@@ -580,7 +591,7 @@ function AttendeeRowItem({
             )}
           </button>
         ) : isCheckedIn ? (
-          <span className="text-xs text-blue-400">✓ checked in</span>
+          <span className="flex items-center gap-1 text-xs text-blue-400"><Check size={12} /> checked in</span>
         ) : null}
       </div>
     </div>

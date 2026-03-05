@@ -6,6 +6,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { Hex } from "viem";
 import type { Entity } from "@arkiv-network/sdk";
+import { SearchX, Globe, Pencil, ArrowLeft, ArrowRight, Check } from "lucide-react";
 import { publicClient } from "@/lib/arkiv/client";
 import { getOrganizerByWallet } from "@/lib/arkiv/entities/organizer";
 import { getEventsByOrganizer } from "@/lib/arkiv/entities/event";
@@ -126,16 +127,18 @@ export default function OrganizerProfilePage() {
     return (
       <div className="flex min-h-screen items-center justify-center bg-zinc-950 px-6 py-24">
         <div className="text-center space-y-4">
-          <div className="text-5xl">🔍</div>
+          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-zinc-900 border border-white/10 mx-auto">
+            <SearchX size={24} className="text-zinc-500" />
+          </div>
           <h2 className="text-xl font-bold text-white">No organizer found</h2>
           <p className="text-sm text-zinc-500">
             {truncateAddress(wallet)} hasn't created a profile yet.
           </p>
           <Link
             href="/"
-            className="inline-block mt-2 text-sm text-violet-400 hover:underline"
+            className="inline-flex items-center gap-1.5 mt-2 text-sm text-violet-400 hover:underline"
           >
-            ← Browse events
+            <ArrowLeft size={14} /> Browse events
           </Link>
         </div>
       </div>
@@ -195,7 +198,7 @@ export default function OrganizerProfilePage() {
                   </h1>
                   {/* Verified badge */}
                   <span className="inline-flex items-center gap-1 rounded-full border border-violet-700/40 bg-violet-900/30 px-2.5 py-0.5 text-xs font-medium text-violet-300">
-                    ✓ Verified organizer on Arkiv
+                    <Check size={10} /> Verified organizer on Arkiv
                   </span>
                 </div>
 
@@ -217,7 +220,7 @@ export default function OrganizerProfilePage() {
                       rel="noopener noreferrer"
                       className="flex items-center gap-1 text-xs text-zinc-400 hover:text-violet-400 transition-colors"
                     >
-                      🌐 {profile.website.replace(/^https?:\/\//, "")}
+                      <Globe size={12} /> {profile.website.replace(/^https?:\/\//, "")}
                     </a>
                   )}
                   {profile?.twitter && (
@@ -239,7 +242,7 @@ export default function OrganizerProfilePage() {
                   href={`/organizers/${wallet}/edit`}
                   className="hidden sm:inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-white/10 px-4 py-2 text-xs font-medium text-zinc-300 hover:text-white hover:border-white/20 transition-colors"
                 >
-                  ✏️ Edit Profile
+                  <Pencil size={12} /> Edit Profile
                 </Link>
               )}
             </div>
@@ -258,9 +261,9 @@ export default function OrganizerProfilePage() {
               <div className="flex gap-3">
                 <Link
                   href="/organizer/dashboard"
-                  className="text-xs text-violet-400 hover:underline"
+                  className="flex items-center gap-1 text-xs text-violet-400 hover:underline"
                 >
-                  → Organizer Dashboard
+                  <ArrowRight size={12} /> Organizer Dashboard
                 </Link>
               </div>
             )}

@@ -12,6 +12,7 @@
     "@arkiv-network/sdk": "^0.6.2",
     "@tanstack/react-query": "^5.90.21",
     "connectkit": "^1.9.1",
+    "html5-qrcode": "^2.3.8",
     "lucide-react": "^0.577.0",
     "next": "16.1.6",
     "qrcode.react": "^4.2.0",

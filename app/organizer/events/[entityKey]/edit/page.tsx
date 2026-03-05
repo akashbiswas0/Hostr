@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import toast from "react-hot-toast";
 import type { Hex } from "viem";
+import { AlertTriangle, Lock, ShieldOff, ArrowLeft, Check } from "lucide-react";
 import { useEvent } from "@/hooks/useEvent";
 import { useWallet } from "@/hooks/useWallet";
 import { publicClient } from "@/lib/arkiv/client";
@@ -74,7 +75,9 @@ export default function EditEventPage() {
     return (
       <div className="flex min-h-screen items-center justify-center bg-zinc-950 p-6">
         <div className="text-center space-y-4 max-w-sm">
-          <div className="text-4xl">{isConnected ? "⚠️" : "🔐"}</div>
+          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-zinc-900 border border-white/10 mx-auto">
+            {isConnected ? <AlertTriangle size={24} className="text-amber-400" /> : <Lock size={24} className="text-violet-400" />}
+          </div>
           <h2 className="text-lg font-bold text-white">
             {isConnected ? "Wrong network" : "Wallet required"}
           </h2>
@@ -91,8 +94,8 @@ export default function EditEventPage() {
       <div className="flex min-h-screen items-center justify-center bg-zinc-950 p-6">
         <div className="text-center space-y-3">
           <p className="text-white font-bold">Event not found</p>
-          <Link href="/organizer/dashboard" className="text-sm text-violet-400 hover:underline">
-            ← Dashboard
+          <Link href="/organizer/dashboard" className="flex items-center justify-center gap-1.5 text-sm text-violet-400 hover:underline">
+            <ArrowLeft size={14} /> Dashboard
           </Link>
         </div>
       </div>
@@ -108,7 +111,9 @@ export default function EditEventPage() {
     return (
       <div className="flex min-h-screen items-center justify-center bg-zinc-950 p-6">
         <div className="text-center space-y-3">
-          <div className="text-4xl">🚫</div>
+          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-zinc-900 border border-white/10 mx-auto">
+            <ShieldOff size={22} className="text-rose-400" />
+          </div>
           <p className="text-white font-bold">Not authorized</p>
           <p className="text-sm text-zinc-400">
             Only the event owner can edit this event.
@@ -156,9 +161,9 @@ export default function EditEventPage() {
         <div className="mb-8">
           <Link
             href="/organizer/dashboard"
-            className="text-sm text-zinc-500 hover:text-white transition-colors"
+            className="flex items-center gap-1.5 text-sm text-zinc-500 hover:text-white transition-colors"
           >
-            ← Dashboard
+            <ArrowLeft size={14} /> Dashboard
           </Link>
           <h1 className="mt-3 text-2xl font-bold text-white truncate">
             Edit: {event?.title}
@@ -296,8 +301,8 @@ export default function EditEventPage() {
 
           {saved && (
             <div className="rounded-lg border border-emerald-700/30 bg-emerald-950/20 px-4 py-3">
-              <p className="text-xs text-emerald-400">
-                ✓ Saved on-chain. Redirecting to dashboard…
+              <p className="text-xs text-emerald-400 flex items-center gap-1.5">
+                <Check size={12} /> Saved on-chain. Redirecting to dashboard…
               </p>
             </div>
           )}

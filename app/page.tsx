@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Search, ChevronRight, Zap, Shield, Globe } from "lucide-react";
+import { Search, ChevronRight, Zap, Shield, Globe, X, Calendar, SearchX, AlertTriangle } from "lucide-react";
 import { useEvents } from "@/hooks/useEvent";
 import { EventCard, EventCardSkeleton } from "@/components/EventCard";
 import { Navbar } from "@/components/Navbar";
@@ -57,34 +57,34 @@ export default function HomePage() {
   const visibleEvents = events.slice(0, visibleCount);
 
   return (
-    <div className="min-h-screen bg-white text-gray-900">
+    <div className="min-h-screen bg-zinc-950 text-white">
       <Navbar active="browse" />
 
       {}
-      <section className="relative overflow-hidden border-b border-gray-100 bg-white">
+      <section className="relative overflow-hidden border-b border-white/5 bg-zinc-950">
         {}
-        <div className="pointer-events-none absolute inset-0 opacity-[0.03]"
+        <div className="pointer-events-none absolute inset-0 opacity-[0.04]"
           style={{
             backgroundImage: "radial-gradient(circle at 1px 1px, #7c3aed 1px, transparent 0)",
-            backgroundSize: "32px 32px",
+            backgroundSize: "40px 40px",
           }}
         />
         <div className="relative mx-auto max-w-4xl px-4 py-20 sm:px-6 text-center">
           {}
-          <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-purple-200 bg-purple-50 px-3 py-1 text-xs font-medium text-purple-700">
-            <span className="h-1.5 w-1.5 rounded-full bg-purple-500 animate-pulse" />
-            On-chain event management · Kaolin Testnet ✦
+          <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-violet-700/30 bg-violet-950/30 px-3 py-1 text-xs font-medium text-violet-300">
+            <span className="h-1.5 w-1.5 rounded-full bg-violet-400 animate-pulse" />
+            On-chain event management · Kaolin Testnet
           </div>
 
-          <h1 className="mx-auto max-w-3xl text-4xl font-bold tracking-tight text-gray-900 sm:text-5xl lg:text-6xl leading-tight">
+          <h1 className="mx-auto max-w-3xl text-4xl font-bold tracking-tight text-white sm:text-5xl lg:text-6xl leading-tight">
             Discover and host
             <br />
-            <span className="bg-gradient-to-r from-purple-500 to-pink-500 bg-clip-text text-transparent">
+            <span className="text-violet-400">
               events on-chain
             </span>
           </h1>
 
-          <p className="mx-auto mt-5 max-w-xl text-base text-gray-500 sm:text-lg">
+          <p className="mx-auto mt-5 max-w-xl text-base text-zinc-400 sm:text-lg">
             Own your events. Own your community. All data lives on Arkiv — no backend, no middleman.
           </p>
 
@@ -102,15 +102,15 @@ export default function HomePage() {
                 onChange={(e) =>
                   setFilters((f) => ({ ...f, keyword: e.target.value }))
                 }
-                className="w-full rounded-full border border-gray-200 bg-white pl-10 pr-4 py-3 text-sm text-gray-900 placeholder-gray-400 focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-100 transition shadow-sm"
+                className="w-full rounded-full border border-white/10 bg-zinc-800 pl-10 pr-4 py-3 text-sm text-white placeholder-zinc-500 focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500/30 transition shadow-sm"
               />
               {filters.keyword && (
                 <button
                   onClick={() => setFilters((f) => ({ ...f, keyword: "" }))}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 transition-colors"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white transition-colors"
                   aria-label="Clear search"
                 >
-                  ×
+                  <X size={14} />
                 </button>
               )}
             </div>
@@ -119,14 +119,14 @@ export default function HomePage() {
           <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
             <a
               href="#events"
-              className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 px-6 py-2.5 text-sm font-semibold text-white hover:opacity-90 transition-opacity shadow-sm"
+              className="inline-flex items-center gap-2 rounded-full bg-violet-600 px-6 py-2.5 text-sm font-semibold text-white hover:bg-violet-500 transition-colors"
             >
               Browse Events
               <ChevronRight size={14} />
             </a>
             <Link
               href="/organizer/onboard"
-              className="inline-flex items-center gap-2 rounded-full border border-gray-200 px-6 py-2.5 text-sm font-semibold text-gray-700 hover:border-gray-300 hover:bg-gray-50 transition-colors"
+              className="inline-flex items-center gap-2 rounded-full border border-white/10 px-6 py-2.5 text-sm font-semibold text-zinc-300 hover:border-white/20 hover:text-white transition-colors"
             >
               Host an Event
             </Link>
@@ -134,17 +134,17 @@ export default function HomePage() {
 
           {}
           <div className="mt-12 grid grid-cols-3 gap-4 max-w-sm mx-auto sm:max-w-md sm:grid-cols-3">
-            <div className="flex flex-col items-center gap-1.5 rounded-xl border border-gray-100 bg-gray-50 p-3">
-              <Shield size={16} className="text-purple-500" />
-              <span className="text-xs font-medium text-gray-600">Wallet-owned</span>
+            <div className="flex flex-col items-center gap-1.5 rounded-xl border border-white/5 bg-zinc-900 p-3">
+              <Shield size={16} className="text-violet-400" />
+              <span className="text-xs font-medium text-zinc-400">Wallet-owned</span>
             </div>
-            <div className="flex flex-col items-center gap-1.5 rounded-xl border border-gray-100 bg-gray-50 p-3">
-              <Zap size={16} className="text-pink-500" />
-              <span className="text-xs font-medium text-gray-600">No backend</span>
+            <div className="flex flex-col items-center gap-1.5 rounded-xl border border-white/5 bg-zinc-900 p-3">
+              <Zap size={16} className="text-violet-400" />
+              <span className="text-xs font-medium text-zinc-400">No backend</span>
             </div>
-            <div className="flex flex-col items-center gap-1.5 rounded-xl border border-gray-100 bg-gray-50 p-3">
-              <Globe size={16} className="text-indigo-500" />
-              <span className="text-xs font-medium text-gray-600">Public access</span>
+            <div className="flex flex-col items-center gap-1.5 rounded-xl border border-white/5 bg-zinc-900 p-3">
+              <Globe size={16} className="text-violet-400" />
+              <span className="text-xs font-medium text-zinc-400">Public access</span>
             </div>
           </div>
         </div>
@@ -155,15 +155,15 @@ export default function HomePage() {
         {}
         <div className="mb-8 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">
+            <h2 className="text-2xl font-bold text-white">
               {filters.status === "live" ? "Live Now" : "Upcoming Events"}
             </h2>
-            <p className="mt-1 text-sm text-gray-500">
+            <p className="mt-1 text-sm text-zinc-500">
               Discover on-chain events happening around the world
             </p>
           </div>
           {!isLoading && !error && (
-            <span className="text-sm text-gray-400">
+            <span className="text-sm text-zinc-600">
               {events.length} event{events.length !== 1 ? "s" : ""} found
             </span>
           )}
@@ -177,8 +177,8 @@ export default function HomePage() {
               onClick={() => setActiveCategory(cat)}
               className={`shrink-0 rounded-full px-4 py-1.5 text-sm font-medium transition-all ${
                 activeCategory === cat
-                  ? "bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-sm"
-                  : "border border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50"
+                  ? "bg-violet-600 text-white"
+                  : "border border-white/10 text-zinc-400 hover:border-white/20 hover:text-white"
               }`}
             >
               {cat}
@@ -231,7 +231,7 @@ export default function HomePage() {
               <div className="mt-12 flex justify-center">
                 <button
                   onClick={() => setVisibleCount((c) => c + 9)}
-                  className="rounded-full border border-gray-200 px-8 py-3 text-sm font-semibold text-gray-700 hover:border-gray-300 hover:bg-gray-50 transition-colors"
+                className="rounded-full border border-white/10 px-8 py-3 text-sm font-semibold text-zinc-300 hover:border-white/20 hover:text-white transition-colors"
                 >
                   Load more events ({events.length - visibleCount} remaining)
                 </button>
@@ -286,17 +286,19 @@ function ErrorState({
   onRetry: () => void;
 }) {
   return (
-    <div className="flex flex-col items-center justify-center rounded-2xl border border-red-100 bg-red-50 py-16 px-6 text-center">
-      <div className="mb-4 text-4xl">⚠️</div>
-      <h3 className="text-base font-semibold text-gray-900">
+    <div className="flex flex-col items-center justify-center rounded-2xl border border-red-800/30 bg-red-950/10 py-16 px-6 text-center">
+      <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-red-950/40 border border-red-700/30">
+        <AlertTriangle size={22} className="text-red-400" />
+      </div>
+      <h3 className="text-base font-semibold text-white">
         Failed to load events
       </h3>
-      <p className="mt-2 max-w-xs text-xs text-red-500 font-mono break-all">
+      <p className="mt-2 max-w-xs text-xs text-red-400 font-mono break-all">
         {message}
       </p>
       <button
         onClick={onRetry}
-        className="mt-6 rounded-full border border-red-200 px-5 py-2 text-sm font-semibold text-red-600 hover:bg-red-100 transition-colors"
+        className="mt-6 rounded-full border border-red-800/40 px-5 py-2 text-sm font-semibold text-red-400 hover:bg-red-950/30 transition-colors"
       >
         Try again
       </button>

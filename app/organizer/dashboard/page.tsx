@@ -7,6 +7,7 @@ import { useMutation } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import type { Hex } from "viem";
 import type { Entity } from "@arkiv-network/sdk";
+import { AlertTriangle, Lock, Calendar, MapPin, Users, Tag, FileText, Flag, Radio, ArrowRight, Plus } from "lucide-react";
 import { useOrganizer } from "@/hooks/useOrganizer";
 import { useOrganizerEvents } from "@/hooks/useEvent";
 import { useWallet } from "@/hooks/useWallet";
@@ -135,7 +136,11 @@ export default function DashboardPage() {
     return (
       <div className="flex min-h-screen items-center justify-center bg-zinc-950 p-6">
         <div className="text-center space-y-4 max-w-sm">
-          <div className="text-4xl">{isConnected ? "⚠️" : "🔐"}</div>
+          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-zinc-900 border border-white/10 mx-auto">
+            {isConnected
+              ? <AlertTriangle size={24} className="text-amber-400" />
+              : <Lock size={24} className="text-violet-400" />}
+          </div>
           <h2 className="text-lg font-bold text-white">
             {isConnected ? "Wrong network" : "Connect your wallet"}
           </h2>
@@ -178,9 +183,9 @@ export default function DashboardPage() {
           </div>
           <Link
             href="/organizer/events/create"
-            className="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-500 transition-colors shadow-lg shadow-violet-900/30"
+            className="inline-flex items-center gap-2 rounded-lg bg-violet-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-500 transition-colors"
           >
-            <span className="text-lg leading-none">+</span>
+            <Plus size={16} />
             Create Event
           </Link>
         </div>
@@ -273,12 +278,12 @@ export default function DashboardPage() {
                         <StatusBadge status={ev.status} />
                       </div>
                       <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-zinc-500">
-                        <span>📅 {formatDate(ev.date)}</span>
-                        <span>📍 {ev.location}</span>
-                        <span>
-                          👥 {rsvpCount} / {ev.capacity} RSVPs
+                        <span className="flex items-center gap-1"><Calendar size={11} />{formatDate(ev.date)}</span>
+                        <span className="flex items-center gap-1"><MapPin size={11} />{ev.location}</span>
+                        <span className="flex items-center gap-1">
+                          <Users size={11} />{rsvpCount} / {ev.capacity} RSVPs
                         </span>
-                        <span>🏷 {ev.category}</span>
+                        <span className="flex items-center gap-1"><Tag size={11} />{ev.category}</span>
                       </div>
                     </div>
 
@@ -410,28 +415,28 @@ function ActionBtn({
 }
 
 function EmptyTab({ status }: { status: EventStatus }) {
-  const config: Record<EventStatus, { icon: string; title: string; msg: string; cta?: string; ctaLabel?: string }> = {
+  const config: Record<EventStatus, { icon: React.ReactNode; title: string; msg: string; cta?: string; ctaLabel?: string }> = {
     draft: {
-      icon: "📝",
+      icon: <FileText size={24} className="text-zinc-500" />,
       title: "No drafts",
       msg: "Create an event and save it as a draft to review before publishing.",
       cta: "/organizer/events/create",
       ctaLabel: "Create Event",
     },
     upcoming: {
-      icon: "📅",
+      icon: <Calendar size={24} className="text-zinc-500" />,
       title: "No upcoming events",
       msg: "Publish a draft event or create a new one to see it here.",
       cta: "/organizer/events/create",
       ctaLabel: "Create Event",
     },
     live: {
-      icon: "🟢",
+      icon: <Radio size={24} className="text-zinc-500" />,
       title: "No live events",
       msg: "Transition an upcoming event to Live when it starts.",
     },
     ended: {
-      icon: "🏁",
+      icon: <Flag size={24} className="text-zinc-500" />,
       title: "No ended events",
       msg: "Completed events will appear here after they end.",
     },
@@ -441,15 +446,15 @@ function EmptyTab({ status }: { status: EventStatus }) {
 
   return (
     <div className="rounded-2xl border border-dashed border-white/10 py-16 text-center px-6">
-      <div className="text-3xl mb-3">{icon}</div>
+      <div className="flex h-14 w-14 items-center justify-center rounded-full bg-zinc-900 border border-white/5 mx-auto mb-3">{icon}</div>
       <p className="text-sm font-semibold text-zinc-300">{title}</p>
       <p className="mt-1.5 text-xs text-zinc-500 max-w-xs mx-auto">{msg}</p>
       {cta && ctaLabel && (
         <Link
           href={cta}
-          className="mt-5 inline-flex items-center gap-1.5 rounded-xl bg-violet-600 px-4 py-2 text-xs font-semibold text-white hover:bg-violet-500 transition-colors"
+          className="mt-5 inline-flex items-center gap-1.5 rounded-lg bg-violet-600 px-4 py-2 text-xs font-semibold text-white hover:bg-violet-500 transition-colors"
         >
-          {ctaLabel} →
+          {ctaLabel} <ArrowRight size={12} />
         </Link>
       )}
     </div>

@@ -55,7 +55,7 @@ export function ConnectButton({ className }: ConnectButtonProps) {
         if (!isCorrectChain) {
           return (
             <div className={`flex items-center gap-2 ${className ?? ""}`}>
-              <span className="rounded-full bg-gray-100 px-3 py-1 font-mono text-xs text-gray-600">
+              <span className="rounded-full bg-zinc-800 px-3 py-1 font-mono text-xs text-zinc-300">
                 {truncate(address)}
               </span>
               <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 border border-amber-200 px-2.5 py-1 text-xs font-medium text-amber-700">

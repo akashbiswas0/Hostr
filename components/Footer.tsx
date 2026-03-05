@@ -1,6 +1,7 @@
 
 
 import Link from "next/link";
+import { ExternalLink, Hexagon } from "lucide-react";
 
 const EXPLORER = "https://explorer.kaolin.hoodi.arkiv.network";
 const ARKIV_SITE = "https://arkiv.network";
@@ -12,7 +13,10 @@ export function Footer() {
         <div className="flex flex-col items-center gap-6 sm:flex-row sm:items-start sm:justify-between">
           {}
           <div className="text-center sm:text-left">
-            <p className="text-sm font-semibold text-white">OnChain Events</p>
+            <div className="flex items-center gap-1.5 justify-center sm:justify-start">
+              <Hexagon size={14} className="text-violet-400" strokeWidth={1.5} />
+              <p className="text-sm font-semibold text-white">OnChain Events</p>
+            </div>
             <p className="mt-0.5 text-xs text-zinc-600">
               Decentralised event management · Kaolin Testnet
             </p>
@@ -33,9 +37,9 @@ export function Footer() {
               href={EXPLORER}
               target="_blank"
               rel="noopener noreferrer"
-              className="hover:text-zinc-400 transition-colors"
+              className="hover:text-zinc-400 transition-colors inline-flex items-center gap-1"
             >
-              Kaolin Explorer ↗
+              Kaolin Explorer <ExternalLink size={10} />
             </a>
           </div>
         </div>

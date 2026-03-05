@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import toast from "react-hot-toast";
+import { AlertTriangle, Lock, ArrowLeft, ArrowRight } from "lucide-react";
 import { useOrganizer } from "@/hooks/useOrganizer";
 import { useWallet } from "@/hooks/useWallet";
 import { createOrganizerEntity } from "@/lib/arkiv/entities/organizer";
@@ -77,8 +78,8 @@ export default function OnboardPage() {
       {}
       <nav className="border-b border-white/5 bg-zinc-950/80 backdrop-blur-md">
         <div className="mx-auto flex max-w-2xl items-center justify-between px-4 py-3 sm:px-6">
-          <Link href="/" className="text-sm text-zinc-400 hover:text-white transition-colors">
-            ← Back
+          <Link href="/" className="flex items-center gap-1.5 text-sm text-zinc-400 hover:text-white transition-colors">
+            <ArrowLeft size={14} /> Back
           </Link>
           <ConnectButton />
         </div>
@@ -179,7 +180,7 @@ export default function OnboardPage() {
                 Saving to blockchain…
               </span>
             ) : (
-              "Create Profile & Continue →"
+              <span className="flex items-center justify-center gap-2">Create Profile &amp; Continue <ArrowRight size={14} /></span>
             )}
           </button>
         </form>
@@ -218,7 +219,9 @@ function WalletGate({
   return (
     <div className="flex min-h-screen items-center justify-center bg-zinc-950 p-6">
       <div className="text-center space-y-4 max-w-sm">
-        <div className="text-4xl">{isConnected ? "⚠️" : "🔐"}</div>
+        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-zinc-900 border border-white/10 mx-auto">
+            {isConnected ? <AlertTriangle size={24} className="text-amber-400" /> : <Lock size={24} className="text-violet-400" />}
+          </div>
         <h2 className="text-lg font-bold text-white">
           {isConnected ? "Wrong network" : "Connect your wallet"}
         </h2>

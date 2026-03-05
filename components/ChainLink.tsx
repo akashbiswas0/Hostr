@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { ChevronDown, ChevronUp, ExternalLink } from "lucide-react";
 import type { Hex } from "viem";
 
 const EXPLORER = "https://explorer.kaolin.hoodi.arkiv.network";
@@ -26,8 +27,8 @@ export function ChainLink({ entityKey, txHash, label }: ChainLinkProps) {
         onClick={() => setOpen((o) => !o)}
         className="inline-flex items-center gap-1.5 text-xs text-violet-400 hover:text-violet-300 transition-colors"
       >
-        <span className="text-[10px]">{open ? "▲" : "▼"}</span>
-        {label ?? "View on-chain ✓"}
+        {open ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+        {label ?? "View on-chain"}
       </button>
 
       {open && (
@@ -41,9 +42,9 @@ export function ChainLink({ entityKey, txHash, label }: ChainLinkProps) {
                 href={`${EXPLORER}/entity/${entityKey}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="break-all font-mono text-[11px] text-violet-300 hover:underline"
+                className="break-all font-mono text-[11px] text-violet-300 hover:underline inline-flex items-center gap-1"
               >
-                {entityKey}
+                {entityKey} <ExternalLink size={10} />
               </a>
             </div>
           )}
@@ -56,9 +57,9 @@ export function ChainLink({ entityKey, txHash, label }: ChainLinkProps) {
                 href={`${EXPLORER}/tx/${txHash}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="break-all font-mono text-[11px] text-violet-300 hover:underline"
+                className="break-all font-mono text-[11px] text-violet-300 hover:underline inline-flex items-center gap-1"
               >
-                {txHash}
+                {txHash} <ExternalLink size={10} />
               </a>
             </div>
           )}

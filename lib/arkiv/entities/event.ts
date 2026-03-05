@@ -14,9 +14,14 @@ const CONTENT_TYPE = "application/json" as const
 
 const MIN_EXPIRY_SECONDS = ExpirationTime.fromDays(1)
 
+// Compute seconds from now until isoDate without relying on ExpirationTime.fromDate,
+// which can return a fractional number that the SDK fails to convert to BigInt.
+// Result is always rounded DOWN to a multiple of 2 (BLOCK_TIME) so that
+// `expiresIn / BLOCK_TIME` is an integer when the SDK converts to blocks.
 function secondsUntil(isoDate: string): number {
-  const diff = ExpirationTime.fromDate(new Date(isoDate))
-  return Math.floor(Math.max(diff, MIN_EXPIRY_SECONDS))
+  const diffMs = new Date(isoDate).getTime() - Date.now()
+  const seconds = Math.floor(Math.max(diffMs / 1_000, MIN_EXPIRY_SECONDS))
+  return Math.floor(seconds / 2) * 2
 }
 
 function toUnixSeconds(isoDate: string): number {

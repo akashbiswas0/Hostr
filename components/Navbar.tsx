@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Menu, X } from "lucide-react";
+import { Menu, X, Hexagon } from "lucide-react";
 import { ConnectButton } from "./ConnectButton";
 import { useOrganizer } from "@/hooks/useOrganizer";
 import { useWallet } from "@/hooks/useWallet";
@@ -19,20 +19,20 @@ export function Navbar({ active }: NavbarProps) {
   const linkCls = (name: NavbarProps["active"]) =>
     `text-sm font-medium transition-colors ${
       active === name
-        ? "text-gray-900"
-        : "text-gray-500 hover:text-gray-900"
+        ? "text-white"
+        : "text-zinc-400 hover:text-white"
     }`;
 
   return (
-    <nav className="sticky top-0 z-50 border-b border-gray-100 bg-white/90 backdrop-blur-md">
+    <nav className="sticky top-0 z-50 border-b border-white/5 bg-zinc-950/90 backdrop-blur-md">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6">
         {}
         <Link
           href="/"
           className="flex items-center gap-2 text-base font-bold tracking-tight"
         >
-          <span className="text-xl">⬡</span>
-          <span className="bg-gradient-to-r from-purple-500 to-pink-500 bg-clip-text text-transparent">
+          <Hexagon size={18} className="text-violet-400" strokeWidth={1.5} />
+          <span className="text-white">
             OnChain Events
           </span>
         </Link>
@@ -55,7 +55,7 @@ export function Navbar({ active }: NavbarProps) {
           {isConnected && !isOrganizer && (
             <Link
               href="/organizer/onboard"
-              className="text-sm font-medium text-purple-600 hover:text-purple-700 transition-colors"
+              className="text-sm font-medium text-violet-400 hover:text-violet-300 transition-colors"
             >
               Host an Event
             </Link>
@@ -69,7 +69,7 @@ export function Navbar({ active }: NavbarProps) {
 
         {}
         <button
-          className="sm:hidden rounded-lg p-2 text-gray-500 hover:text-gray-900 transition-colors"
+          className="sm:hidden rounded-lg p-2 text-zinc-400 hover:text-white transition-colors"
           onClick={() => setMobileOpen((v) => !v)}
           aria-label="Toggle menu"
         >
@@ -79,10 +79,10 @@ export function Navbar({ active }: NavbarProps) {
 
       {}
       {mobileOpen && (
-        <div className="sm:hidden border-t border-gray-100 bg-white px-4 pb-4 pt-2 space-y-2">
+        <div className="sm:hidden border-t border-white/5 bg-zinc-950 px-4 pb-4 pt-2 space-y-2">
           <Link
             href="/#events"
-            className="block py-2 text-sm font-medium text-gray-700 hover:text-gray-900"
+            className="block py-2 text-sm font-medium text-zinc-400 hover:text-white"
             onClick={() => setMobileOpen(false)}
           >
             Browse
@@ -90,7 +90,7 @@ export function Navbar({ active }: NavbarProps) {
           {isConnected && (
             <Link
               href="/my-rsvps"
-              className="block py-2 text-sm font-medium text-gray-700 hover:text-gray-900"
+              className="block py-2 text-sm font-medium text-zinc-400 hover:text-white"
               onClick={() => setMobileOpen(false)}
             >
               My RSVPs
@@ -99,7 +99,7 @@ export function Navbar({ active }: NavbarProps) {
           {isConnected && isOrganizer && (
             <Link
               href="/organizer/dashboard"
-              className="block py-2 text-sm font-medium text-gray-700 hover:text-gray-900"
+              className="block py-2 text-sm font-medium text-zinc-400 hover:text-white"
               onClick={() => setMobileOpen(false)}
             >
               Dashboard
@@ -108,7 +108,7 @@ export function Navbar({ active }: NavbarProps) {
           {isConnected && !isOrganizer && (
             <Link
               href="/organizer/onboard"
-              className="block py-2 text-sm font-medium text-purple-600 hover:text-purple-700"
+              className="block py-2 text-sm font-medium text-violet-400 hover:text-violet-300"
               onClick={() => setMobileOpen(false)}
             >
               Host an Event

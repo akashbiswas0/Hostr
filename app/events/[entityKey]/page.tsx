@@ -3,14 +3,16 @@
 import { useParams, useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import type { Hex } from "viem";
 import { QRCodeSVG } from "qrcode.react";
+import { SearchX, Flag, Clock, CheckCircle2, XCircle, ArrowRight, Calendar, MapPin, Users, ExternalLink, Check } from "lucide-react";
 import { useEvent } from "@/hooks/useEvent";
 import { useRsvp } from "@/hooks/useRsvp";
 import { useWallet } from "@/hooks/useWallet";
 import { publicClient } from "@/lib/arkiv/client";
-import { getRsvpsByEvent, getApprovalForRsvp, getRejectionForRsvp } from "@/lib/arkiv/entities/rsvp";
+import { getRsvpsByEvent, getApprovalForRsvp, getRejectionForRsvp, getApprovalsByEvent } from "@/lib/arkiv/entities/rsvp";
+import { getCheckinsByEvent } from "@/lib/arkiv/entities/checkin";
 import { getOrganizerByWallet } from "@/lib/arkiv/entities/organizer";
 import { ConnectButton } from "@/components/ConnectButton";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -76,8 +78,63 @@ export default function EventDetailPage() {
       return res.data;
     },
     enabled: !!entityKey,
-    staleTime: 30_000,
+    staleTime: 0, // always fetch fresh so cancellations / new RSVPs appear immediately
   });
+
+  // Fetch checkin entities to show who has been physically checked in
+  const checkinQuery = useQuery({
+    queryKey: ["checkins", entityKey],
+    queryFn: async () => {
+      const res = await getCheckinsByEvent(publicClient, entityKey);
+      return res.success ? res.data : [];
+    },
+    enabled: !!entityKey,
+    staleTime: 0,
+  });
+
+  // Fetch approval entities so we can show organizer-approved RSVPs as confirmed
+  const approvalsQuery = useQuery({
+    queryKey: ["rsvp-approvals-public", entityKey],
+    queryFn: async () => {
+      const res = await getApprovalsByEvent(publicClient, entityKey);
+      return res.success ? res.data : [];
+    },
+    enabled: !!entityKey,
+    staleTime: 0,
+  });
+
+  // Set of attendee wallets that have checked in (from checkin entities)
+  const checkedInWallets = useMemo(() => {
+    return new Set(
+      (checkinQuery.data ?? []).map((e) => {
+        const attr = e.attributes.find((a) => a.key === "attendeeWallet");
+        return ((attr?.value as string) ?? "").toLowerCase();
+      }),
+    );
+  }, [checkinQuery.data]);
+
+  // Set of rsvpKeys that have an organizer-created approval entity
+  const approvedRsvpKeys = useMemo(() => {
+    return new Set(
+      (approvalsQuery.data ?? []).map((e) => {
+        const attr = e.attributes.find((a) => a.key === "rsvpKey");
+        return ((attr?.value as string) ?? "").toLowerCase();
+      }),
+    );
+  }, [approvalsQuery.data]);
+
+  // Only show confirmed attendees on the public page:
+  // - status === "confirmed" (direct / auto-approved)
+  // - status === "pending" but organizer created an approval entity
+  const confirmedAttendees = useMemo(() => {
+    return (attendeeQuery.data ?? []).filter((ent) => {
+      const statusAttr = ent.attributes.find((a) => a.key === "status");
+      const status = (statusAttr?.value as string) ?? "confirmed";
+      if (status === "confirmed") return true;
+      if (status === "pending" && approvedRsvpKeys.has((ent.key as string).toLowerCase())) return true;
+      return false;
+    });
+  }, [attendeeQuery.data, approvedRsvpKeys]);
 
   
   const organizerQuery = useQuery({
@@ -97,10 +154,14 @@ export default function EventDetailPage() {
   
   const [rsvpModalOpen, setRsvpModalOpen] = useState(false);
 
-  
-  const rsvpCount = Number(
+  // Use the live confirmedAttendees count once loaded (staleTime:0),
+  // otherwise fall back to the on-chain rsvpCount attribute from the event entity.
+  const onChainRsvpCount = Number(
     entity?.attributes.find((a) => a.key === "rsvpCount")?.value ?? 0,
   );
+  const rsvpCount = attendeeQuery.isLoading
+    ? onChainRsvpCount
+    : confirmedAttendees.length;
   const capacity = event?.capacity ?? 0;
   const capacityPct = capacity ? Math.min(100, (rsvpCount / capacity) * 100) : 0;
   const isFull = rsvpCount >= capacity && capacity > 0;
@@ -149,7 +210,9 @@ export default function EventDetailPage() {
     return (
       <div className="flex min-h-screen items-center justify-center bg-zinc-950">
         <div className="text-center">
-          <div className="text-4xl mb-4">🔍</div>
+          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-zinc-900 border border-white/10 mx-auto mb-4">
+            <SearchX size={24} className="text-zinc-500" />
+          </div>
           <h1 className="text-xl font-bold text-white mb-2">Event not found</h1>
           <p className="text-zinc-400 text-sm mb-6">{error ?? "This event doesn't exist on-chain."}</p>
           <button
@@ -205,27 +268,27 @@ export default function EventDetailPage() {
 
               {}
               <div className="mt-5 flex flex-col gap-3 text-sm text-zinc-400">
-                <MetaRow icon={<CalendarIcon />}>
+                <MetaRow icon={<Calendar size={14} />}>
                   <span>{formatDateFull(event.date)}</span>
-                  <span className="text-zinc-600">→</span>
+                  <ArrowRight size={12} className="text-zinc-600" />
                   <span>{formatDateFull(event.endDate)}</span>
                 </MetaRow>
 
-                <MetaRow icon={<PinIcon />}>
+                <MetaRow icon={<MapPin size={14} />}>
                   {event.location}
                   {event.virtualLink && (
                     <a
                       href={event.virtualLink}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="ml-2 text-violet-400 hover:text-violet-300 transition-colors"
+                      className="ml-2 text-violet-400 hover:text-violet-300 transition-colors flex items-center gap-1"
                     >
-                      Join online →
+                      Join online <ArrowRight size={12} />
                     </a>
                   )}
                 </MetaRow>
 
-                <MetaRow icon={<UsersIcon />}>
+                <MetaRow icon={<Users size={14} />}>
                   <span
                     className={isFull ? "text-rose-400" : "text-zinc-400"}
                   >
@@ -334,8 +397,9 @@ export default function EventDetailPage() {
                 </span>
               </h2>
               <AttendeeList
-                entities={attendeeQuery.data ?? []}
-                isLoading={attendeeQuery.isLoading}
+                entities={confirmedAttendees}
+                isLoading={attendeeQuery.isLoading || approvalsQuery.isLoading}
+                checkedInWallets={checkedInWallets}
               />
             </section>
           </div>
@@ -396,15 +460,15 @@ export default function EventDetailPage() {
                     href={`${EXPLORER}/entity/${rsvpEntity.key}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="block text-xs font-mono text-zinc-500 hover:text-violet-400 transition-colors"
+                    className="block text-xs font-mono text-zinc-500 hover:text-violet-400 transition-colors flex items-center gap-1"
                   >
-                    {(rsvpEntity.key as string).slice(0, 14)}… ↗
+                    {(rsvpEntity.key as string).slice(0, 14)}… <ExternalLink size={10} />
                   </a>
                   <Link
                     href="/my-rsvps"
-                    className="block text-xs text-zinc-500 hover:text-white transition-colors"
+                    className="block text-xs text-zinc-500 hover:text-white transition-colors flex items-center gap-1"
                   >
-                    All my RSVPs →
+                    All my RSVPs <ArrowRight size={10} />
                   </Link>
                 </div>
               )}
@@ -489,7 +553,9 @@ function RsvpCard({
       {}
       {isEnded ? (
         <div className="rounded-xl border border-dashed border-zinc-700 bg-zinc-800/50 py-8 text-center">
-          <div className="text-3xl mb-2">🏁</div>
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-zinc-900 border border-white/5 mx-auto mb-2">
+            <Flag size={20} className="text-zinc-500" />
+          </div>
           <p className="text-sm font-medium text-zinc-400">Event has ended</p>
         </div>
       ) : rsvpLoading ? (
@@ -506,7 +572,9 @@ function RsvpCard({
         </div>
       ) : hasRsvp && myRsvpStatus === "pending" ? (
         <div className="rounded-xl border border-violet-700/30 bg-violet-950/20 py-6 text-center">
-          <div className="text-2xl mb-2">⏳</div>
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-violet-900/40 mx-auto mb-2">
+            <Clock size={18} className="text-violet-400" />
+          </div>
           <p className="text-sm font-semibold text-violet-300">Request pending</p>
           <p className="mt-1 text-xs text-zinc-500">Waiting for organizer approval</p>
           <Link
@@ -518,7 +586,9 @@ function RsvpCard({
         </div>
       ) : hasRsvp && myRsvpStatus === "rejected" ? (
         <div className="rounded-xl border border-rose-700/30 bg-rose-950/20 py-6 text-center">
-          <div className="text-2xl mb-2">❌</div>
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-rose-900/40 mx-auto mb-2">
+            <XCircle size={20} className="text-rose-400" />
+          </div>
           <p className="text-sm font-semibold text-rose-300">Request rejected</p>
           <p className="mt-1 text-xs text-zinc-500">The organizer declined your request</p>
           <Link
@@ -530,7 +600,9 @@ function RsvpCard({
         </div>
       ) : hasRsvp ? (
         <div className="rounded-xl border border-emerald-700/30 bg-emerald-950/20 py-6 text-center">
-          <div className="text-2xl mb-2">✅</div>
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-900/40 mx-auto mb-2">
+            <CheckCircle2 size={20} className="text-emerald-400" />
+          </div>
           <p className="text-sm font-semibold text-emerald-300">You&apos;re going!</p>
           {myRsvp?.attendeeName && (
             <p className="mt-1 text-xs text-zinc-500">{myRsvp.attendeeName}</p>
@@ -569,9 +641,11 @@ function RsvpCard({
 function AttendeeList({
   entities,
   isLoading,
+  checkedInWallets = new Set(),
 }: {
   entities: Entity[];
   isLoading: boolean;
+  checkedInWallets?: Set<string>;
 }) {
   if (isLoading) {
     return (
@@ -619,15 +693,15 @@ function AttendeeList({
                 )}
               </div>
             </div>
-            <span
-              className={`shrink-0 text-xs font-medium ${
-                rsvp.checkedIn
-                  ? "text-emerald-400"
-                  : "text-zinc-500"
-              }`}
-            >
-              {rsvp.checkedIn ? "✓ Checked in" : "Confirmed"}
-            </span>
+            {checkedInWallets.has((entity.owner ?? "").toLowerCase()) ? (
+              <span className="shrink-0 flex items-center gap-1 text-xs font-medium text-blue-400">
+                <Check size={12} /> Checked in
+              </span>
+            ) : (
+              <span className="shrink-0 text-xs font-medium text-emerald-400">
+                Confirmed
+              </span>
+            )}
           </div>
         );
       })}
@@ -684,48 +758,18 @@ function InfoRow({
 }
 
 function ArrowLeftIcon() {
-  return (
-    <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none">
-      <path
-        d="M10 12L6 8l4-4"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
+  // kept for backwards-compat if referenced; prefer lucide ArrowLeft directly
+  return null;
 }
 
 function CalendarIcon() {
-  return (
-    <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none">
-      <rect x="1.5" y="2.5" width="13" height="12" rx="1.5" stroke="currentColor" strokeWidth="1.2" />
-      <path d="M5 1v3M11 1v3M1.5 6.5h13" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
-    </svg>
-  );
+  return null;
 }
 
 function PinIcon() {
-  return (
-    <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none">
-      <path
-        d="M8 1.5C5.79 1.5 4 3.29 4 5.5c0 3.25 4 8.5 4 8.5s4-5.25 4-8.5c0-2.21-1.79-4-4-4z"
-        stroke="currentColor"
-        strokeWidth="1.2"
-        strokeLinejoin="round"
-      />
-      <circle cx="8" cy="5.5" r="1.5" stroke="currentColor" strokeWidth="1.2" />
-    </svg>
-  );
+  return null;
 }
 
 function UsersIcon() {
-  return (
-    <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none">
-      <circle cx="6" cy="5" r="2.5" stroke="currentColor" strokeWidth="1.2" />
-      <path d="M1 13.5c0-2.76 2.24-5 5-5s5 2.24 5 5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
-      <path d="M12 7a2 2 0 000-4M15 13.5a4 4 0 00-4-4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
-    </svg>
-  );
+  return null;
 }

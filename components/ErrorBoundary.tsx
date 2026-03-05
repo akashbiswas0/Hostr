@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { AlertTriangle } from "lucide-react";
 
 interface Props {
   children: React.ReactNode;
@@ -44,7 +45,9 @@ export class ErrorBoundary extends React.Component<Props, State> {
 
     return (
       <div className="flex flex-col items-center gap-4 rounded-2xl border border-red-500/20 bg-red-950/10 px-6 py-12 text-center">
-        <div className="text-3xl">⚠️</div>
+        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-950/40 border border-red-700/30">
+          <AlertTriangle size={22} className="text-red-400" />    
+        </div>
         <div>
           <p className="font-semibold text-white">
             {label ? `${label} failed to load` : "Something went wrong"}
