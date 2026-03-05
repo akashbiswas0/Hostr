@@ -6,6 +6,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { Hex } from "viem";
 import type { Entity } from "@arkiv-network/sdk";
+import { getAddress } from "viem";
 import { SearchX, Globe, Pencil, ArrowLeft, ArrowRight, Check } from "lucide-react";
 import { publicClient } from "@/lib/arkiv/client";
 import { getOrganizerByWallet } from "@/lib/arkiv/entities/organizer";
@@ -66,7 +67,8 @@ type Tab = "upcoming" | "past";
 
 export default function OrganizerProfilePage() {
   const params = useParams();
-  const wallet = (params.wallet as string).toLowerCase() as Hex;
+  const walletRaw = params.wallet as string;
+  const wallet = (() => { try { return getAddress(walletRaw); } catch { return walletRaw.toLowerCase() as Hex; } })() as Hex;
   const { address: connectedAddress } = useWallet();
   const [tab, setTab] = useState<Tab>("upcoming");
 
