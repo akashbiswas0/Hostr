@@ -421,7 +421,7 @@ export default function EventDetailPage() {
               />
 
               {}
-              {hasRsvp && rsvpEntity && (
+              {hasRsvp && rsvpEntity && effectiveMyRsvpStatus !== "not-going" && (
                 <div className="rounded-2xl border border-emerald-700/20 bg-emerald-950/10 p-4 space-y-2">
                   <div className="flex items-center justify-between">
                     <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">Your RSVP</p>
@@ -597,6 +597,22 @@ function RsvpCard({
           >
             Manage RSVPs
           </Link>
+        </div>
+      ) : hasRsvp && myRsvpStatus === "not-going" ? (
+        <div className="space-y-3">
+          <div className="rounded-xl border border-zinc-700/30 bg-zinc-800/50 py-6 text-center">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-zinc-800 mx-auto mb-2">
+              <XCircle size={20} className="text-zinc-400" />
+            </div>
+            <p className="text-sm font-semibold text-zinc-300">Not attending</p>
+            <p className="mt-1 text-xs text-zinc-500">You marked yourself as not going</p>
+          </div>
+          <button
+            onClick={onOpen}
+            className="w-full rounded-xl border border-white/10 py-3 text-sm font-semibold text-white hover:bg-zinc-800 transition-colors"
+          >
+            {isFull ? "Join Waitlist" : "Change mind? RSVP again"}
+          </button>
         </div>
       ) : hasRsvp ? (
         <div className="rounded-xl border border-emerald-700/30 bg-emerald-950/20 py-6 text-center">

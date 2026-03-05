@@ -10,7 +10,7 @@ import { X, Lock, AlertTriangle, Clock, CheckCircle2, XCircle, ExternalLink, Lin
 import { useWallet } from "@/hooks/useWallet";
 import { publicClient } from "@/lib/arkiv/client";
 import { createRsvpEntity } from "@/lib/arkiv/entities/rsvp"
-import { getRsvpByAttendee } from "@/lib/arkiv/queries/rsvps"
+import { getRsvpByAttendee, getRsvpsByEvent } from "@/lib/arkiv/queries/rsvps"
 import { ConnectButton } from "@/components/ConnectButton";
 import { friendlyError } from "@/lib/arkiv/errors";
 import type { Event, RSVP } from "@/lib/arkiv/types";
@@ -116,9 +116,16 @@ export function RsvpModal({
         address as Hex,
       );
       if (existingRsvp.success && existingRsvp.data) {
-        setErrorMsg("You've already RSVP'd to this event");
-        setStep("error");
-        return;
+        const existingStatus = existingRsvp.data.attributes.find(
+          (a) => a.key === "status",
+        )?.value;
+        // Allow re-RSVPing only if the previous RSVP was withdrawn (not-going).
+        // All other active statuses (pending, confirmed, waitlisted, checked-in) block duplicates.
+        if (existingStatus !== "not-going") {
+          setErrorMsg("You've already RSVP'd to this event");
+          setStep("error");
+          return;
+        }
       }
 
       const endMs = toMs(event.endDate);
@@ -133,8 +140,18 @@ export function RsvpModal({
         message: message.trim() || undefined,
       };
 
+      // Re-derive capacity state from a fresh live count instead of the stale
+      // `isFull` prop (which could be wrong if another user RSVPed concurrently).
+      const freshRsvpRes = await getRsvpsByEvent(publicClient, entity.key as Hex);
+      const activeRsvpCount = freshRsvpRes.success
+        ? freshRsvpRes.data.filter((e) => {
+            const s = e.attributes.find((a) => a.key === "status")?.value;
+            return s !== "not-going";
+          }).length
+        : 0;
+      const isActuallyFull = event.capacity > 0 && activeRsvpCount >= event.capacity;
       // All RSVPs start as pending — organizer must approve before attendee sees confirmed
-      const status = isFull ? "waitlisted" : "pending";
+      const status = isActuallyFull ? "waitlisted" : "pending";
 
       const createRes = await createRsvpEntity(
         walletClient,
