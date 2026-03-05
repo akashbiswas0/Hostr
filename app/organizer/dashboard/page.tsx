@@ -16,6 +16,7 @@ import { updateEventStatus, deleteEvent, autoTransitionEndedEvents } from "@/lib
 import { OrganizerNav } from "@/components/OrganizerNav";
 import { StatusBadge } from "@/components/StatusBadge";
 import { ConnectButton } from "@/components/ConnectButton";
+import { ConfirmModal } from "@/components/ConfirmModal";
 import type { Event, EventStatus } from "@/lib/arkiv/types";
 
 function toMs(value: unknown): number {
@@ -73,6 +74,7 @@ export default function DashboardPage() {
 
   const [tab, setTab] = useState<EventStatus>("upcoming");
   const [deletingKey, setDeletingKey] = useState<string | null>(null);
+  const [confirmDeleteKey, setConfirmDeleteKey] = useState<{ key: Hex; title: string } | null>(null);
 
   
   useEffect(() => {
@@ -355,15 +357,9 @@ export default function DashboardPage() {
 
                       {}
                       <button
-                        onClick={() => {
-                          if (
-                            confirm(
-                              `Delete "${ev.title}"? This will also delete all RSVPs and cannot be undone.`,
-                            )
-                          ) {
-                            deleteMutation.mutate(entityKey);
-                          }
-                        }}
+                        onClick={() =>
+                          setConfirmDeleteKey({ key: entityKey, title: ev.title })
+                        }
                         disabled={deleteMutation.isPending}
                         className="rounded-lg border border-rose-800/40 px-3 py-1.5 text-xs font-medium text-rose-500 hover:bg-rose-950/20 disabled:opacity-40 transition-colors"
                       >
@@ -377,6 +373,18 @@ export default function DashboardPage() {
           </div>
         )}
       </main>
+
+      <ConfirmModal
+        open={!!confirmDeleteKey}
+        title={`Delete "${confirmDeleteKey?.title ?? "this event"}"?`}
+        message="This will also delete all RSVPs and cannot be undone."
+        confirmLabel="Delete"
+        destructive
+        onConfirm={() => {
+          if (confirmDeleteKey) deleteMutation.mutate(confirmDeleteKey.key);
+        }}
+        onClose={() => setConfirmDeleteKey(null)}
+      />
     </div>
   );
 }

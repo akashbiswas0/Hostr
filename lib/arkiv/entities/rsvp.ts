@@ -76,10 +76,11 @@ export async function updateRsvpStatus(
     const currentStatus = currentStatusAttr?.value as string
 
     const VALID_TRANSITIONS: Record<string, string[]> = {
-      "pending": ["confirmed", "waitlisted"],
-      "waitlisted": ["confirmed"],
-      "confirmed": ["checked-in"],
+      "pending":    ["confirmed", "waitlisted", "not-going"],
+      "waitlisted": ["confirmed", "not-going"],
+      "confirmed":  ["checked-in", "not-going"],
       "checked-in": [],
+      "not-going":  [],
     }
 
     const allowed = VALID_TRANSITIONS[currentStatus] ?? []
