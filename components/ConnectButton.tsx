@@ -44,7 +44,7 @@ export function ConnectButton({ className }: ConnectButtonProps) {
               ) : (
                 <>
                   <Wallet size={15} />
-                  Connect Wallet
+                  Sign in
                 </>
               )}
             </button>

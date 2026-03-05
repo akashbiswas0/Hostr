@@ -118,12 +118,12 @@ export default function CreateEventPage() {
             {isConnected ? <AlertTriangle size={24} className="text-amber-400" /> : <Lock size={24} className="text-violet-400" />}
           </div>
           <h2 className="text-lg font-bold text-white">
-            {isConnected ? "Wrong network" : "Wallet required"}
+            {isConnected ? "Wrong network" : "Sign in required"}
           </h2>
           <p className="text-sm text-zinc-400">
             {isConnected
               ? "Switch to Kaolin to create events."
-              : "Connect to create on-chain events."}
+              : "Sign in to create events."}
           </p>
           <div className="flex justify-center"><ConnectButton /></div>
         </div>
@@ -175,7 +175,7 @@ export default function CreateEventPage() {
       organizer?.name ?? undefined,
     );
     if (res.success) {
-      toast.success(publishNow ? "Event published on-chain ✓" : "Event saved as draft ✓");
+      toast.success(publishNow ? "Event published ✓" : "Event saved as draft ✓");
       router.push(`/organizer/dashboard`);
     } else {
       setError(res.error);
@@ -573,7 +573,7 @@ function Step3({
       <div>
         <h2 className="text-xl font-bold text-white">Review & Submit</h2>
         <p className="text-sm text-zinc-500 mt-1">
-          Review your event details before creating it on-chain.
+          Review your event details before creating it.
         </p>
       </div>
 
@@ -652,7 +652,7 @@ function Step3({
           className="rounded-xl bg-violet-600 px-6 py-2.5 text-sm font-semibold text-white hover:bg-violet-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-lg shadow-violet-900/30"
         >
           {submitting ? (
-            <span className="flex items-center gap-2"><SpinnerIcon />Saving to blockchain…</span>
+            <span className="flex items-center gap-2"><SpinnerIcon />Saving…</span>
           ) : publishNow ? (
             <span className="flex items-center gap-1.5">Publish Event <ArrowRight size={14} /></span>
           ) : (

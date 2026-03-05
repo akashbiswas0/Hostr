@@ -79,7 +79,7 @@ export default function EditEventPage() {
             {isConnected ? <AlertTriangle size={24} className="text-amber-400" /> : <Lock size={24} className="text-violet-400" />}
           </div>
           <h2 className="text-lg font-bold text-white">
-            {isConnected ? "Wrong network" : "Wallet required"}
+            {isConnected ? "Wrong network" : "Sign in required"}
           </h2>
           <div className="flex justify-center"><ConnectButton /></div>
         </div>
@@ -144,7 +144,7 @@ export default function EditEventPage() {
 
     const res = await updateEventDetails(walletClient, publicClient, entityKey, updated);
     if (res.success) {
-      toast.success("Event saved on-chain ✓");
+      toast.success("Event saved ✓");
       setSaved(true);
       setTimeout(() => router.push(`/organizer/dashboard`), 1_000);
     } else {
@@ -169,7 +169,7 @@ export default function EditEventPage() {
             Edit: {event?.title}
           </h1>
           <p className="mt-1 text-xs text-zinc-500">
-            Changes are recorded on-chain and cannot be undone.
+            Changes are saved and cannot be undone.
           </p>
         </div>
 
@@ -302,7 +302,7 @@ export default function EditEventPage() {
           {saved && (
             <div className="rounded-lg border border-emerald-700/30 bg-emerald-950/20 px-4 py-3">
               <p className="text-xs text-emerald-400 flex items-center gap-1.5">
-                <Check size={12} /> Saved on-chain. Redirecting to dashboard…
+                <Check size={12} /> Saved. Redirecting to dashboard…
               </p>
             </div>
           )}
@@ -322,7 +322,7 @@ export default function EditEventPage() {
               {submitting ? (
                 <span className="flex items-center justify-center gap-2">
                   <SpinnerIcon />
-                  Saving to blockchain…
+                  Saving…
                 </span>
               ) : (
                 "Save Changes"

@@ -1,3 +1,8 @@
+/**
+ * Proof-of-Attendance (PoA) entity — minted by organizer after attendee check-in.
+ * Long-lived on-chain proof that an attendee was present at an event.
+ */
+
 import { jsonToPayload } from "@arkiv-network/sdk"
 import { eq } from "@arkiv-network/sdk/query"
 import { ExpirationTime } from "@arkiv-network/sdk/utils"
@@ -12,44 +17,48 @@ import type { ArkivResult } from "../types"
 
 const CONTENT_TYPE = "application/json" as const
 
-// Checkin entities get a 1-day grace period after event end.
-// Result is rounded DOWN to a multiple of 2 (BLOCK_TIME) so that
-// `expiresIn / BLOCK_TIME` is always an integer when the SDK converts to blocks.
-function expiresInFromEventEnd(eventEndDate: number): number {
-  const secondsFromNow =
-    eventEndDate - Math.floor(Date.now() / 1_000)
-  // Add 1-day grace period after event end
-  const gracePeriod = ExpirationTime.fromDays(1)
-  const seconds = Math.floor(Math.max(secondsFromNow + gracePeriod, ExpirationTime.fromHours(1)))
-  return Math.floor(seconds / 2) * 2
+export interface ProofOfAttendance {
+  eventKey: string
+  attendeeWallet: string
+  eventTitle: string
+  checkedInAt: number
+  mintedAt: number
 }
 
-export async function createCheckinEntity(
+/**
+ * Mints a proof-of-attendance entity after successful check-in.
+ * Owned by the organizer on behalf of the attendee.
+ * Expiration: 2 years (long-lived proof).
+ */
+export async function createPoAEntity(
   walletClient: WalletArkivClient<Transport, Chain, Account>,
   eventKey: Hex,
+  rsvpKey: Hex,
   attendeeWallet: Hex,
-  eventEndDate: number,
-  rsvpKey?: Hex,
+  checkinKey: Hex,
+  eventTitle: string,
 ): Promise<ArkivResult<{ entityKey: Hex; txHash: Hex }>> {
   try {
-    const checkinData = {
+    const poaData: ProofOfAttendance = {
       eventKey,
       attendeeWallet,
-      rsvpKey: rsvpKey ?? "",
+      eventTitle,
       checkedInAt: Math.floor(Date.now() / 1_000),
+      mintedAt: Math.floor(Date.now() / 1_000),
     }
 
     const result = await walletClient.createEntity({
-      payload: jsonToPayload(checkinData),
+      payload: jsonToPayload(poaData),
       contentType: CONTENT_TYPE,
       attributes: [
-        { key: "type", value: ENTITY_TYPES.CHECKIN },
+        { key: "type", value: ENTITY_TYPES.PROOF_OF_ATTENDANCE },
         { key: "eventKey", value: eventKey },
+        { key: "rsvpKey", value: rsvpKey },
         { key: "attendeeWallet", value: attendeeWallet },
-        // Entity relationship chain: eventKey → rsvpKey → checkin
-        { key: "rsvpKey", value: rsvpKey ?? "" },
+        { key: "checkinKey", value: checkinKey },
       ],
-      expiresIn: expiresInFromEventEnd(eventEndDate),
+      // PoA is a long-lived proof — 2 years
+      expiresIn: Math.floor(ExpirationTime.fromDays(730)),
     })
 
     return { success: true, data: result as { entityKey: Hex; txHash: Hex } }
@@ -61,16 +70,17 @@ export async function createCheckinEntity(
   }
 }
 
-export async function getCheckinsByEvent(
+/** Get all PoA entities for a specific attendee wallet. */
+export async function getPoAsByAttendee(
   publicClient: PublicArkivClient,
-  eventKey: Hex,
+  attendeeWallet: Hex,
 ): Promise<ArkivResult<Entity[]>> {
   try {
     const result = await publicClient
       .buildQuery()
       .where([
-        eq("type", ENTITY_TYPES.CHECKIN),
-        eq("eventKey", eventKey),
+        eq("type", ENTITY_TYPES.PROOF_OF_ATTENDANCE),
+        eq("attendeeWallet", attendeeWallet),
       ])
       .withPayload()
       .withAttributes()
@@ -85,23 +95,23 @@ export async function getCheckinsByEvent(
   }
 }
 
-export async function hasAttendeeCheckedIn(
+/** Get all PoA entities for a specific event. */
+export async function getPoAsByEvent(
   publicClient: PublicArkivClient,
   eventKey: Hex,
-  attendeeWallet: Hex,
-): Promise<ArkivResult<boolean>> {
+): Promise<ArkivResult<Entity[]>> {
   try {
     const result = await publicClient
       .buildQuery()
       .where([
-        eq("type", ENTITY_TYPES.CHECKIN),
+        eq("type", ENTITY_TYPES.PROOF_OF_ATTENDANCE),
         eq("eventKey", eventKey),
-        eq("attendeeWallet", attendeeWallet),
       ])
+      .withPayload()
       .withAttributes()
       .fetch()
 
-    return { success: true, data: result.entities.length > 0 }
+    return { success: true, data: result.entities }
   } catch (error) {
     return {
       success: false,

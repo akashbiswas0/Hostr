@@ -11,10 +11,13 @@ import { AlertTriangle, Lock, ShieldOff, ArrowLeft, Download, Check, ScanLine } 
 import { useEvent } from "@/hooks/useEvent";
 import { useWallet } from "@/hooks/useWallet";
 import { publicClient } from "@/lib/arkiv/client";
-import { getRsvpsByEvent, confirmRsvp, rejectRsvp, getApprovalsByEvent, getRejectionsByEvent } from "@/lib/arkiv/entities/rsvp";
-import { createCheckinEntity, getCheckinsByEvent } from "@/lib/arkiv/entities/checkin";
+import { confirmRsvp, rejectRsvp } from "@/lib/arkiv/entities/rsvp";
+import { getRsvpsByEvent, getApprovalsByEvent, getRejectionsByEvent, getApprovalForRsvp, getRejectionForRsvp } from "@/lib/arkiv/queries/rsvps";
+import { createCheckinEntity, getCheckinsByEvent, hasAttendeeCheckedIn } from "@/lib/arkiv/entities/checkin";
+import { createPoAEntity } from "@/lib/arkiv/entities/attendance";
 import { OrganizerNav } from "@/components/OrganizerNav";
 import { ConnectButton } from "@/components/ConnectButton";
+import { friendlyError } from "@/lib/arkiv/errors";
 import type { RSVP, RSVPStatus } from "@/lib/arkiv/types";
 
 interface AttendeeRow {
@@ -185,6 +188,11 @@ export default function AttendeesPage() {
       if (!walletClient || !event?.endDate) {
         throw new Error("Missing walletClient or event data");
       }
+      // Prevent duplicate check-in
+      const alreadyRes = await hasAttendeeCheckedIn(publicClient, entityKey, vars.ownerAddress);
+      if (alreadyRes.success && alreadyRes.data) {
+        throw new Error("This attendee has already been checked in");
+      }
       const ms = toMs(event.endDate);
       const endDateSeconds = isNaN(ms)
         ? Math.floor(Date.now() / 1_000) + 3_600
@@ -194,21 +202,37 @@ export default function AttendeesPage() {
         entityKey,
         vars.ownerAddress,
         endDateSeconds,
+        vars.rsvpKey,
       );
       if (!checkinRes.success) throw new Error(checkinRes.error);
+
+      // Mint proof-of-attendance (non-fatal)
+      try {
+        await createPoAEntity(
+          walletClient,
+          entityKey,
+          vars.rsvpKey,
+          vars.ownerAddress,
+          checkinRes.data.entityKey,
+          event?.title ?? "",
+        );
+      } catch { /* PoA is best-effort */ }
     },
     onSuccess: () => {
       toast.success("Attendee checked in ✓");
       refetchRsvps();
       refetchCheckins();
     },
-    onError: (e) => toast.error(e instanceof Error ? e.message : "Check-in failed"),
+    onError: (e) => toast.error(friendlyError(e instanceof Error ? e.message : "Check-in failed")),
   });
 
   // Approve a pending RSVP request — creates an organizer-owned approval entity
   const approveMutation = useMutation({
     mutationFn: async (vars: { rsvpKey: Hex; ownerAddress: Hex }) => {
       if (!walletClient || !event?.endDate) throw new Error("Wallet or event data missing");
+      // Prevent approving a rejected RSVP
+      const rejRes = await getRejectionForRsvp(publicClient, vars.rsvpKey);
+      if (rejRes.success && rejRes.data) throw new Error("Cannot approve — this RSVP was already rejected");
       const ms = toMs(event.endDate);
       const endDateSeconds = isNaN(ms)
         ? Math.floor(Date.now() / 1_000) + 86_400
@@ -228,13 +252,16 @@ export default function AttendeesPage() {
       refetchApprovals();
       refetchRsvps();
     },
-    onError: (e) => toast.error(e instanceof Error ? e.message : "Approval failed"),
+    onError: (e) => toast.error(friendlyError(e instanceof Error ? e.message : "Approval failed")),
   });
 
   // Reject a pending RSVP request — creates an organizer-owned rejection entity
   const rejectMutation = useMutation({
     mutationFn: async (vars: { rsvpKey: Hex; ownerAddress: Hex }) => {
       if (!walletClient || !event?.endDate) throw new Error("Wallet or event data missing");
+      // Prevent rejecting an approved RSVP
+      const appRes = await getApprovalForRsvp(publicClient, vars.rsvpKey);
+      if (appRes.success && appRes.data) throw new Error("Cannot reject — this RSVP was already approved");
       const ms = toMs(event.endDate);
       const endDateSeconds = isNaN(ms)
         ? Math.floor(Date.now() / 1_000) + 86_400
@@ -253,7 +280,7 @@ export default function AttendeesPage() {
       refetchRejections();
       refetchRsvps();
     },
-    onError: (e) => toast.error(e instanceof Error ? e.message : "Rejection failed"),
+    onError: (e) => toast.error(friendlyError(e instanceof Error ? e.message : "Rejection failed")),
   });
 
   
@@ -265,7 +292,7 @@ export default function AttendeesPage() {
             {isConnected ? <AlertTriangle size={24} className="text-amber-400" /> : <Lock size={24} className="text-violet-400" />}
           </div>
           <h2 className="text-lg font-bold text-white">
-            {isConnected ? "Wrong network" : "Wallet required"}
+            {isConnected ? "Wrong network" : "Sign in required"}
           </h2>
           <div className="flex justify-center"><ConnectButton /></div>
         </div>

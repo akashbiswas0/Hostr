@@ -9,7 +9,7 @@ import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { FilterBar, DEFAULT_FILTERS } from "@/components/FilterBar";
 import type { FilterState } from "@/components/FilterBar";
-import type { EventFilters } from "@/lib/arkiv/entities/event";
+import type { EventFilters } from "@/lib/arkiv/queries/events";
 import type { Event, EventStatus } from "@/lib/arkiv/types";
 
 const CATEGORIES = ["All", "DeFi", "NFT", "Gaming", "IRL", "Virtual", "Infrastructure", "DAO", "Education", "Other"];
@@ -19,10 +19,13 @@ export default function HomePage() {
   const [activeCategory, setActiveCategory] = useState("All");
   const [visibleCount, setVisibleCount] = useState(9);
 
-  
+  // Compose Arkiv-level filters — category pills + FilterBar all go on-chain
   const eventFilters = useMemo<EventFilters | undefined>(() => {
     const f: EventFilters = {};
+    // Category from FilterBar dropdown
     if (filters.category) f.category = filters.category;
+    // Category from pills — overrides dropdown when not "All"
+    if (activeCategory !== "All") f.category = activeCategory;
     // location is filtered client-side (substring match); omit from on-chain exact-match query
     if (filters.status) f.status = filters.status as EventStatus;
     if (filters.dateFrom)
@@ -32,11 +35,13 @@ export default function HomePage() {
         new Date(filters.dateTo + "T23:59:59").getTime() / 1_000,
       );
     return Object.keys(f).length ? f : undefined;
-  }, [filters]);
+  }, [filters, activeCategory]);
 
   const { events: rawEvents, isLoading, error } = useEvents(eventFilters);
 
   
+  // Client-side filters: keyword (full-text) and location (substring) only.
+  // Category is now an Arkiv-level query — no matchesCat needed here.
   const events = useMemo(() => {
     const kw = filters.keyword.trim().toLowerCase();
     const loc = filters.location.trim().toLowerCase();
@@ -48,11 +53,9 @@ export default function HomePage() {
         ev.description.toLowerCase().includes(kw);
       const matchesLoc =
         !loc || ev.location.toLowerCase().includes(loc);
-      const matchesCat =
-        activeCategory === "All" || ev.category === activeCategory;
-      return matchesKw && matchesLoc && matchesCat;
+      return matchesKw && matchesLoc;
     });
-  }, [rawEvents, filters.keyword, filters.location, activeCategory]);
+  }, [rawEvents, filters.keyword, filters.location]);
 
   const visibleEvents = events.slice(0, visibleCount);
 
@@ -73,14 +76,14 @@ export default function HomePage() {
           {}
           <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-violet-700/30 bg-violet-950/30 px-3 py-1 text-xs font-medium text-violet-300">
             <span className="h-1.5 w-1.5 rounded-full bg-violet-400 animate-pulse" />
-            On-chain event management · Kaolin Testnet
+            Event management · Kaolin Testnet
           </div>
 
           <h1 className="mx-auto max-w-3xl text-4xl font-bold tracking-tight text-white sm:text-5xl lg:text-6xl leading-tight">
             Discover and host
             <br />
             <span className="text-violet-400">
-              events on-chain
+              events
             </span>
           </h1>
 
@@ -159,7 +162,7 @@ export default function HomePage() {
               {filters.status === "live" ? "Live Now" : "Upcoming Events"}
             </h2>
             <p className="mt-1 text-sm text-zinc-500">
-              Discover on-chain events happening around the world
+              Discover events happening around the world
             </p>
           </div>
           {!isLoading && !error && (
@@ -256,7 +259,7 @@ function EmptyState({ hasFilters, onClear }: { hasFilters?: boolean; onClear?: (
       <p className="mt-2 max-w-xs text-sm text-gray-500">
         {hasFilters
           ? "Try adjusting your filters or clearing your search."
-          : "Be the first to host an on-chain event."}
+          : "Be the first to host an event."}
       </p>
       <div className="mt-6 flex flex-wrap justify-center gap-3">
         {hasFilters && onClear && (

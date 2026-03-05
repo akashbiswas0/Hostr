@@ -50,7 +50,7 @@ export default function OnboardPage() {
 
     const res = await createOrganizerEntity(walletClient, form);
     if (res.success) {
-      toast.success("Profile saved on-chain ✓");
+      toast.success("Profile saved ✓");
       await refetch();
       router.push("/organizer/dashboard");
     } else {
@@ -96,7 +96,7 @@ export default function OnboardPage() {
             Create your organizer profile
           </h1>
           <p className="mt-2 text-sm text-zinc-400">
-            Your profile is stored on-chain and owned by{" "}
+            Your profile is securely stored and owned by{" "}
             <span className="font-mono text-zinc-300">
               {address ? `${address.slice(0, 6)}…${address.slice(-4)}` : "—"}
             </span>
@@ -177,7 +177,7 @@ export default function OnboardPage() {
             {submitting ? (
               <span className="flex items-center justify-center gap-2">
                 <SpinnerIcon />
-                Saving to blockchain…
+                Saving…
               </span>
             ) : (
               <span className="flex items-center justify-center gap-2">Create Profile &amp; Continue <ArrowRight size={14} /></span>

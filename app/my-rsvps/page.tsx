@@ -12,8 +12,11 @@ import { useMyRsvps } from "@/hooks/useRsvp";
 import { useEvent } from "@/hooks/useEvent";
 import { useWallet } from "@/hooks/useWallet";
 import { publicClient } from "@/lib/arkiv/client";
-import { deleteRsvp, promoteFirstWaitlisted, getRsvpsByEvent, getApprovalForRsvp, getRejectionForRsvp } from "@/lib/arkiv/entities/rsvp";
+import { deleteRsvp, promoteFirstWaitlisted } from "@/lib/arkiv/entities/rsvp";
+import { getRsvpsByEvent, getApprovalForRsvp, getRejectionForRsvp } from "@/lib/arkiv/queries/rsvps";
 import { updateRsvpCount } from "@/lib/arkiv/entities/event";
+import { friendlyError } from "@/lib/arkiv/errors";
+import { assertOwnership } from "@/lib/arkiv/client";
 import { ConnectButton } from "@/components/ConnectButton";
 import { Navbar } from "@/components/Navbar";
 import { AddressBadge } from "@/components/AddressBadge";
@@ -87,7 +90,7 @@ export default function MyRsvpsPage() {
                 Connect your wallet
               </p>
               <p className="mt-1 text-sm text-zinc-500">
-                Connect to see your on-chain RSVPs
+                Connect to see your RSVPs
               </p>
             </div>
             <ConnectButton />
@@ -154,7 +157,7 @@ function RsvpRow({
   const rsvpStatus =
     (rsvpEntity.attributes.find((a) => a.key === "status")?.value as string) ??
     "confirmed";
-  const isCheckedIn = rsvp.checkedIn ?? rsvpStatus === "checked-in";
+  const isCheckedIn = rsvpStatus === "checked-in";
 
   // For pending RSVPs, check if the organizer has approved or rejected via separate entities
   const { data: approvalEntity } = useQuery({
@@ -195,6 +198,9 @@ function RsvpRow({
   const cancelMutation = useMutation({
     mutationFn: async () => {
       if (!walletClient) throw new Error("Wallet not connected");
+
+      // Pre-check ownership before attempting on-chain delete
+      assertOwnership(rsvpEntity, walletClient.account.address);
       
       const deleteRes = await deleteRsvp(walletClient, rsvpEntity.key as Hex);
       if (!deleteRes.success) throw new Error(deleteRes.error);
@@ -214,6 +220,7 @@ function RsvpRow({
       toast.success("RSVP cancelled");
       onCancelled();
     },
+    onError: (e) => toast.error(friendlyError(e)),
   });
 
   const statusStyle = STATUS_STYLE[effectiveStatus] ?? STATUS_STYLE.confirmed;
@@ -279,7 +286,7 @@ function RsvpRow({
           </div>
 
           {}
-          <ChainLink entityKey={rsvpEntity.key} label="On-chain ✓" />
+          <ChainLink entityKey={rsvpEntity.key} label="Verified ✓" />
 
           {}
           {!isCheckedIn && !isEventEnded && effectiveStatus !== "rejected" && (
@@ -287,7 +294,7 @@ function RsvpRow({
               onClick={() => {
                 if (
                   confirm(
-                    "Cancel your RSVP? This action is recorded on-chain.",
+                    "Cancel your RSVP? This cannot be undone.",
                   )
                 ) {
                   cancelMutation.mutate();

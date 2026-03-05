@@ -12,12 +12,22 @@ import type { ArkivResult, RSVP, RSVPStatus } from "../types"
 
 const CONTENT_TYPE = "application/json" as const
 
+// Compute expiry for RSVP entities — differentiated by status:
+// - "pending" RSVPs auto-expire in 7 days if not approved
+// - "confirmed" / "waitlisted" RSVPs live until event end + 7 days
 // Result is rounded DOWN to a multiple of 2 (BLOCK_TIME) so that
 // `expiresIn / BLOCK_TIME` is always an integer when the SDK converts to blocks.
-function expiresInFromEventEnd(eventEndDate: number): number {
+function expiresInFromEventEnd(eventEndDate: number, status?: string): number {
+  if (status === "pending") {
+    // Pending RSVPs auto-expire in 7 days
+    const seconds = Math.floor(ExpirationTime.fromDays(7))
+    return Math.floor(seconds / 2) * 2
+  }
   const secondsFromNow =
     eventEndDate - Math.floor(Date.now() / 1_000)
-  const seconds = Math.floor(Math.max(secondsFromNow, ExpirationTime.fromHours(1)))
+  // Add 7-day grace period after event end
+  const gracePeriod = ExpirationTime.fromDays(7)
+  const seconds = Math.floor(Math.max(secondsFromNow + gracePeriod, ExpirationTime.fromHours(1)))
   return Math.floor(seconds / 2) * 2
 }
 
@@ -28,7 +38,7 @@ export async function createRsvpEntity(
   initialStatus: RSVPStatus = "confirmed",
 ): Promise<ArkivResult<{ entityKey: Hex; txHash: Hex }>> {
   try {
-    const rsvpData: RSVP = { ...data, checkedIn: false }
+    const rsvpData: RSVP = { ...data }
 
     const result = await walletClient.createEntity({
       payload: jsonToPayload(rsvpData),
@@ -41,7 +51,7 @@ export async function createRsvpEntity(
         { key: "attendeeWallet", value: walletClient.account.address },
         { key: "status", value: initialStatus },
       ],
-      expiresIn: expiresInFromEventEnd(eventEndDate),
+      expiresIn: expiresInFromEventEnd(eventEndDate, initialStatus),
     })
 
     return { success: true, data: result as { entityKey: Hex; txHash: Hex } }
@@ -60,24 +70,35 @@ export async function updateRsvpStatus(
   status: RSVPStatus,
 ): Promise<ArkivResult<{ entityKey: Hex; txHash: Hex }>> {
   try {
-    
+    // Validate one-way status transitions
     const entity = await publicClient.getEntity(entityKey)
+    const currentStatusAttr = entity.attributes.find((a) => a.key === "status")
+    const currentStatus = currentStatusAttr?.value as string
 
-    
-    
+    const VALID_TRANSITIONS: Record<string, string[]> = {
+      "pending": ["confirmed", "waitlisted"],
+      "waitlisted": ["confirmed"],
+      "confirmed": ["checked-in"],
+      "checked-in": [],
+    }
+
+    const allowed = VALID_TRANSITIONS[currentStatus] ?? []
+    if (!allowed.includes(status)) {
+      return {
+        success: false,
+        error: `Invalid status transition: ${currentStatus} → ${status}`,
+      }
+    }
+
+    // Use event-end-aware expiry (30 days for confirmed actions)
     const expiresIn = Math.floor(ExpirationTime.fromDays(30))
 
-    
     const updatedAttrs = entity.attributes.map((a) =>
       a.key === "status" ? { key: "status", value: status } : a,
     )
 
-    
     const currentRsvp = entity.toJson() as RSVP
-    const updatedRsvp: RSVP = {
-      ...currentRsvp,
-      checkedIn: status === "checked-in",
-    }
+    const updatedRsvp: RSVP = { ...currentRsvp }
 
     const result = await walletClient.updateEntity({
       entityKey,
@@ -96,6 +117,13 @@ export async function updateRsvpStatus(
   }
 }
 
+/**
+ * Deletes an attendee-owned RSVP entity.
+ *
+ * NOTE (Pattern C — hybrid ownership): Organizer-owned entities linked to this
+ * RSVP (approvals, rejections, checkins) cannot be deleted by the attendee’s
+ * wallet. They will expire naturally per their TTL settings.
+ */
 export async function deleteRsvp(
   walletClient: WalletArkivClient<Transport, Chain, Account>,
   entityKey: Hex,
@@ -159,7 +187,7 @@ export async function confirmRsvp(
         { key: "attendeeWallet", value: attendeeWallet },
       ],
       expiresIn: Math.floor(Math.max(
-        eventEndDate - Math.floor(Date.now() / 1_000),
+        eventEndDate - Math.floor(Date.now() / 1_000) + ExpirationTime.fromDays(7),
         ExpirationTime.fromHours(1),
       ) / 2) * 2,
     })
@@ -198,7 +226,7 @@ export async function rejectRsvp(
         { key: "attendeeWallet", value: attendeeWallet },
       ],
       expiresIn: Math.floor(Math.max(
-        eventEndDate - Math.floor(Date.now() / 1_000),
+        eventEndDate - Math.floor(Date.now() / 1_000) + ExpirationTime.fromDays(7),
         ExpirationTime.fromHours(1),
       ) / 2) * 2,
     })
@@ -315,10 +343,18 @@ export async function getRsvpByAttendee(
   }
 }
 
+/**
+ * Promotes the first waitlisted attendee by creating an approval entity.
+ * 
+ * NOTE (Pattern C): The organizer cannot directly update the attendee-owned RSVP
+ * entity. Instead, we create an RSVP_APPROVAL entity (owned by organizer) which
+ * the UI interprets as an upgrade from "waitlisted" → "confirmed".
+ */
 export async function promoteFirstWaitlisted(
   walletClient: WalletArkivClient<Transport, Chain, Account>,
   publicClient: PublicArkivClient,
   eventKey: Hex,
+  eventEndDate?: number,
 ): Promise<ArkivResult<{ promoted: boolean; entityKey?: Hex }>> {
   try {
     const result = await publicClient
@@ -337,18 +373,21 @@ export async function promoteFirstWaitlisted(
     }
 
     const first = result.entities[0]
-    const currentRsvp = first.toJson() as import("../types").RSVP
-    const updatedAttrs = first.attributes.map((a) =>
-      a.key === "status" ? { key: "status", value: "confirmed" } : a,
+    const attendeeWalletAttr = first.attributes.find((a) => a.key === "attendeeWallet")
+    const attendeeWallet = (attendeeWalletAttr?.value as Hex) ?? (first.owner as Hex)
+
+    // Create an approval entity — same pattern as confirmRsvp
+    const endDate = eventEndDate ?? Math.floor(Date.now() / 1_000) + 86_400
+    const approvalRes = await confirmRsvp(
+      walletClient,
+      publicClient,
+      first.key as Hex,
+      eventKey,
+      attendeeWallet,
+      endDate,
     )
 
-    await walletClient.updateEntity({
-      entityKey: first.key as Hex,
-      payload: jsonToPayload({ ...currentRsvp, checkedIn: false }),
-      contentType: CONTENT_TYPE,
-      attributes: updatedAttrs,
-      expiresIn: Math.floor(ExpirationTime.fromDays(30)),
-    })
+    if (!approvalRes.success) throw new Error(approvalRes.error)
 
     return { success: true, data: { promoted: true, entityKey: first.key as Hex } }
   } catch (error) {

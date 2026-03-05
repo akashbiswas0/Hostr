@@ -11,7 +11,9 @@ import { useWallet } from "@/hooks/useWallet";
 import { publicClient } from "@/lib/arkiv/client";
 import { createRsvpEntity, promoteFirstWaitlisted } from "@/lib/arkiv/entities/rsvp"
 import { updateRsvpCount, autoPromoteCapacityStatus } from "@/lib/arkiv/entities/event"
+import { getRsvpByAttendee } from "@/lib/arkiv/queries/rsvps"
 import { ConnectButton } from "@/components/ConnectButton";
+import { friendlyError } from "@/lib/arkiv/errors";
 import type { Event, RSVP } from "@/lib/arkiv/types";
 
 export interface RsvpModalProps {
@@ -108,6 +110,18 @@ export function RsvpModal({
     setErrorMsg("");
 
     try {
+      // ── Duplicate RSVP prevention ──────────────────────────────────────
+      const existingRsvp = await getRsvpByAttendee(
+        publicClient,
+        entity.key as Hex,
+        address as Hex,
+      );
+      if (existingRsvp.success && existingRsvp.data) {
+        setErrorMsg("You've already RSVP'd to this event");
+        setStep("error");
+        return;
+      }
+
       const endMs = toMs(event.endDate);
       const eventEndDate = isNaN(endMs)
         ? Math.floor(Date.now() / 1_000) + 86_400
@@ -118,7 +132,6 @@ export function RsvpModal({
         attendeeName: name.trim(),
         attendeeEmail: email.trim(),
         message: message.trim() || undefined,
-        checkedIn: false,
       };
 
       // If event requires approval → pending; if full → waitlisted; otherwise confirmed
@@ -154,7 +167,7 @@ export function RsvpModal({
           ? "Added to waitlist ✓"
           : requiresRsvp
           ? "Request submitted — awaiting organizer approval ✓"
-          : "RSVP confirmed on-chain ✓",
+          : "RSVP confirmed ✓",
       );
       if (!isFull && !requiresRsvp) {
         autoPromoteCapacityStatus(walletClient, publicClient, entity.key as Hex).catch(() => {});
@@ -162,7 +175,7 @@ export function RsvpModal({
       onSuccess();
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      setErrorMsg(msg);
+      setErrorMsg(friendlyError(msg));
       toast.error("Transaction failed — please try again");
       setStep("error");
     }
@@ -365,7 +378,7 @@ function FormStep({
           </div>
 
           <p className="text-xs text-zinc-600">
-            Your RSVP will be recorded on-chain and owned by your wallet.
+            Your RSVP will be securely recorded and linked to your account.
           </p>
 
           <button
@@ -406,7 +419,7 @@ function SubmittingStep({ isFull, requiresRsvp }: { isFull: boolean; requiresRsv
       <div className="text-center">
         <p className="text-base font-semibold text-white">{label}</p>
         <p className="mt-1 text-sm text-zinc-500">
-          Submitting to blockchain — please approve in your wallet
+          Submitting — please approve in your wallet
         </p>
       </div>
     </div>
@@ -457,8 +470,8 @@ function SuccessStep({
           {isPending
             ? "The organizer will review and approve your request."
             : isFull
-            ? "Waitlist RSVP confirmed on-chain ✓"
-            : "RSVP confirmed on-chain ✓"}
+            ? "Waitlist RSVP confirmed ✓"
+            : "RSVP confirmed ✓"}
         </p>
       </div>
 

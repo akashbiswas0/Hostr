@@ -7,7 +7,7 @@ import {
   getAllUpcomingEvents,
   getEventsByOrganizer,
   type EventFilters,
-} from "@/lib/arkiv/entities/event";
+} from "@/lib/arkiv/queries/events";
 import type { Event } from "@/lib/arkiv/types";
 import type { Entity } from "@arkiv-network/sdk";
 import type { Hex } from "viem";

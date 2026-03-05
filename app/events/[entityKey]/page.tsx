@@ -214,7 +214,7 @@ export default function EventDetailPage() {
             <SearchX size={24} className="text-zinc-500" />
           </div>
           <h1 className="text-xl font-bold text-white mb-2">Event not found</h1>
-          <p className="text-zinc-400 text-sm mb-6">{error ?? "This event doesn't exist on-chain."}</p>
+          <p className="text-zinc-400 text-sm mb-6">{error ?? "This event could not be found."}</p>
           <button
             onClick={() => router.push("/")}
             className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-500 transition-colors"
@@ -251,7 +251,7 @@ export default function EventDetailPage() {
             <StatusBadge status={event.status} />
           </div>
           {}
-          <ChainLink entityKey={entity.key} label="Verified on-chain ✓" />
+          <ChainLink entityKey={entity.key} label="Verified ✓" />
         </div>
       </div>
 
@@ -430,7 +430,7 @@ export default function EventDetailPage() {
                         ? "bg-violet-900/40 text-violet-300 ring-violet-700/40"
                         : effectiveMyRsvpStatus === "rejected"
                         ? "bg-rose-900/40 text-rose-300 ring-rose-700/40"
-                        : myRsvp?.checkedIn
+                        : effectiveMyRsvpStatus === "checked-in"
                         ? "bg-blue-900/40 text-blue-300 ring-blue-700/40"
                         : "bg-emerald-900/40 text-emerald-300 ring-emerald-700/40"
                     }`}>
@@ -438,7 +438,7 @@ export default function EventDetailPage() {
                         ? "Awaiting approval"
                         : effectiveMyRsvpStatus === "rejected"
                         ? "Rejected"
-                        : myRsvp?.checkedIn
+                        : effectiveMyRsvpStatus === "checked-in"
                         ? "Checked in ✓"
                         : "Confirmed"}
                     </span>
@@ -757,19 +757,4 @@ function InfoRow({
   );
 }
 
-function ArrowLeftIcon() {
-  // kept for backwards-compat if referenced; prefer lucide ArrowLeft directly
-  return null;
-}
 
-function CalendarIcon() {
-  return null;
-}
-
-function PinIcon() {
-  return null;
-}
-
-function UsersIcon() {
-  return null;
-}

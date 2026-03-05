@@ -2,7 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { publicClient } from "@/lib/arkiv/client";
-import { getRsvpByAttendee } from "@/lib/arkiv/entities/rsvp";
+import { getRsvpByAttendee } from "@/lib/arkiv/queries/rsvps";
 import { eq } from "@arkiv-network/sdk/query";
 import { ENTITY_TYPES } from "@/lib/arkiv/constants";
 import type { RSVP } from "@/lib/arkiv/types";

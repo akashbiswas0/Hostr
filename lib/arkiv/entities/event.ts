@@ -14,13 +14,16 @@ const CONTENT_TYPE = "application/json" as const
 
 const MIN_EXPIRY_SECONDS = ExpirationTime.fromDays(1)
 
-// Compute seconds from now until isoDate without relying on ExpirationTime.fromDate,
-// which can return a fractional number that the SDK fails to convert to BigInt.
+// Compute seconds from now until isoDate + 30-day grace period without relying
+// on ExpirationTime.fromDate, which can return a fractional number that the SDK
+// fails to convert to BigInt.
 // Result is always rounded DOWN to a multiple of 2 (BLOCK_TIME) so that
 // `expiresIn / BLOCK_TIME` is an integer when the SDK converts to blocks.
 function secondsUntil(isoDate: string): number {
   const diffMs = new Date(isoDate).getTime() - Date.now()
-  const seconds = Math.floor(Math.max(diffMs / 1_000, MIN_EXPIRY_SECONDS))
+  // Add 30-day grace period after end date so event data remains queryable
+  const gracePeriod = ExpirationTime.fromDays(30)
+  const seconds = Math.floor(Math.max(diffMs / 1_000 + gracePeriod, MIN_EXPIRY_SECONDS))
   return Math.floor(seconds / 2) * 2
 }
 
@@ -49,9 +52,10 @@ export async function createEventEntity(
         { key: "capacity", value: data.capacity },
         { key: "rsvpCount", value: 0 },
         { key: "requiresRsvp", value: data.requiresRsvp ? 1 : 0 },
+        { key: "isOnline", value: data.virtualLink ? 1 : 0 },
         // entity relationship: reference to the organizer_profile entity
-        ...(organizerKey ? [{ key: "organizerKey", value: organizerKey }] : []),
-        ...(organizerName ? [{ key: "organizerName", value: organizerName }] : []),
+        { key: "organizerKey", value: organizerKey ?? "" },
+        { key: "organizerName", value: organizerName ?? "" },
       ],
       
       expiresIn: secondsUntil(data.endDate),
@@ -101,8 +105,9 @@ export async function updateEventStatus(
         { key: "capacity", value: currentPayload.capacity },
         { key: "rsvpCount", value: rsvpCount },
         { key: "requiresRsvp", value: existingRequiresRsvp },
-        ...(existingOrgKey ? [{ key: "organizerKey", value: existingOrgKey }] : []),
-        ...(existingOrgName ? [{ key: "organizerName", value: existingOrgName }] : []),
+        { key: "isOnline", value: currentPayload.virtualLink ? 1 : 0 },
+        { key: "organizerKey", value: existingOrgKey ?? "" },
+        { key: "organizerName", value: existingOrgName ?? "" },
       ],
       expiresIn: secondsUntil(currentPayload.endDate),
     })
@@ -147,8 +152,9 @@ export async function updateEventDetails(
         { key: "capacity", value: updatedData.capacity },
         { key: "rsvpCount", value: rsvpCount },
         { key: "requiresRsvp", value: updatedData.requiresRsvp ? 1 : 0 },
-        ...(existingOrgKey ? [{ key: "organizerKey", value: existingOrgKey }] : []),
-        ...(existingOrgName ? [{ key: "organizerName", value: existingOrgName }] : []),
+        { key: "isOnline", value: updatedData.virtualLink ? 1 : 0 },
+        { key: "organizerKey", value: existingOrgKey ?? "" },
+        { key: "organizerName", value: existingOrgName ?? "" },
       ],
       expiresIn: secondsUntil(updatedData.endDate),
     })
@@ -162,6 +168,15 @@ export async function updateEventDetails(
   }
 }
 
+/**
+ * Atomically reads the current rsvpCount attribute from the entity, computes +1 or -1
+ * (floored at 0), then writes back the updated attributes via updateEntity.
+ *
+ * NOTE: This uses a read-then-write pattern which is as atomic as the SDK allows
+ * (single updateEntity call). In high-concurrency scenarios, two simultaneous
+ * increments could read the same value and both write count+1 instead of count+2.
+ * This is acceptable for the testnet environment.
+ */
 export async function updateRsvpCount(
   walletClient: WalletArkivClient<Transport, Chain, Account>,
   publicClient: PublicArkivClient,
@@ -206,26 +221,70 @@ export async function updateRsvpCount(
   }
 }
 
+/**
+ * Cascade-deletes the event entity and all organizer-owned child entities
+ * (approvals, rejections, checkins) in a single mutateEntities call.
+ *
+ * NOTE (Pattern C): Attendee-owned RSVPs cannot be deleted by the organizer
+ * due to on-chain ownership. These will expire naturally per their TTL.
+ */
 export async function deleteEvent(
   walletClient: WalletArkivClient<Transport, Chain, Account>,
   publicClient: PublicArkivClient,
   eventKey: Hex,
 ): Promise<ArkivResult<{ txHash: Hex; deletedCount: number }>> {
   try {
-    
-    const rsvpResult = await publicClient
-      .buildQuery()
-      .where([
-        eq("type", ENTITY_TYPES.RSVP),
-        eq("eventKey", eventKey),
-      ])
-      .withAttributes()
-      .fetch()
+    // Query all child entities for this event in parallel
+    const [approvalResult, rejectionResult, checkinResult] = await Promise.all([
+      publicClient
+        .buildQuery()
+        .where([
+          eq("type", ENTITY_TYPES.RSVP_APPROVAL),
+          eq("eventKey", eventKey),
+        ])
+        .withAttributes()
+        .fetch(),
+      publicClient
+        .buildQuery()
+        .where([
+          eq("type", ENTITY_TYPES.RSVP_REJECTION),
+          eq("eventKey", eventKey),
+        ])
+        .withAttributes()
+        .fetch(),
+      publicClient
+        .buildQuery()
+        .where([
+          eq("type", ENTITY_TYPES.CHECKIN),
+          eq("eventKey", eventKey),
+        ])
+        .withAttributes()
+        .fetch(),
+    ])
 
-    
+    // Also query PoA entities if they exist
+    let poaEntities: { key: string | import("viem").Hex }[] = []
+    try {
+      const poaResult = await publicClient
+        .buildQuery()
+        .where([
+          eq("type", ENTITY_TYPES.PROOF_OF_ATTENDANCE),
+          eq("eventKey", eventKey),
+        ])
+        .withAttributes()
+        .fetch()
+      poaEntities = poaResult.entities
+    } catch {
+      // PoA entity type may not exist yet — ignore
+    }
+
+    // Build cascade delete: event + all organizer-owned children
     const deletes = [
       { entityKey: eventKey },
-      ...rsvpResult.entities.map((e) => ({ entityKey: e.key })),
+      ...approvalResult.entities.map((e) => ({ entityKey: e.key as Hex })),
+      ...rejectionResult.entities.map((e) => ({ entityKey: e.key as Hex })),
+      ...checkinResult.entities.map((e) => ({ entityKey: e.key as Hex })),
+      ...poaEntities.map((e) => ({ entityKey: e.key as Hex })),
     ]
 
     const result = await walletClient.mutateEntities({ deletes })

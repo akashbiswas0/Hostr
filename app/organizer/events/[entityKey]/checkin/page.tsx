@@ -24,7 +24,9 @@ import { useEvent } from "@/hooks/useEvent";
 import { useWallet } from "@/hooks/useWallet";
 import { publicClient } from "@/lib/arkiv/client";
 import { hasAttendeeCheckedIn, createCheckinEntity } from "@/lib/arkiv/entities/checkin";
-import { getApprovalForRsvp } from "@/lib/arkiv/entities/rsvp";
+import { createPoAEntity } from "@/lib/arkiv/entities/attendance";
+import { getApprovalForRsvp } from "@/lib/arkiv/queries/rsvps";
+import { friendlyError } from "@/lib/arkiv/errors";
 import { OrganizerNav } from "@/components/OrganizerNav";
 import { ConnectButton } from "@/components/ConnectButton";
 import type { RSVP } from "@/lib/arkiv/types";
@@ -167,8 +169,20 @@ export default function CheckinPage() {
           ? Math.floor(Date.now() / 1_000) + 3_600
           : Math.floor(endMs / 1_000);
 
-        const res = await createCheckinEntity(walletClient, entityKey, attendeeWallet, endDateSeconds);
+        const res = await createCheckinEntity(walletClient, entityKey, attendeeWallet, endDateSeconds, rsvpKey);
         if (!res.success) throw new Error(res.error);
+
+        // Mint proof-of-attendance (non-fatal — checkin already succeeded)
+        try {
+          await createPoAEntity(
+            walletClient,
+            entityKey,
+            rsvpKey,
+            attendeeWallet,
+            res.data.entityKey,
+            event.title ?? "",
+          );
+        } catch { /* PoA is best-effort */ }
 
         toast.success(`${attendeeName} checked in ✓`);
         setState({
@@ -180,7 +194,7 @@ export default function CheckinPage() {
       } catch (err) {
         setState({
           kind: "error",
-          message: err instanceof Error ? err.message : String(err),
+          message: friendlyError(err),
         });
       } finally {
         processingRef.current = false;
@@ -208,7 +222,7 @@ export default function CheckinPage() {
             )}
           </div>
           <h2 className="text-lg font-bold text-white">
-            {isConnected ? "Wrong network" : "Wallet required"}
+            {isConnected ? "Wrong network" : "Sign in required"}
           </h2>
           <div className="flex justify-center">
             <ConnectButton />
@@ -300,7 +314,7 @@ export default function CheckinPage() {
               <div>
                 <p className="font-semibold text-white">Enter RSVP Key</p>
                 <p className="text-sm text-zinc-500 mt-0.5">
-                  Paste the RSVP entity key manually
+                  Paste the RSVP key manually
                 </p>
               </div>
             </button>
@@ -341,7 +355,7 @@ export default function CheckinPage() {
             <div className="rounded-xl border border-white/10 bg-zinc-900 p-5 space-y-4">
               <div>
                 <label className="block text-xs font-medium text-zinc-400 mb-1.5">
-                  RSVP Entity Key
+                  RSVP Key
                 </label>
                 <input
                   type="text"

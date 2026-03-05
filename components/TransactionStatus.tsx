@@ -3,6 +3,7 @@
 import type { Hex } from "viem";
 import { Check, X } from "lucide-react";
 import { ChainLink } from "./ChainLink";
+import { friendlyError } from "@/lib/arkiv/errors";
 
 export type TxState = "idle" | "pending" | "success" | "error";
 
@@ -19,7 +20,7 @@ export interface TransactionStatusProps {
 
 export function TransactionStatus({
   state,
-  successMessage = "Saved on-chain",
+  successMessage = "Saved successfully",
   error,
   entityKey,
   txHash,
@@ -31,7 +32,7 @@ export function TransactionStatus({
     return (
       <div className="flex items-center gap-3 rounded-xl border border-white/5 bg-zinc-900 px-4 py-3">
         <SpinnerIcon className="h-4 w-4 shrink-0 text-violet-400" />
-        <span className="text-sm text-zinc-300">Saving to blockchain…</span>
+        <span className="text-sm text-zinc-300">Saving…</span>
       </div>
     );
   }
@@ -55,10 +56,10 @@ export function TransactionStatus({
     <div className="rounded-xl border border-red-800/30 bg-red-950/20 px-4 py-3 space-y-2">
       <div className="flex items-center gap-2">
         <span className="text-red-400">✕</span>
-        <span className="text-sm text-red-300 font-medium">Transaction failed — please try again</span>
+        <span className="text-sm text-red-300 font-medium">Something went wrong — please try again</span>
       </div>
       {error && (
-        <p className="text-xs text-red-400/70 font-mono break-all">{error}</p>
+        <p className="text-xs text-red-400/70 break-all">{friendlyError(error)}</p>
       )}
       {onRetry && (
         <button

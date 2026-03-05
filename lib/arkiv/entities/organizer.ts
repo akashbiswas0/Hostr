@@ -24,8 +24,8 @@ export async function createOrganizerEntity(
         { key: "wallet", value: walletClient.account.address },
         { key: "name", value: data.name },
       ],
-      
-      expiresIn: Math.floor(ExpirationTime.fromDays(365)),
+      // Organizer profiles are long-lived identity entities (2 years, renewed on edit)
+      expiresIn: Math.floor(ExpirationTime.fromDays(730)),
     })
 
     return { success: true, data: result as { entityKey: Hex; txHash: Hex } }
@@ -52,8 +52,8 @@ export async function updateOrganizerEntity(
         { key: "wallet", value: walletClient.account.address },
         { key: "name", value: data.name },
       ],
-      
-      expiresIn: Math.floor(ExpirationTime.fromDays(365)),
+      // Renew 2-year lifespan on each edit
+      expiresIn: Math.floor(ExpirationTime.fromDays(730)),
     })
 
     return { success: true, data: result as { entityKey: Hex; txHash: Hex } }

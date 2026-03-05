@@ -64,7 +64,7 @@ export default function EditOrganizerPage() {
             {isConnected ? <AlertTriangle size={24} className="text-amber-400" /> : <Lock size={24} className="text-violet-400" />}
           </div>
           <h2 className="text-lg font-bold text-white">
-            {isConnected ? "Wrong network" : "Wallet required"}
+            {isConnected ? "Wrong network" : "Sign in required"}
           </h2>
           <p className="text-sm text-zinc-500">
             Connect to the Kaolin testnet to edit your profile.
@@ -154,7 +154,7 @@ export default function EditOrganizerPage() {
         <div className="mb-8">
           <h1 className="text-2xl font-bold text-white">Edit Profile</h1>
           <p className="mt-1 text-xs text-zinc-500">
-            Updates are stored on-chain via Arkiv.
+            Updates are saved securely via Arkiv.
           </p>
         </div>
 
@@ -253,7 +253,7 @@ export default function EditOrganizerPage() {
           {saved && (
             <div className="rounded-lg border border-emerald-700/30 bg-emerald-950/20 px-4 py-3">
               <p className="text-xs text-emerald-400 flex items-center gap-1.5">
-                <Check size={12} /> Profile saved on-chain. Redirecting…
+                <Check size={12} /> Profile saved. Redirecting…
               </p>
             </div>
           )}
@@ -274,7 +274,7 @@ export default function EditOrganizerPage() {
               {submitting ? (
                 <span className="flex items-center justify-center gap-2">
                   <SpinnerIcon />
-                  Saving to blockchain…
+                  Saving…
                 </span>
               ) : (
                 "Save Profile"

@@ -39,5 +39,4 @@ export interface RSVP {
   attendeeEmail: string;
   
   message?: string;
-  checkedIn: boolean;
 }

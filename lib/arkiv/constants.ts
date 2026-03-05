@@ -5,6 +5,7 @@ export const ENTITY_TYPES = {
   CHECKIN: "checkin",
   RSVP_APPROVAL: "rsvp_approval",
   RSVP_REJECTION: "rsvp_rejection",
+  PROOF_OF_ATTENDANCE: "proof_of_attendance",
 } as const;
 
 export type EntityType = (typeof ENTITY_TYPES)[keyof typeof ENTITY_TYPES];

@@ -7,7 +7,8 @@ import {
   http,
 } from "@arkiv-network/sdk";
 import { kaolin } from "@arkiv-network/sdk/chains";
-import type { Account, EIP1193RequestFn } from "viem";
+import type { Account, EIP1193RequestFn, Hex } from "viem";
+import type { Entity } from "@arkiv-network/sdk";
 
 export const publicClient = createPublicClient({
   chain: kaolin,
@@ -23,6 +24,18 @@ export function getWalletClient(
     transport: custom(provider),
     account,
   });
+}
+
+/**
+ * Asserts the connected wallet owns the given entity.
+ * Throws a clear error before any on-chain mutation attempt if ownership doesn't match.
+ */
+export function assertOwnership(entity: Entity, walletAddress: Hex): void {
+  const owner = (entity.owner ?? "").toLowerCase();
+  const wallet = walletAddress.toLowerCase();
+  if (owner !== wallet) {
+    throw new Error("You don't own this entity — only the original creator can modify it.");
+  }
 }
 
 export { kaolin };
