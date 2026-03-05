@@ -1,0 +1,731 @@
+"use client";
+
+import { useParams, useRouter } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
+import Link from "next/link";
+import { useState } from "react";
+import type { Hex } from "viem";
+import { QRCodeSVG } from "qrcode.react";
+import { useEvent } from "@/hooks/useEvent";
+import { useRsvp } from "@/hooks/useRsvp";
+import { useWallet } from "@/hooks/useWallet";
+import { publicClient } from "@/lib/arkiv/client";
+import { getRsvpsByEvent, getApprovalForRsvp, getRejectionForRsvp } from "@/lib/arkiv/entities/rsvp";
+import { getOrganizerByWallet } from "@/lib/arkiv/entities/organizer";
+import { ConnectButton } from "@/components/ConnectButton";
+import { StatusBadge } from "@/components/StatusBadge";
+import { RsvpModal } from "@/components/RsvpModal";
+import { Navbar } from "@/components/Navbar";
+import { ChainLink } from "@/components/ChainLink";
+import type { RSVP, OrganizerProfile } from "@/lib/arkiv/types";
+import type { Entity } from "@arkiv-network/sdk";
+
+const EXPLORER = "https://explorer.kaolin.hoodi.arkiv.network";
+
+function toMs(value: unknown): number {
+  if (value == null || value === "") return NaN;
+  if (typeof value === "number") return isFinite(value) ? value * 1_000 : NaN;
+  const str = String(value);
+  if (/^\d+$/.test(str)) return Number(str) * 1_000;
+  const t = Date.parse(str);
+  return isNaN(t) ? NaN : t;
+}
+
+function formatDateFull(value: unknown) {
+  const ms = toMs(value);
+  if (isNaN(ms)) return "Date TBD";
+  return new Intl.DateTimeFormat("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZoneName: "short",
+  }).format(new Date(ms));
+}
+
+function truncate(addr: string) {
+  return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
+}
+
+const CATEGORY_GRADIENT: Record<string, string> = {
+  DeFi: "from-violet-900 to-violet-950",
+  NFT: "from-pink-900 to-pink-950",
+  Gaming: "from-cyan-900 to-cyan-950",
+  IRL: "from-amber-900 to-amber-950",
+  Virtual: "from-emerald-900 to-emerald-950",
+};
+
+export default function EventDetailPage() {
+  const params = useParams();
+  const router = useRouter();
+  const entityKey = params.entityKey as Hex;
+
+  const { event, entity, isLoading, error, refetch: refetchEvent } = useEvent(entityKey);
+  const { hasRsvp, rsvp: myRsvp, entity: rsvpEntity, isLoading: rsvpLoading, refetch: refetchRsvp } =
+    useRsvp(entityKey);
+  const { isConnected, isCorrectChain } = useWallet();
+
+  
+  const attendeeQuery = useQuery({
+    queryKey: ["attendees", entityKey],
+    queryFn: async () => {
+      const res = await getRsvpsByEvent(publicClient, entityKey);
+      if (!res.success) throw new Error(res.error);
+      return res.data;
+    },
+    enabled: !!entityKey,
+    staleTime: 30_000,
+  });
+
+  
+  const organizerQuery = useQuery({
+    queryKey: ["organizer-profile", entity?.owner],
+    queryFn: async () => {
+      if (!entity?.owner) return null;
+      const res = await getOrganizerByWallet(publicClient, entity.owner as Hex);
+      return res.success ? res.data : null;
+    },
+    enabled: !!entity?.owner,
+    staleTime: 60_000,
+  });
+  const organizerProfile: OrganizerProfile | null = organizerQuery.data
+    ? (organizerQuery.data.toJson() as OrganizerProfile)
+    : null;
+
+  
+  const [rsvpModalOpen, setRsvpModalOpen] = useState(false);
+
+  
+  const rsvpCount = Number(
+    entity?.attributes.find((a) => a.key === "rsvpCount")?.value ?? 0,
+  );
+  const capacity = event?.capacity ?? 0;
+  const capacityPct = capacity ? Math.min(100, (rsvpCount / capacity) * 100) : 0;
+  const isFull = rsvpCount >= capacity && capacity > 0;
+  const isEnded = event?.status === "ended";
+  const gradient =
+    CATEGORY_GRADIENT[event?.category ?? ""] ?? "from-zinc-800 to-zinc-900";
+  // Is the event offline-only (has physical location, no virtual link)?
+  const isOffline = !!(event?.location && !event?.virtualLink);
+  // Current user's RSVP status (raw, from attendee-owned entity)
+  const myRsvpStatus =
+    (rsvpEntity?.attributes.find((a) => a.key === "status")?.value as string) ?? null;
+
+  // For pending RSVPs, check if the organizer has approved/rejected via separate entities
+  const { data: myApprovalEntity } = useQuery({
+    queryKey: ["rsvp-approval", rsvpEntity?.key],
+    queryFn: async () => {
+      const res = await getApprovalForRsvp(publicClient, rsvpEntity!.key as Hex);
+      return res.success ? res.data : null;
+    },
+    enabled: myRsvpStatus === "pending" && !!rsvpEntity,
+    staleTime: 30_000,
+  });
+
+  const { data: myRejectionEntity } = useQuery({
+    queryKey: ["rsvp-rejection", rsvpEntity?.key],
+    queryFn: async () => {
+      const res = await getRejectionForRsvp(publicClient, rsvpEntity!.key as Hex);
+      return res.success ? res.data : null;
+    },
+    enabled: myRsvpStatus === "pending" && !!rsvpEntity,
+    staleTime: 30_000,
+  });
+
+  // Effective status: organizer approval/rejection overrides raw pending
+  const effectiveMyRsvpStatus =
+    myRsvpStatus === "pending" && myApprovalEntity
+      ? "confirmed"
+      : myRsvpStatus === "pending" && myRejectionEntity
+      ? "rejected"
+      : myRsvpStatus;
+
+  
+  if (isLoading) return <PageSkeleton />;
+
+  if (error || !event || !entity) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-zinc-950">
+        <div className="text-center">
+          <div className="text-4xl mb-4">🔍</div>
+          <h1 className="text-xl font-bold text-white mb-2">Event not found</h1>
+          <p className="text-zinc-400 text-sm mb-6">{error ?? "This event doesn't exist on-chain."}</p>
+          <button
+            onClick={() => router.push("/")}
+            className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-500 transition-colors"
+          >
+            Back to Events
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-zinc-950 text-white">
+      <Navbar />
+
+      {}
+      <div
+        className={`relative h-48 border-b border-white/5 flex items-end overflow-hidden ${event.imageUrl ? "" : `bg-gradient-to-br ${gradient}`}`}
+      >
+        {event.imageUrl && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={event.imageUrl}
+            alt={event.title}
+            className="absolute inset-0 w-full h-full object-cover opacity-60"
+          />
+        )}
+        {!event.imageUrl && <div className={`absolute inset-0 bg-gradient-to-br ${gradient}`} />}
+        <div className="relative mx-auto w-full max-w-7xl px-4 pb-6 sm:px-6 flex items-end justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <span className="rounded-full border border-white/20 bg-black/30 px-3 py-1 text-xs font-semibold text-white/80 backdrop-blur-sm">
+              {event.category}
+            </span>
+            <StatusBadge status={event.status} />
+          </div>
+          {}
+          <ChainLink entityKey={entity.key} label="Verified on-chain ✓" />
+        </div>
+      </div>
+
+      {}
+      <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6">
+        <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
+          {}
+          <div className="lg:col-span-2 space-y-8">
+            {}
+            <div>
+              <h1 className="text-3xl font-extrabold tracking-tight text-white sm:text-4xl">
+                {event.title}
+              </h1>
+
+              {}
+              <div className="mt-5 flex flex-col gap-3 text-sm text-zinc-400">
+                <MetaRow icon={<CalendarIcon />}>
+                  <span>{formatDateFull(event.date)}</span>
+                  <span className="text-zinc-600">→</span>
+                  <span>{formatDateFull(event.endDate)}</span>
+                </MetaRow>
+
+                <MetaRow icon={<PinIcon />}>
+                  {event.location}
+                  {event.virtualLink && (
+                    <a
+                      href={event.virtualLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="ml-2 text-violet-400 hover:text-violet-300 transition-colors"
+                    >
+                      Join online →
+                    </a>
+                  )}
+                </MetaRow>
+
+                <MetaRow icon={<UsersIcon />}>
+                  <span
+                    className={isFull ? "text-rose-400" : "text-zinc-400"}
+                  >
+                    {rsvpCount} / {capacity} attendees
+                    {isFull && " · Full"}
+                  </span>
+                </MetaRow>
+              </div>
+
+              {}
+              <div className="mt-4 space-y-1.5">
+                <div className="flex justify-between text-xs text-zinc-500">
+                  <span>Capacity</span>
+                  <span>{Math.round(capacityPct)}%</span>
+                </div>
+                <div className="h-2 w-full rounded-full bg-zinc-800">
+                  <div
+                    className={`h-full rounded-full transition-all duration-700 ${
+                      isFull ? "bg-rose-500" : "bg-violet-500"
+                    }`}
+                    style={{ width: `${capacityPct}%` }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {}
+            <section>
+              <h2 className="mb-3 text-base font-semibold text-white">
+                About this event
+              </h2>
+              <div className="rounded-2xl border border-white/5 bg-zinc-900 p-5">
+                <p className="whitespace-pre-wrap text-sm leading-relaxed text-zinc-300">
+                  {event.description}
+                </p>
+              </div>
+            </section>
+
+            {}
+            <section>
+              <h2 className="mb-3 text-base font-semibold text-white">
+                Organizer
+              </h2>
+              <Link
+                href={entity.owner ? `/organizers/${entity.owner}` : "#"}
+                className="group flex items-center gap-4 rounded-2xl border border-white/5 bg-zinc-900 p-5 transition-colors hover:border-violet-700/40 hover:bg-zinc-900/80"
+              >
+                {}
+                {organizerProfile?.avatarUrl ? (
+                  <img
+                    src={organizerProfile.avatarUrl}
+                    alt={organizerProfile.name}
+                    className="h-12 w-12 shrink-0 rounded-full object-cover ring-2 ring-white/10"
+                    onError={(e) => {
+                      (e.currentTarget as HTMLImageElement).style.display = "none";
+                    }}
+                  />
+                ) : (
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-violet-700 to-pink-700 text-sm font-bold text-white ring-2 ring-white/10">
+                    {organizerProfile?.name
+                      ? organizerProfile.name
+                          .split(" ")
+                          .map((w: string) => w[0])
+                          .join("")
+                          .slice(0, 2)
+                          .toUpperCase()
+                      : entity.owner
+                        ? entity.owner.slice(2, 4).toUpperCase()
+                        : "??"}
+                  </div>
+                )}
+                <div className="min-w-0 flex-1">
+                  {organizerProfile?.name ? (
+                    <>
+                      <p className="font-semibold text-white group-hover:text-violet-300 transition-colors">
+                        {organizerProfile.name}
+                      </p>
+                      {organizerProfile.bio && (
+                        <p className="mt-0.5 text-xs text-zinc-500 line-clamp-1">
+                          {organizerProfile.bio}
+                        </p>
+                      )}
+                    </>
+                  ) : (
+                    <p className="font-medium text-white group-hover:text-violet-300 transition-colors">
+                      {entity.owner ? truncate(entity.owner) : "Unknown"}
+                    </p>
+                  )}
+                  <p className="mt-1 text-xs font-mono text-zinc-600">
+                    {entity.owner ? truncate(entity.owner) : "—"}
+                  </p>
+                </div>
+                {}
+                <svg className="h-4 w-4 shrink-0 text-zinc-600 group-hover:text-violet-400 transition-colors" viewBox="0 0 16 16" fill="none">
+                  <path d="M6 4l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </Link>
+            </section>
+
+            {}
+            <section>
+              <h2 className="mb-3 text-base font-semibold text-white">
+                Attendees{" "}
+                <span className="text-zinc-500 font-normal text-sm">
+                  ({rsvpCount})
+                </span>
+              </h2>
+              <AttendeeList
+                entities={attendeeQuery.data ?? []}
+                isLoading={attendeeQuery.isLoading}
+              />
+            </section>
+          </div>
+
+          {}
+          <div className="lg:col-span-1">
+            <div className="sticky top-24 space-y-4">
+              <RsvpCard
+                isEnded={isEnded}
+                isFull={isFull}
+                isConnected={isConnected}
+                isCorrectChain={isCorrectChain}
+                hasRsvp={hasRsvp}
+                rsvpLoading={rsvpLoading}
+                myRsvp={myRsvp}
+                myRsvpStatus={effectiveMyRsvpStatus}
+                rsvpEntity={rsvpEntity}
+                onOpen={() => setRsvpModalOpen(true)}
+              />
+
+              {}
+              {hasRsvp && rsvpEntity && (
+                <div className="rounded-2xl border border-emerald-700/20 bg-emerald-950/10 p-4 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">Your RSVP</p>
+                    <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ${
+                      effectiveMyRsvpStatus === "pending"
+                        ? "bg-violet-900/40 text-violet-300 ring-violet-700/40"
+                        : effectiveMyRsvpStatus === "rejected"
+                        ? "bg-rose-900/40 text-rose-300 ring-rose-700/40"
+                        : myRsvp?.checkedIn
+                        ? "bg-blue-900/40 text-blue-300 ring-blue-700/40"
+                        : "bg-emerald-900/40 text-emerald-300 ring-emerald-700/40"
+                    }`}>
+                      {effectiveMyRsvpStatus === "pending"
+                        ? "Awaiting approval"
+                        : effectiveMyRsvpStatus === "rejected"
+                        ? "Rejected"
+                        : myRsvp?.checkedIn
+                        ? "Checked in ✓"
+                        : "Confirmed"}
+                    </span>
+                  </div>
+                  {myRsvp?.attendeeName && (
+                    <p className="text-sm text-white">{myRsvp.attendeeName}</p>
+                  )}
+                  {/* QR code for confirmed offline events */}
+                  {effectiveMyRsvpStatus !== "pending" && effectiveMyRsvpStatus !== "waitlisted" && effectiveMyRsvpStatus !== "rejected" && isOffline && (
+                    <div className="flex flex-col items-center gap-1.5 pt-2">
+                      <p className="text-xs text-zinc-500 uppercase tracking-wide">Entry QR</p>
+                      <div className="rounded-lg bg-white p-2">
+                        <QRCodeSVG value={rsvpEntity.key as string} size={120} level="M" />
+                      </div>
+                      <p className="text-xs text-zinc-600 text-center">Show at venue</p>
+                    </div>
+                  )}
+                  <a
+                    href={`${EXPLORER}/entity/${rsvpEntity.key}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block text-xs font-mono text-zinc-500 hover:text-violet-400 transition-colors"
+                  >
+                    {(rsvpEntity.key as string).slice(0, 14)}… ↗
+                  </a>
+                  <Link
+                    href="/my-rsvps"
+                    className="block text-xs text-zinc-500 hover:text-white transition-colors"
+                  >
+                    All my RSVPs →
+                  </Link>
+                </div>
+              )}
+
+              {}
+              <div className="rounded-2xl border border-white/5 bg-zinc-900 p-4 space-y-2">
+                <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wide">
+                  On-chain info
+                </p>
+                <InfoRow label="Entity key">
+                  <a
+                    href={`${EXPLORER}/entity/${entity.key}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-mono text-violet-400 hover:text-violet-300 transition-colors truncate max-w-[140px] block"
+                  >
+                    {truncate(entity.key)}
+                  </a>
+                </InfoRow>
+                {entity.createdAtBlock !== undefined && (
+                  <InfoRow label="Created at block">
+                    <span className="font-mono text-zinc-300 text-xs">
+                      #{entity.createdAtBlock.toString()}
+                    </span>
+                  </InfoRow>
+                )}
+                <InfoRow label="Network">
+                  <span className="text-zinc-300">Kaolin Testnet</span>
+                </InfoRow>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      {}
+      {event && entity && (
+        <RsvpModal
+          open={rsvpModalOpen}
+          onClose={() => setRsvpModalOpen(false)}
+          entity={entity}
+          event={event}
+          isFull={isFull}
+          onSuccess={() => {
+            refetchEvent();
+            refetchRsvp();
+            attendeeQuery.refetch();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+interface RsvpCardProps {
+  isEnded: boolean;
+  isFull: boolean;
+  isConnected: boolean;
+  isCorrectChain: boolean;
+  hasRsvp: boolean;
+  rsvpLoading: boolean;
+  myRsvp: RSVP | null;
+  myRsvpStatus: string | null;
+  rsvpEntity: Entity | null;
+  onOpen: () => void;
+}
+
+function RsvpCard({
+  isEnded,
+  isFull,
+  isConnected,
+  isCorrectChain,
+  hasRsvp,
+  rsvpLoading,
+  myRsvp,
+  myRsvpStatus,
+  onOpen,
+}: RsvpCardProps) {
+  return (
+    <div className="rounded-2xl border border-white/5 bg-zinc-900 p-5 space-y-4">
+      <h2 className="text-base font-bold text-white">RSVP</h2>
+
+      {}
+      {isEnded ? (
+        <div className="rounded-xl border border-dashed border-zinc-700 bg-zinc-800/50 py-8 text-center">
+          <div className="text-3xl mb-2">🏁</div>
+          <p className="text-sm font-medium text-zinc-400">Event has ended</p>
+        </div>
+      ) : rsvpLoading ? (
+        <div className="h-12 rounded-xl bg-zinc-800 animate-pulse" />
+      ) : !isConnected ? (
+        <div className="space-y-3">
+          <p className="text-xs text-zinc-500 text-center">Connect your wallet to RSVP</p>
+          <div className="flex justify-center"><ConnectButton /></div>
+        </div>
+      ) : !isCorrectChain ? (
+        <div className="text-center space-y-3">
+          <p className="text-xs text-amber-400">Switch to Kaolin to RSVP</p>
+          <ConnectButton />
+        </div>
+      ) : hasRsvp && myRsvpStatus === "pending" ? (
+        <div className="rounded-xl border border-violet-700/30 bg-violet-950/20 py-6 text-center">
+          <div className="text-2xl mb-2">⏳</div>
+          <p className="text-sm font-semibold text-violet-300">Request pending</p>
+          <p className="mt-1 text-xs text-zinc-500">Waiting for organizer approval</p>
+          <Link
+            href="/my-rsvps"
+            className="mt-3 inline-block text-xs text-zinc-500 hover:text-white underline transition-colors"
+          >
+            Manage RSVPs
+          </Link>
+        </div>
+      ) : hasRsvp && myRsvpStatus === "rejected" ? (
+        <div className="rounded-xl border border-rose-700/30 bg-rose-950/20 py-6 text-center">
+          <div className="text-2xl mb-2">❌</div>
+          <p className="text-sm font-semibold text-rose-300">Request rejected</p>
+          <p className="mt-1 text-xs text-zinc-500">The organizer declined your request</p>
+          <Link
+            href="/my-rsvps"
+            className="mt-3 inline-block text-xs text-zinc-500 hover:text-white underline transition-colors"
+          >
+            Manage RSVPs
+          </Link>
+        </div>
+      ) : hasRsvp ? (
+        <div className="rounded-xl border border-emerald-700/30 bg-emerald-950/20 py-6 text-center">
+          <div className="text-2xl mb-2">✅</div>
+          <p className="text-sm font-semibold text-emerald-300">You&apos;re going!</p>
+          {myRsvp?.attendeeName && (
+            <p className="mt-1 text-xs text-zinc-500">{myRsvp.attendeeName}</p>
+          )}
+          <Link
+            href="/my-rsvps"
+            className="mt-3 inline-block text-xs text-zinc-500 hover:text-white underline transition-colors"
+          >
+            Manage RSVPs
+          </Link>
+        </div>
+      ) : isFull ? (
+        <div className="space-y-3">
+          <div className="rounded-xl border border-amber-700/30 bg-amber-950/20 p-3 text-center">
+            <p className="text-xs text-amber-400 font-medium">Capacity reached</p>
+          </div>
+          <button
+            onClick={onOpen}
+            className="w-full rounded-xl border border-white/10 py-3 text-sm font-semibold text-white hover:bg-zinc-800 transition-colors"
+          >
+            Join Waitlist
+          </button>
+        </div>
+      ) : (
+        <button
+          onClick={onOpen}
+          className="w-full rounded-xl bg-violet-600 py-3 text-sm font-semibold text-white hover:bg-violet-500 transition-colors shadow-lg shadow-violet-900/30"
+        >
+          RSVP for this Event
+        </button>
+      )}
+    </div>
+  );
+}
+
+function AttendeeList({
+  entities,
+  isLoading,
+}: {
+  entities: Entity[];
+  isLoading: boolean;
+}) {
+  if (isLoading) {
+    return (
+      <div className="space-y-2">
+        {[1, 2, 3].map((i) => (
+          <div
+            key={i}
+            className="h-10 rounded-xl bg-zinc-900 animate-pulse"
+          />
+        ))}
+      </div>
+    );
+  }
+
+  if (entities.length === 0) {
+    return (
+      <p className="rounded-2xl border border-dashed border-white/10 py-8 text-center text-sm text-zinc-500">
+        No attendees yet. Be the first to RSVP!
+      </p>
+    );
+  }
+
+  return (
+    <div className="rounded-2xl border border-white/5 bg-zinc-900 divide-y divide-white/5 overflow-hidden">
+      {entities.map((entity) => {
+        const rsvp = entity.toJson() as RSVP;
+        return (
+          <div
+            key={entity.key}
+            className="flex items-center justify-between px-4 py-3 gap-4"
+          >
+            <div className="flex items-center gap-3 min-w-0">
+              {}
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-violet-800 to-pink-800 text-xs font-bold text-white">
+                {rsvp.attendeeName?.charAt(0)?.toUpperCase() ?? "?"}
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-white truncate">
+                  {rsvp.attendeeName || "Anonymous"}
+                </p>
+                {entity.owner && (
+                  <p className="text-xs text-zinc-500 font-mono">
+                    {truncate(entity.owner)}
+                  </p>
+                )}
+              </div>
+            </div>
+            <span
+              className={`shrink-0 text-xs font-medium ${
+                rsvp.checkedIn
+                  ? "text-emerald-400"
+                  : "text-zinc-500"
+              }`}
+            >
+              {rsvp.checkedIn ? "✓ Checked in" : "Confirmed"}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function PageSkeleton() {
+  return (
+    <div className="min-h-screen bg-zinc-950 animate-pulse">
+      <div className="h-16 border-b border-white/5 bg-zinc-900" />
+      <div className="h-48 bg-zinc-800" />
+      <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="lg:col-span-2 space-y-6">
+          <div className="h-10 w-3/4 rounded-xl bg-zinc-800" />
+          <div className="h-4 w-1/2 rounded bg-zinc-900" />
+          <div className="h-4 w-2/3 rounded bg-zinc-900" />
+          <div className="h-32 rounded-2xl bg-zinc-900" />
+        </div>
+        <div className="h-48 rounded-2xl bg-zinc-900" />
+      </div>
+    </div>
+  );
+}
+
+function MetaRow({
+  icon,
+  children,
+}: {
+  icon: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-start gap-2.5 flex-wrap">
+      <span className="mt-0.5 shrink-0 text-zinc-500">{icon}</span>
+      <span className="flex items-center gap-2 flex-wrap">{children}</span>
+    </div>
+  );
+}
+
+function InfoRow({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-2">
+      <span className="text-xs text-zinc-500">{label}</span>
+      <span className="text-xs text-right">{children}</span>
+    </div>
+  );
+}
+
+function ArrowLeftIcon() {
+  return (
+    <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none">
+      <path
+        d="M10 12L6 8l4-4"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function CalendarIcon() {
+  return (
+    <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none">
+      <rect x="1.5" y="2.5" width="13" height="12" rx="1.5" stroke="currentColor" strokeWidth="1.2" />
+      <path d="M5 1v3M11 1v3M1.5 6.5h13" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function PinIcon() {
+  return (
+    <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none">
+      <path
+        d="M8 1.5C5.79 1.5 4 3.29 4 5.5c0 3.25 4 8.5 4 8.5s4-5.25 4-8.5c0-2.21-1.79-4-4-4z"
+        stroke="currentColor"
+        strokeWidth="1.2"
+        strokeLinejoin="round"
+      />
+      <circle cx="8" cy="5.5" r="1.5" stroke="currentColor" strokeWidth="1.2" />
+    </svg>
+  );
+}
+
+function UsersIcon() {
+  return (
+    <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none">
+      <circle cx="6" cy="5" r="2.5" stroke="currentColor" strokeWidth="1.2" />
+      <path d="M1 13.5c0-2.76 2.24-5 5-5s5 2.24 5 5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+      <path d="M12 7a2 2 0 000-4M15 13.5a4 4 0 00-4-4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+    </svg>
+  );
+}
