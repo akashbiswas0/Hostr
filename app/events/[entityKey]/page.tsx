@@ -216,7 +216,7 @@ export default function EventDetailPage() {
           <h1 className="text-xl font-bold text-white mb-2">Event not found</h1>
           <p className="text-zinc-400 text-sm mb-6">{error ?? "This event could not be found."}</p>
           <button
-            onClick={() => router.push("/")}
+            onClick={() => router.push("/events")}
             className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-500 transition-colors"
           >
             Back to Events
@@ -756,5 +756,4 @@ function InfoRow({
     </div>
   );
 }
-
 

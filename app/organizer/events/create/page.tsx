@@ -1,17 +1,48 @@
 "use client";
 
-import { useState, useRef } from "react";
-import { useRouter } from "next/navigation";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type ReactNode,
+} from "react";
+import { Space_Grotesk } from "next/font/google";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
-import { AlertTriangle, Lock, ClipboardList, Image as ImageIcon, ArrowLeft, ArrowRight, Check } from "lucide-react";
+import {
+  AlertTriangle,
+  AlignLeft,
+  Check,
+  ChevronsUpDown,
+  ClipboardList,
+  Globe,
+  Image as ImageIcon,
+  Lock,
+  MapPin,
+  Palette,
+  Sparkles,
+  Ticket,
+  Type,
+  Users,
+  WandSparkles,
+  X,
+} from "lucide-react";
 
+import { ConnectButton } from "@/components/ConnectButton";
+import { OrganizerNav } from "@/components/OrganizerNav";
 import { useOrganizer } from "@/hooks/useOrganizer";
 import { useWallet } from "@/hooks/useWallet";
 import { createEventEntity } from "@/lib/arkiv/entities/event";
-import { OrganizerNav } from "@/components/OrganizerNav";
-import { ConnectButton } from "@/components/ConnectButton";
 import type { Event } from "@/lib/arkiv/types";
+
+const displayFont = Space_Grotesk({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  display: "swap",
+});
 
 const CATEGORIES = [
   "DeFi",
@@ -24,6 +55,35 @@ const CATEGORIES = [
   "Education",
   "Other",
 ];
+
+const THEME_OPTIONS = [
+  { id: "minimal", label: "Minimal", preview: "linear-gradient(145deg, #ece6f2 0%, #b7b1c5 100%)" },
+  { id: "quantum", label: "Quantum", preview: "linear-gradient(145deg, #7cdbff 0%, #d078ff 50%, #6f83ff 100%)" },
+  { id: "warp", label: "Warp", preview: "radial-gradient(circle at 50% 50%, #320337 0%, #0f0a1a 42%, #6de2ff 100%)" },
+  { id: "emoji", label: "Emoji", preview: "linear-gradient(145deg, #ffd4f6 0%, #c8a1ff 100%)" },
+  { id: "confetti", label: "Confetti", preview: "linear-gradient(145deg, #7f17f0 0%, #c64ffd 45%, #ff79d7 100%)" },
+  { id: "pattern", label: "Pattern", preview: "linear-gradient(145deg, #6f54ff 0%, #5f8fff 50%, #95a1ff 100%)" },
+  { id: "seasonal", label: "Seasonal", preview: "linear-gradient(145deg, #63c2ff 0%, #4d8fff 50%, #0f4f86 100%)" },
+] as const;
+
+const FONT_PRESETS = [
+  "Default",
+  "Museo",
+  "Factoria",
+  "Ivy Presto",
+  "Ivy Mode",
+  "Google",
+  "Roc",
+  "Nunito",
+  "Degular",
+  "Pearl",
+  "Geist Mono",
+  "New Spirit",
+  "Departure",
+  "Garamond",
+  "Futura",
+  "Alternate",
+] as const;
 
 const EMPTY_FORM: Omit<Event, "status"> = {
   title: "",
@@ -40,41 +100,26 @@ const EMPTY_FORM: Omit<Event, "status"> = {
 
 type FormState = typeof EMPTY_FORM;
 
-const inputCls =
-  "w-full rounded-lg border border-white/10 bg-zinc-800 px-3 py-2.5 text-sm text-white placeholder-zinc-500 focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500/50 transition-colors";
-const labelCls = "mb-1.5 block text-xs font-medium text-zinc-400";
-
-function step1Valid(f: FormState) {
-  return f.title.trim() !== "" && f.description.trim() !== "" && f.category !== "";
-}
-
-function step2Valid(f: FormState) {
-  if (!f.date || !f.endDate) return false;
-  if (f.date >= f.endDate) return false;
-  if (!f.location.trim() && !f.virtualLink?.trim()) return false;
-  if (f.capacity < 1) return false;
+function isFormValid(form: FormState): boolean {
+  if (!form.title.trim() || !form.description.trim() || !form.category) return false;
+  if (!form.date || !form.endDate || form.date >= form.endDate) return false;
+  if (!form.location.trim() && !form.virtualLink?.trim()) return false;
+  if (form.capacity < 1) return false;
   return true;
 }
 
-function toMs(value: unknown): number {
-  if (!value) return NaN;
-  const str = String(value);
-  if (/^\d+$/.test(str)) return Number(str) * 1_000;
-  const t = Date.parse(str);
-  return isNaN(t) ? NaN : t;
+function getUtcOffsetLabel(date = new Date()): string {
+  const offsetMinutes = -date.getTimezoneOffset();
+  const sign = offsetMinutes >= 0 ? "+" : "-";
+  const absolute = Math.abs(offsetMinutes);
+  const hh = String(Math.floor(absolute / 60)).padStart(2, "0");
+  const mm = String(absolute % 60).padStart(2, "0");
+  return `GMT${sign}${hh}:${mm}`;
 }
 
-function formatReview(value: string) {
-  const ms = toMs(value);
-  if (isNaN(ms)) return "—";
-  return new Intl.DateTimeFormat("en-US", {
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  }).format(new Date(ms));
+function toCityName(timeZone: string): string {
+  const city = timeZone.split("/").at(-1) ?? timeZone;
+  return city.replaceAll("_", " ");
 }
 
 export default function CreateEventPage() {
@@ -82,48 +127,104 @@ export default function CreateEventPage() {
   const { isConnected, isCorrectChain, walletClient } = useWallet();
   const { isOrganizer, isLoading: profileLoading, entityKey: organizerKey, organizer } = useOrganizer();
 
-  const [step, setStep] = useState(1);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
-  const [publishNow, setPublishNow] = useState(true);
+  const [visibility, setVisibility] = useState<"public" | "draft">("public");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [selectedTheme, setSelectedTheme] = useState<(typeof THEME_OPTIONS)[number]["id"]>("minimal");
+  const [selectedFont, setSelectedFont] = useState<(typeof FONT_PRESETS)[number]>("Default");
+  const [fontMenuOpen, setFontMenuOpen] = useState(false);
 
-  function set<K extends keyof FormState>(key: K, value: FormState[K]) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const fontMenuRef = useRef<HTMLDivElement>(null);
+
+  const timeZone = useMemo(
+    () => Intl.DateTimeFormat().resolvedOptions().timeZone ?? "UTC",
+    [],
+  );
+  const utcOffset = useMemo(() => getUtcOffsetLabel(), []);
+  const valid = useMemo(() => isFormValid(form), [form]);
+  const selectedThemeMeta = useMemo(
+    () => THEME_OPTIONS.find((theme) => theme.id === selectedTheme) ?? THEME_OPTIONS[0],
+    [selectedTheme],
+  );
+
+  useEffect(() => {
+    function onDocumentClick(event: MouseEvent) {
+      if (!fontMenuRef.current?.contains(event.target as Node)) {
+        setFontMenuOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", onDocumentClick);
+    return () => document.removeEventListener("mousedown", onDocumentClick);
+  }, []);
+
+  function setField<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
-  function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
+  function handleImageUpload(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
     if (!file) return;
     if (file.size > 2 * 1024 * 1024) {
       toast.error("Image must be under 2 MB");
       return;
     }
     const reader = new FileReader();
-    reader.onload = (ev) => {
-      const dataUrl = ev.target?.result as string;
+    reader.onload = (e) => {
+      const dataUrl = e.target?.result as string;
       setImagePreview(dataUrl);
-      set("imageUrl", dataUrl);
+      setField("imageUrl", dataUrl);
     };
     reader.readAsDataURL(file);
   }
 
-  
+  async function handleSubmit() {
+    if (!walletClient || submitting) return;
+    if (!valid) {
+      toast.error("Complete all required fields before creating the event.");
+      return;
+    }
+
+    setSubmitting(true);
+    setError("");
+
+    const eventData: Event = {
+      ...form,
+      virtualLink: form.virtualLink?.trim() || undefined,
+      status: visibility === "public" ? "upcoming" : "draft",
+    };
+
+    const res = await createEventEntity(
+      walletClient,
+      eventData,
+      organizerKey ?? undefined,
+      organizer?.name ?? undefined,
+    );
+
+    if (res.success) {
+      toast.success(visibility === "public" ? "Event published ✓" : "Draft saved ✓");
+      router.push("/organizer/dashboard");
+      return;
+    }
+
+    setError(res.error);
+    setSubmitting(false);
+  }
+
   if (!isConnected || !isCorrectChain) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-zinc-950 p-6">
-        <div className="text-center space-y-4 max-w-sm">
-          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-zinc-900 border border-white/10 mx-auto">
-            {isConnected ? <AlertTriangle size={24} className="text-amber-400" /> : <Lock size={24} className="text-violet-400" />}
+      <div className={`flex min-h-screen items-center justify-center bg-[#2f0e34] p-6 ${displayFont.className}`}>
+        <div className="max-w-sm space-y-4 text-center">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full border border-white/10 bg-[#4a2850]">
+            {isConnected ? <AlertTriangle size={24} className="text-amber-300" /> : <Lock size={24} className="text-fuchsia-200" />}
           </div>
           <h2 className="text-lg font-bold text-white">
             {isConnected ? "Wrong network" : "Sign in required"}
           </h2>
-          <p className="text-sm text-zinc-400">
-            {isConnected
-              ? "Switch to Kaolin to create events."
-              : "Sign in to create events."}
+          <p className="text-sm text-[#ccb8cf]">
+            {isConnected ? "Switch to Kaolin to create events." : "Sign in to create events."}
           </p>
           <div className="flex justify-center"><ConnectButton /></div>
         </div>
@@ -135,557 +236,488 @@ export default function CreateEventPage() {
 
   if (!isOrganizer) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-zinc-950 p-6">
-        <div className="text-center space-y-4 max-w-sm">
-          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-zinc-900 border border-white/10 mx-auto">
-            <ClipboardList size={24} className="text-violet-400" />
+      <div className={`flex min-h-screen items-center justify-center bg-[#2f0e34] p-6 ${displayFont.className}`}>
+        <div className="max-w-sm space-y-4 text-center">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full border border-white/10 bg-[#4a2850]">
+            <ClipboardList size={24} className="text-fuchsia-200" />
           </div>
           <h2 className="text-lg font-bold text-white">Set up your profile first</h2>
-          <p className="text-sm text-zinc-400">
+          <p className="text-sm text-[#ccb8cf]">
             You need an organizer profile to create events.
           </p>
           <Link
             href="/organizer/onboard"
-            className="inline-block rounded-lg bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-violet-500 transition-colors"
+            className="inline-block rounded-lg bg-fuchsia-500 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-fuchsia-400"
           >
-            Create Profile <ArrowRight size={14} className="inline" />
+            Create Profile
           </Link>
         </div>
       </div>
     );
   }
 
-  
-  async function handleSubmit() {
-    if (!walletClient) return;
-    setSubmitting(true);
-    setError("");
-
-    const eventData: Event = {
-      ...form,
-      
-      virtualLink: form.virtualLink?.trim() || undefined,
-      status: publishNow ? "upcoming" : "draft",
-    };
-
-    const res = await createEventEntity(
-      walletClient,
-      eventData,
-      organizerKey ?? undefined,
-      organizer?.name ?? undefined,
-    );
-    if (res.success) {
-      toast.success(publishNow ? "Event published ✓" : "Event saved as draft ✓");
-      router.push(`/organizer/dashboard`);
-    } else {
-      setError(res.error);
-      setSubmitting(false);
-    }
-  }
-
   return (
-    <div className="min-h-screen bg-zinc-950 text-white">
+    <div className={`min-h-screen bg-[#47174d] text-[#f3e8f4] ${displayFont.className}`}>
       <OrganizerNav crumb="Create Event" />
 
-      <main className="mx-auto max-w-2xl px-4 py-10 sm:px-6">
-        {}
-        <StepIndicator current={step} />
-
-        {}
-        {step === 1 && (
-          <Step1
-            form={form}
-            set={set}
-            onNext={() => setStep(2)}
-            valid={step1Valid(form)}
-            imagePreview={imagePreview}
-            onImageUpload={handleImageUpload}
-            onImageClear={() => { setImagePreview(null); set("imageUrl", ""); }}
-          />
-        )}
-
-        {step === 2 && (
-          <Step2
-            form={form}
-            set={set}
-            onBack={() => setStep(1)}
-            onNext={() => setStep(3)}
-            valid={step2Valid(form)}
-          />
-        )}
-
-        {step === 3 && (
-          <Step3
-            form={form}
-            onBack={() => setStep(2)}
-            onSubmit={handleSubmit}
-            submitting={submitting}
-            error={error}
-            publishNow={publishNow}
-            onPublishToggle={() => setPublishNow((v) => !v)}
-            imagePreview={imagePreview}
-          />
-        )}
-      </main>
-    </div>
-  );
-}
-
-function StepIndicator({ current }: { current: number }) {
-  const steps = ["Basic Info", "When & Where", "Review"];
-  return (
-    <div className="flex items-center gap-0 mb-10">
-      {steps.map((label, i) => {
-        const n = i + 1;
-        const done = n < current;
-        const active = n === current;
-        return (
-          <div key={n} className="flex flex-1 items-center">
-            <div className="flex items-center gap-2 shrink-0">
-              <div
-                className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold transition-colors ${
-                  done ? "bg-emerald-600 text-white"
-                  : active
-                    ? "bg-violet-600 text-white"
-                    : "bg-zinc-800 text-zinc-500"
-                }`}
-              >
-                {done ? <Check size={12} /> : n}
-              </div>
-              <span
-                className={`text-xs font-medium hidden sm:block ${
-                  active ? "text-white" : done ? "text-zinc-400" : "text-zinc-600"
-                }`}
-              >
-                {label}
-              </span>
-            </div>
-            {i < steps.length - 1 && (
-              <div
-                className={`flex-1 mx-3 h-px transition-colors ${
-                  done ? "bg-emerald-700" : "bg-zinc-800"
-                }`}
-              />
-            )}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-function Step1({
-  form,
-  set,
-  onNext,
-  valid,
-  imagePreview,
-  onImageUpload,
-  onImageClear,
-}: {
-  form: FormState;
-  set: <K extends keyof FormState>(k: K, v: FormState[K]) => void;
-  onNext: () => void;
-  valid: boolean;
-  imagePreview: string | null;
-  onImageUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  onImageClear: () => void;
-}) {
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-xl font-bold text-white">Basic Info</h2>
-        <p className="text-sm text-zinc-500 mt-1">Tell people what your event is about.</p>
-      </div>
-
-      <div className="rounded-2xl border border-white/5 bg-zinc-900 p-6 space-y-5">
-        {/* Cover image */}
-        <div>
-          <label className={labelCls}>Cover image <span className="text-zinc-600">(optional, max 2 MB)</span></label>
-          {imagePreview ? (
-            <div className="relative rounded-xl overflow-hidden border border-white/10 h-36">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={imagePreview} alt="Cover preview" className="w-full h-full object-cover" />
-              <button
-                type="button"
-                onClick={onImageClear}
-                className="absolute top-2 right-2 rounded-full bg-black/60 px-2 py-0.5 text-xs text-zinc-300 hover:text-white"
-              >
-                Remove
-              </button>
-            </div>
-          ) : (
+      <main className="mx-auto max-w-[1120px] px-4 pb-52 pt-8 sm:px-6 lg:px-8">
+        <div className="grid gap-7 xl:grid-cols-[320px_minmax(0,1fr)]">
+          <aside className="space-y-4">
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="flex w-full flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-white/10 py-8 text-zinc-500 hover:border-violet-600/50 hover:text-zinc-400 transition-colors"
+              className="relative block aspect-square w-full overflow-hidden rounded-2xl border border-white/15 bg-[#633566] shadow-[0_18px_60px_-30px_rgba(0,0,0,0.75)]"
             >
-              <ImageIcon size={24} className="text-zinc-600" />
-              <span className="text-sm">Click to upload cover image</span>
-              <span className="text-xs">PNG, JPG, WebP — max 2 MB</span>
+              {imagePreview ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={imagePreview} alt="Cover preview" className="h-full w-full object-cover" />
+              ) : (
+                <div className="relative flex h-full w-full items-center justify-center p-6">
+                  <div
+                    className="absolute inset-0 opacity-95"
+                    style={{ background: selectedThemeMeta.preview }}
+                  />
+                  <p className="relative max-w-[220px] text-center text-[2.3rem] font-black uppercase leading-[0.9] text-black/85">
+                    Party like it&apos;s the last one
+                  </p>
+                </div>
+              )}
+              <span className="absolute bottom-3 right-3 inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/35 bg-black/55 text-white">
+                <ImageIcon size={16} />
+              </span>
             </button>
-          )}
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/png,image/jpeg,image/webp,image/gif"
-            className="hidden"
-            onChange={onImageUpload}
-          />
-        </div>
 
-        <div>
-          <label className={labelCls}>
-            Event title <span className="text-rose-400">*</span>
-          </label>
-          <input
-            required
-            type="text"
-            placeholder="e.g. DeFi Summit 2026"
-            value={form.title}
-            onChange={(e) => set("title", e.target.value)}
-            className={inputCls}
-          />
-        </div>
-
-        <div>
-          <label className={labelCls}>
-            Description <span className="text-rose-400">*</span>
-          </label>
-          <textarea
-            required
-            rows={5}
-            placeholder="What will attendees experience? Include agenda, speakers, requirements…"
-            value={form.description}
-            onChange={(e) => set("description", e.target.value)}
-            className={`${inputCls} resize-none`}
-          />
-        </div>
-
-        <div>
-          <label className={labelCls}>
-            Category <span className="text-rose-400">*</span>
-          </label>
-          <select
-            value={form.category}
-            onChange={(e) => set("category", e.target.value)}
-            className={inputCls}
-          >
-            <option value="">Select a category…</option>
-            {CATEGORIES.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {/* RSVP approval toggle */}
-        <div className="flex items-start gap-3 rounded-xl border border-white/5 bg-zinc-800/60 p-4">
-          <button
-            type="button"
-            role="switch"
-            aria-checked={form.requiresRsvp}
-            onClick={() => set("requiresRsvp", !form.requiresRsvp)}
-            className={`relative mt-0.5 h-5 w-9 shrink-0 rounded-full transition-colors ${
-              form.requiresRsvp ? "bg-violet-600" : "bg-zinc-700"
-            }`}
-          >
-            <span
-              className={`absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${
-                form.requiresRsvp ? "translate-x-4" : "translate-x-0"
-              }`}
-            />
-          </button>
-          <div>
-            <p className="text-sm font-medium text-white">Require RSVP approval</p>
-            <p className="mt-0.5 text-xs text-zinc-500">
-              When enabled, attendee requests go into a "pending" queue that only you can approve from your dashboard.
-            </p>
-          </div>
-        </div>
-      </div>
-
-      <div className="flex justify-end">
-        <button
-          onClick={onNext}
-          disabled={!valid}
-          className="rounded-xl bg-violet-600 px-6 py-2.5 text-sm font-semibold text-white hover:bg-violet-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-        >
-          Next: When &amp; Where <ArrowRight size={14} className="inline" />
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function Step2({
-  form,
-  set,
-  onBack,
-  onNext,
-  valid,
-}: {
-  form: FormState;
-  set: <K extends keyof FormState>(k: K, v: FormState[K]) => void;
-  onBack: () => void;
-  onNext: () => void;
-  valid: boolean;
-}) {
-  return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-xl font-bold text-white">When & Where</h2>
-        <p className="text-sm text-zinc-500 mt-1">
-          Set the date, location, and capacity.
-        </p>
-      </div>
-
-      <div className="rounded-2xl border border-white/5 bg-zinc-900 p-6 space-y-5">
-        {}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label className={labelCls}>
-              Start date & time <span className="text-rose-400">*</span>
-            </label>
             <input
-              required
-              type="datetime-local"
-              value={form.date}
-              onChange={(e) => set("date", e.target.value)}
-              className={`${inputCls} [color-scheme:dark]`}
+              ref={fileInputRef}
+              type="file"
+              accept="image/png,image/jpeg,image/webp,image/gif"
+              className="hidden"
+              onChange={handleImageUpload}
             />
-          </div>
-          <div>
-            <label className={labelCls}>
-              End date & time <span className="text-rose-400">*</span>
-            </label>
+
+            <div className="grid grid-cols-[1fr_54px] gap-2">
+              <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-[#69406d]/70 px-3 py-2">
+                <div
+                  className="h-10 w-10 rounded-lg border border-white/25"
+                  style={{ background: selectedThemeMeta.preview }}
+                />
+                <div className="min-w-0">
+                  <p className="text-xs text-[#ceb8d0]">Theme</p>
+                  <p className="truncate text-lg font-semibold leading-none text-white">{selectedThemeMeta.label}</p>
+                </div>
+                <ChevronsUpDown size={16} className="ml-auto text-[#cfb5d1]" />
+              </div>
+
+              <button
+                type="button"
+                className="inline-flex h-full items-center justify-center rounded-xl border border-white/10 bg-[#69406d]/70 text-[#e3cae5] transition-colors hover:bg-[#7a4a7f]"
+              >
+                <WandSparkles size={18} />
+              </button>
+            </div>
+
+            {imagePreview && (
+              <button
+                type="button"
+                onClick={() => {
+                  setImagePreview(null);
+                  setField("imageUrl", "");
+                }}
+                className="inline-flex items-center gap-1.5 text-xs text-[#d8bedb] hover:text-white"
+              >
+                <X size={12} /> Remove cover image
+              </button>
+            )}
+          </aside>
+
+          <section>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-[#69406d]/65 px-3 py-2">
+                <Globe size={14} className="text-[#dbc3dd]" />
+                <select
+                  value={form.category}
+                  onChange={(event) => setField("category", event.target.value)}
+                  className="min-w-[180px] appearance-none bg-transparent text-sm font-semibold text-white outline-none"
+                >
+                  <option value="" className="bg-[#4f2953] text-white">Select category</option>
+                  {CATEGORIES.map((category) => (
+                    <option key={category} value={category} className="bg-[#4f2953] text-white">
+                      {category}
+                    </option>
+                  ))}
+                </select>
+                <ChevronsUpDown size={14} className="text-[#dbc3dd]" />
+              </div>
+
+              <div className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-[#69406d]/65 px-3 py-2">
+                <Globe size={14} className="text-[#dbc3dd]" />
+                <select
+                  value={visibility}
+                  onChange={(event) => setVisibility(event.target.value as "public" | "draft")}
+                  className="appearance-none bg-transparent text-sm font-semibold text-white outline-none"
+                >
+                  <option value="public" className="bg-[#4f2953] text-white">Public</option>
+                  <option value="draft" className="bg-[#4f2953] text-white">Draft</option>
+                </select>
+                <ChevronsUpDown size={14} className="text-[#dbc3dd]" />
+              </div>
+            </div>
+
             <input
-              required
-              type="datetime-local"
-              value={form.endDate}
-              min={form.date}
-              onChange={(e) => set("endDate", e.target.value)}
-              className={`${inputCls} [color-scheme:dark]`}
+              type="text"
+              value={form.title}
+              onChange={(event) => setField("title", event.target.value)}
+              placeholder="Event Name"
+              className="mt-4 w-full border-none bg-transparent text-4xl font-semibold tracking-tight text-[#dfcbe1] placeholder:text-[#b596b8] outline-none sm:text-6xl"
             />
-          </div>
-        </div>
-        {form.date && form.endDate && form.date >= form.endDate && (
-          <p className="text-xs text-rose-400">End time must be after start time.</p>
-        )}
 
-        {}
-        <div>
-          <label className={labelCls}>
-            Location{" "}
-            <span className="text-zinc-600">(required if no virtual link)</span>
-          </label>
-          <input
-            type="text"
-            placeholder="e.g. San Francisco, CA  or  ETH Denver Convention Center"
-            value={form.location}
-            onChange={(e) => set("location", e.target.value)}
-            className={inputCls}
-          />
-        </div>
+            <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1fr)_170px]">
+              <div className="space-y-2 rounded-2xl border border-white/10 bg-[#6a406f]/70 p-3">
+                <TimeRow
+                  label="Start"
+                  value={form.date}
+                  onChange={(value) => setField("date", value)}
+                />
+                <TimeRow
+                  label="End"
+                  value={form.endDate}
+                  min={form.date}
+                  onChange={(value) => setField("endDate", value)}
+                />
+              </div>
 
-        {}
-        <div>
-          <label className={labelCls}>
-            Virtual link{" "}
-            <span className="text-zinc-600">(optional – for online or hybrid)</span>
-          </label>
-          <input
-            type="url"
-            placeholder="https://meet.example.com/my-event"
-            value={form.virtualLink}
-            onChange={(e) => set("virtualLink", e.target.value)}
-            className={inputCls}
-          />
-        </div>
-        {!form.location.trim() && !form.virtualLink?.trim() && (
-          <p className="text-xs text-amber-400">
-            Provide a physical location or a virtual link (or both).
-          </p>
-        )}
+              <div className="rounded-2xl border border-white/10 bg-[#6a406f]/70 p-4">
+                <p className="flex items-center gap-2 text-sm text-[#ceb8d0]">
+                  <Globe size={14} />
+                  Timezone
+                </p>
+                <p className="mt-2 text-2xl font-semibold text-white">{utcOffset}</p>
+                <p className="text-sm text-[#dec9df]">{toCityName(timeZone)}</p>
+              </div>
+            </div>
 
-        {}
-        <div>
-          <label className={labelCls}>
-            Capacity <span className="text-rose-400">*</span>
-          </label>
-          <input
-            required
-            type="number"
-            min={1}
-            max={100_000}
-            value={form.capacity}
-            onChange={(e) => set("capacity", Number(e.target.value))}
-            className={inputCls}
-          />
-          <p className="mt-1 text-xs text-zinc-600">
-            Max number of confirmed RSVPs (waitlist applies after this).
-          </p>
-        </div>
-      </div>
+            {form.date && form.endDate && form.date >= form.endDate && (
+              <p className="mt-2 text-xs text-rose-300">End time must be after start time.</p>
+            )}
 
-      <div className="flex justify-between">
-        <button
-          onClick={onBack}
-          className="rounded-xl border border-white/10 px-5 py-2.5 text-sm text-zinc-400 hover:text-white transition-colors"
-        >
-          <span className="flex items-center gap-1.5"><ArrowLeft size={14} /> Back</span>
-        </button>
-        <button
-          onClick={onNext}
-          disabled={!valid}
-          className="rounded-xl bg-violet-600 px-6 py-2.5 text-sm font-semibold text-white hover:bg-violet-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-        >
-          <span className="flex items-center gap-1.5">Review <ArrowRight size={14} /></span>
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function Step3({
-  form,
-  onBack,
-  onSubmit,
-  submitting,
-  error,
-  publishNow,
-  onPublishToggle,
-  imagePreview,
-}: {
-  form: FormState;
-  onBack: () => void;
-  onSubmit: () => void;
-  submitting: boolean;
-  error: string;
-  publishNow: boolean;
-  onPublishToggle: () => void;
-  imagePreview: string | null;
-}) {
-  return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-xl font-bold text-white">Review & Submit</h2>
-        <p className="text-sm text-zinc-500 mt-1">
-          Review your event details before creating it.
-        </p>
-      </div>
-
-      {imagePreview && (
-        <div className="rounded-2xl overflow-hidden border border-white/5 h-40">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={imagePreview} alt="Cover" className="w-full h-full object-cover" />
-        </div>
-      )}
-
-      <div className="rounded-2xl border border-white/5 bg-zinc-900 divide-y divide-white/5 overflow-hidden">
-        <ReviewRow label="Title">{form.title}</ReviewRow>
-        <ReviewRow label="Category">{form.category}</ReviewRow>
-        <ReviewRow label="Start">{formatReview(form.date)}</ReviewRow>
-        <ReviewRow label="End">{formatReview(form.endDate)}</ReviewRow>
-        <ReviewRow label="Location">
-          {form.location || <span className="text-zinc-600">—</span>}
-        </ReviewRow>
-        {form.virtualLink && (
-          <ReviewRow label="Virtual link">
-            <a
-              href={form.virtualLink}
-              className="text-violet-400 text-xs hover:underline break-all"
-              target="_blank"
-              rel="noopener noreferrer"
+            <FieldBlock
+              icon={<MapPin size={16} />}
+              title="Add Event Location"
+              subtitle="Offline location or virtual link"
+              className="mt-3"
             >
-              {form.virtualLink}
-            </a>
-          </ReviewRow>
-        )}
-        <ReviewRow label="Capacity">{form.capacity} attendees</ReviewRow>
-        <ReviewRow label="RSVP mode">
-          <span className={form.requiresRsvp ? "text-violet-300" : "text-zinc-400"}>
-            {form.requiresRsvp ? "Approval required" : "Open (auto-confirm)"}
-          </span>
-        </ReviewRow>
-        <ReviewRow label="Status">
-          <button
-            type="button"
-            onClick={onPublishToggle}
-            className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold transition-colors ${
-              publishNow
-                ? "border-emerald-700/40 bg-emerald-950/30 text-emerald-300"
-                : "border-amber-700/40 bg-amber-950/20 text-amber-300"
-            }`}
-          >
-            {publishNow ? <><Check size={12} className="inline" /> Publish immediately (Upcoming)</> : "Save as Draft"}
-            <span className="text-zinc-500">(click to toggle)</span>
-          </button>
-        </ReviewRow>
-        <div className="px-5 py-4">
-          <p className="text-xs font-medium text-zinc-400 mb-2">Description</p>
-          <p className="text-sm text-zinc-300 whitespace-pre-wrap line-clamp-6">
-            {form.description}
-          </p>
-        </div>
-      </div>
+              <input
+                type="text"
+                value={form.location}
+                onChange={(event) => setField("location", event.target.value)}
+                placeholder="123 Main St, San Francisco"
+                className={fieldInputCls}
+              />
+              <input
+                type="url"
+                value={form.virtualLink}
+                onChange={(event) => setField("virtualLink", event.target.value)}
+                placeholder="https://meet.example.com/room (optional)"
+                className={fieldInputCls}
+              />
+            </FieldBlock>
 
-      {error && (
-        <div className="rounded-lg border border-red-800/40 bg-red-950/20 px-4 py-3">
-          <p className="text-xs text-red-400 font-mono">{error}</p>
-        </div>
-      )}
+            <FieldBlock icon={<AlignLeft size={16} />} title="Add Description" className="mt-3">
+              <textarea
+                rows={3}
+                value={form.description}
+                onChange={(event) => setField("description", event.target.value)}
+                placeholder="Tell attendees what they can expect."
+                className={`${fieldInputCls} resize-none`}
+              />
+            </FieldBlock>
 
-      <div className="flex justify-between">
-        <button
-          onClick={onBack}
-          disabled={submitting}
-          className="rounded-xl border border-white/10 px-5 py-2.5 text-sm text-zinc-400 hover:text-white transition-colors disabled:opacity-40"
-        >
-          <span className="flex items-center gap-1.5"><ArrowLeft size={14} /> Back</span>
-        </button>
-        <button
-          onClick={onSubmit}
-          disabled={submitting}
-          className="rounded-xl bg-violet-600 px-6 py-2.5 text-sm font-semibold text-white hover:bg-violet-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-lg shadow-violet-900/30"
-        >
-          {submitting ? (
-            <span className="flex items-center gap-2"><SpinnerIcon />Saving…</span>
-          ) : publishNow ? (
-            <span className="flex items-center gap-1.5">Publish Event <ArrowRight size={14} /></span>
-          ) : (
-            <span className="flex items-center gap-1.5">Save as Draft <ArrowRight size={14} /></span>
-          )}
-        </button>
-      </div>
+            {!form.location.trim() && !form.virtualLink?.trim() && (
+              <p className="mt-2 text-xs text-amber-300">
+                Add either a physical location or a virtual link.
+              </p>
+            )}
+
+            <p className="mt-4 text-sm font-semibold text-[#dfcade]">Event Options</p>
+            <div className="mt-2 overflow-hidden rounded-2xl border border-white/10 bg-[#6a406f]/70">
+              <OptionRow icon={<Ticket size={15} />} label="Ticket Price">
+                <span className="font-semibold text-[#dfc7e0]">Free</span>
+              </OptionRow>
+
+              <OptionRow icon={<Check size={15} />} label="Require Approval">
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={form.requiresRsvp}
+                  onClick={() => setField("requiresRsvp", !form.requiresRsvp)}
+                  className={`relative h-7 w-12 rounded-full transition-colors ${
+                    form.requiresRsvp ? "bg-fuchsia-400/80" : "bg-white/30"
+                  }`}
+                >
+                  <span
+                    className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform ${
+                      form.requiresRsvp ? "translate-x-[23px]" : "translate-x-[2px]"
+                    }`}
+                  />
+                </button>
+              </OptionRow>
+
+              <OptionRow icon={<Users size={15} />} label="Capacity" last>
+                <input
+                  type="number"
+                  min={1}
+                  max={100_000}
+                  value={form.capacity}
+                  onChange={(event) => setField("capacity", Number(event.target.value))}
+                  className="w-28 rounded-lg border border-white/20 bg-black/20 px-3 py-1.5 text-right text-sm font-semibold text-white outline-none focus:border-fuchsia-300"
+                />
+              </OptionRow>
+            </div>
+
+            {error && (
+              <div className="mt-4 rounded-lg border border-rose-200/25 bg-rose-900/30 px-4 py-3 text-xs text-rose-100">
+                {error}
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={handleSubmit}
+              disabled={!valid || submitting}
+              className="mt-9 w-full rounded-xl bg-[#f4f2f6] py-3.5 text-3xl font-semibold text-[#2f1733] transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-50 sm:text-[2rem]"
+            >
+              {submitting ? (
+                <span className="inline-flex items-center gap-2 text-lg sm:text-xl">
+                  <SpinnerIcon />
+                  Creating Event...
+                </span>
+              ) : (
+                "Create Event"
+              )}
+            </button>
+          </section>
+        </div>
+      </main>
+
+      <ThemeDock
+        selectedTheme={selectedTheme}
+        selectedFont={selectedFont}
+        fontMenuOpen={fontMenuOpen}
+        fontMenuRef={fontMenuRef}
+        onThemeChange={setSelectedTheme}
+        onFontChange={(font) => {
+          setSelectedFont(font);
+          setFontMenuOpen(false);
+        }}
+        onFontToggle={() => setFontMenuOpen((prev) => !prev)}
+      />
     </div>
   );
 }
 
-function ReviewRow({
+function TimeRow({
   label,
-  children,
+  value,
+  min,
+  onChange,
 }: {
   label: string;
-  children: React.ReactNode;
+  value: string;
+  min?: string;
+  onChange: (value: string) => void;
 }) {
   return (
-    <div className="flex items-start justify-between gap-4 px-5 py-3">
-      <span className="text-xs text-zinc-500 shrink-0 w-24">{label}</span>
-      <span className="text-sm text-white text-right">{children}</span>
+    <div className="grid grid-cols-[58px_minmax(0,1fr)] items-center gap-3">
+      <p className="text-lg font-semibold text-[#e9d7ea]">{label}</p>
+      <input
+        type="datetime-local"
+        min={min}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="w-full rounded-lg border border-white/15 bg-[#7a527d]/70 px-3 py-2 text-sm font-semibold text-white outline-none [color-scheme:dark] focus:border-fuchsia-200"
+      />
     </div>
   );
+}
+
+const fieldInputCls =
+  "w-full rounded-lg border border-white/15 bg-[#7a527d]/45 px-3 py-2 text-sm text-[#f6ecf7] placeholder:text-[#ceb2d1] outline-none focus:border-fuchsia-200";
+
+function FieldBlock({
+  icon,
+  title,
+  subtitle,
+  className,
+  children,
+}: {
+  icon: ReactNode;
+  title: string;
+  subtitle?: string;
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className={`rounded-xl border border-white/10 bg-[#6a406f]/70 px-4 py-3 ${className ?? ""}`}>
+      <div className="mb-2 flex items-center gap-2 text-[#e7d3e9]">
+        <span className="text-[#d5bad8]">{icon}</span>
+        <div>
+          <p className="text-lg font-semibold leading-none">{title}</p>
+          {subtitle && <p className="mt-1 text-sm text-[#cfb4d2]">{subtitle}</p>}
+        </div>
+      </div>
+      <div className="space-y-2">{children}</div>
+    </div>
+  );
+}
+
+function OptionRow({
+  icon,
+  label,
+  children,
+  last = false,
+}: {
+  icon: ReactNode;
+  label: string;
+  children: ReactNode;
+  last?: boolean;
+}) {
+  return (
+    <div className={`flex items-center justify-between gap-3 px-4 py-3 ${last ? "" : "border-b border-white/10"}`}>
+      <div className="flex items-center gap-2 text-xl font-semibold text-[#e6d2e8]">
+        <span className="text-[#d5bad8]">{icon}</span>
+        <span>{label}</span>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function ThemeDock({
+  selectedTheme,
+  selectedFont,
+  fontMenuOpen,
+  fontMenuRef,
+  onThemeChange,
+  onFontChange,
+  onFontToggle,
+}: {
+  selectedTheme: (typeof THEME_OPTIONS)[number]["id"];
+  selectedFont: (typeof FONT_PRESETS)[number];
+  fontMenuOpen: boolean;
+  fontMenuRef: React.RefObject<HTMLDivElement | null>;
+  onThemeChange: (themeId: (typeof THEME_OPTIONS)[number]["id"]) => void;
+  onFontChange: (font: (typeof FONT_PRESETS)[number]) => void;
+  onFontToggle: () => void;
+}) {
+  return (
+    <aside className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-[#2b1231]/95 backdrop-blur-md">
+      <div className="mx-auto max-w-[1120px] px-4 pb-4 pt-3 sm:px-6 lg:px-8">
+        <div className="mb-3 flex items-start gap-3 overflow-x-auto pb-1">
+          {THEME_OPTIONS.map((theme) => (
+            <button
+              key={theme.id}
+              type="button"
+              onClick={() => onThemeChange(theme.id)}
+              className="flex shrink-0 flex-col items-center gap-1"
+            >
+              <span
+                className={`h-14 w-20 rounded-xl border ${
+                  theme.id === selectedTheme ? "border-white shadow-[0_0_0_2px_rgba(255,255,255,0.15)]" : "border-white/20"
+                }`}
+                style={{ background: theme.preview }}
+              />
+              <span className={`text-xs font-semibold ${theme.id === selectedTheme ? "text-white" : "text-[#b898bd]"}`}>
+                {theme.label}
+              </span>
+            </button>
+          ))}
+        </div>
+
+        <div className="grid gap-2 md:grid-cols-4">
+          <DockChip icon={<Palette size={14} />} label="Colour" value="Custom" />
+          <DockChip icon={<Sparkles size={14} />} label="Style" value="Auto" />
+
+          <div ref={fontMenuRef} className="relative">
+            <DockChip
+              asButton
+              icon={<Type size={14} />}
+              label="Font"
+              value={selectedFont}
+              onClick={onFontToggle}
+            />
+            {fontMenuOpen && (
+              <div className="absolute bottom-[calc(100%+0.55rem)] left-1/2 z-50 w-[min(92vw,420px)] -translate-x-1/2 rounded-2xl border border-white/15 bg-[#261729]/95 p-3 shadow-2xl backdrop-blur md:left-0 md:translate-x-0">
+                <div className="grid grid-cols-4 gap-2">
+                  {FONT_PRESETS.map((font) => (
+                    <button
+                      key={font}
+                      type="button"
+                      onClick={() => onFontChange(font)}
+                      className={`rounded-lg border px-2 py-2 text-left transition-colors ${
+                        selectedFont === font
+                          ? "border-white/70 bg-white/12 text-white"
+                          : "border-white/15 bg-white/5 text-[#cab2cd] hover:bg-white/10"
+                      }`}
+                    >
+                      <span className="block text-xl leading-none">Ag</span>
+                      <span className="mt-1 block truncate text-xs font-semibold">{font}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <DockChip icon={<Globe size={14} />} label="Display" value="Auto" />
+        </div>
+      </div>
+    </aside>
+  );
+}
+
+function DockChip({
+  icon,
+  label,
+  value,
+  asButton = false,
+  onClick,
+}: {
+  icon: ReactNode;
+  label: string;
+  value: string;
+  asButton?: boolean;
+  onClick?: () => void;
+}) {
+  const content = (
+    <span className="flex items-center justify-between gap-3">
+      <span className="inline-flex items-center gap-2">
+        <span className="text-[#ddc6df]">{icon}</span>
+        <span className="text-lg font-semibold text-[#e4d2e7]">{label}</span>
+      </span>
+      <span className="text-lg font-semibold text-[#bba0bf]">{value}</span>
+    </span>
+  );
+
+  const cls = "w-full rounded-xl border border-white/10 bg-[#5d3763]/70 px-4 py-2 text-left";
+
+  if (asButton) {
+    return (
+      <button type="button" className={cls} onClick={onClick}>
+        {content}
+      </button>
+    );
+  }
+
+  return <div className={cls}>{content}</div>;
 }
 
 function FullSkeleton() {
   return (
-    <div className="min-h-screen bg-zinc-950 animate-pulse">
-      <div className="h-14 bg-zinc-900 border-b border-white/5" />
-      <div className="mx-auto max-w-2xl px-4 py-10 sm:px-6 space-y-6">
-        <div className="h-6 w-64 rounded bg-zinc-800" />
-        <div className="h-80 rounded-2xl bg-zinc-900" />
+    <div className="min-h-screen animate-pulse bg-[#2f0e34]">
+      <div className="h-14 border-b border-white/5 bg-[#3f2246]" />
+      <div className="mx-auto max-w-[1120px] space-y-6 px-4 py-10 sm:px-6">
+        <div className="h-8 w-56 rounded-lg bg-[#59335f]" />
+        <div className="h-[460px] rounded-3xl bg-[#59335f]" />
       </div>
     </div>
   );
@@ -693,7 +725,7 @@ function FullSkeleton() {
 
 function SpinnerIcon() {
   return (
-    <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+    <svg className="h-5 w-5 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
     </svg>

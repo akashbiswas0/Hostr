@@ -25,7 +25,10 @@ export function Footer() {
           {}
           <div className="flex flex-wrap justify-center gap-x-6 gap-y-2 text-xs text-zinc-600">
             <Link href="/" className="hover:text-zinc-400 transition-colors">
-              Browse Events
+              Home
+            </Link>
+            <Link href="/events" className="hover:text-zinc-400 transition-colors">
+              Events
             </Link>
             <Link href="/my-rsvps" className="hover:text-zinc-400 transition-colors">
               My RSVPs

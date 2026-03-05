@@ -135,7 +135,7 @@ export default function OrganizerProfilePage() {
             {truncateAddress(wallet)} hasn't created a profile yet.
           </p>
           <Link
-            href="/"
+            href="/events"
             className="inline-flex items-center gap-1.5 mt-2 text-sm text-violet-400 hover:underline"
           >
             <ArrowLeft size={14} /> Browse events

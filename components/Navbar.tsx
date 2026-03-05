@@ -8,7 +8,7 @@ import { useOrganizer } from "@/hooks/useOrganizer";
 import { useWallet } from "@/hooks/useWallet";
 
 interface NavbarProps {
-  active?: "browse" | "my-rsvps" | "dashboard";
+  active?: "home" | "events" | "my-rsvps" | "dashboard";
 }
 
 export function Navbar({ active }: NavbarProps) {
@@ -39,8 +39,11 @@ export function Navbar({ active }: NavbarProps) {
 
         {}
         <div className="hidden sm:flex items-center gap-6">
-          <Link href="/#events" className={linkCls("browse")}>
-            Browse
+          <Link href="/" className={linkCls("home")}>
+            Home
+          </Link>
+          <Link href="/events" className={linkCls("events")}>
+            Events
           </Link>
           {isConnected && (
             <Link href="/my-rsvps" className={linkCls("my-rsvps")}>
@@ -81,11 +84,18 @@ export function Navbar({ active }: NavbarProps) {
       {mobileOpen && (
         <div className="sm:hidden border-t border-white/5 bg-zinc-950 px-4 pb-4 pt-2 space-y-2">
           <Link
-            href="/#events"
+            href="/"
             className="block py-2 text-sm font-medium text-zinc-400 hover:text-white"
             onClick={() => setMobileOpen(false)}
           >
-            Browse
+            Home
+          </Link>
+          <Link
+            href="/events"
+            className="block py-2 text-sm font-medium text-zinc-400 hover:text-white"
+            onClick={() => setMobileOpen(false)}
+          >
+            Events
           </Link>
           {isConnected && (
             <Link

@@ -379,7 +379,7 @@ function EmptyState() {
         </p>
       </div>
       <Link
-        href="/"
+        href="/events"
         className="rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-violet-500 transition-colors"
       >
         Browse Events
@@ -406,5 +406,4 @@ function LoadingSkeleton() {
     </div>
   );
 }
-
 

@@ -1,310 +1,473 @@
 "use client";
 
-import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Search, ChevronRight, Zap, Shield, Globe, X, Calendar, SearchX, AlertTriangle } from "lucide-react";
-import { useEvents } from "@/hooks/useEvent";
-import { EventCard, EventCardSkeleton } from "@/components/EventCard";
-import { Navbar } from "@/components/Navbar";
-import { Footer } from "@/components/Footer";
-import { FilterBar, DEFAULT_FILTERS } from "@/components/FilterBar";
-import type { FilterState } from "@/components/FilterBar";
-import type { EventFilters } from "@/lib/arkiv/queries/events";
-import type { Event, EventStatus } from "@/lib/arkiv/types";
+import { useMemo, useState, type ReactNode } from "react";
+import { useQuery } from "@tanstack/react-query";
+import type { Entity } from "@arkiv-network/sdk";
+import type { Hex } from "viem";
+import {
+  AlertTriangle,
+  CalendarDays,
+  Clock3,
+  MapPin,
+  Sparkles,
+} from "lucide-react";
 
-const CATEGORIES = ["All", "DeFi", "NFT", "Gaming", "IRL", "Virtual", "Infrastructure", "DAO", "Education", "Other"];
+import { ConnectButton } from "@/components/ConnectButton";
+import { Footer } from "@/components/Footer";
+import { Navbar } from "@/components/Navbar";
+import { useMyRsvps } from "@/hooks/useRsvp";
+import { useWallet } from "@/hooks/useWallet";
+import { publicClient } from "@/lib/arkiv/client";
+import { getEventByKey } from "@/lib/arkiv/queries/events";
+import type { Event } from "@/lib/arkiv/types";
+
+type TimelineView = "upcoming" | "past";
+
+interface RegisteredEventItem {
+  eventKey: Hex;
+  eventEntity: Entity;
+  event: Event;
+  rsvpStatus: string;
+  organizerName: string;
+  dateMs: number;
+}
+
+interface DayGroup {
+  key: string;
+  label: string;
+  weekday: string;
+  sortMs: number;
+  items: RegisteredEventItem[];
+}
+
+const STATUS_STYLES: Record<string, string> = {
+  confirmed: "bg-emerald-500/20 text-emerald-300 border border-emerald-400/25",
+  pending: "bg-amber-500/20 text-amber-300 border border-amber-400/25",
+  waitlisted: "bg-orange-500/20 text-orange-300 border border-orange-400/25",
+  "checked-in": "bg-violet-500/20 text-violet-300 border border-violet-400/25",
+  rejected: "bg-rose-500/20 text-rose-300 border border-rose-400/25",
+};
+
+const STATUS_LABELS: Record<string, string> = {
+  confirmed: "Going",
+  pending: "Pending",
+  waitlisted: "Waitlisted",
+  "checked-in": "Checked in",
+  rejected: "Rejected",
+};
+
+function toMs(value: unknown): number {
+  if (value == null || value === "") return NaN;
+  if (typeof value === "number") return Number.isFinite(value) ? value * 1_000 : NaN;
+  const str = String(value);
+  if (/^\d+$/.test(str)) return Number(str) * 1_000;
+  const parsed = Date.parse(str);
+  return Number.isNaN(parsed) ? NaN : parsed;
+}
+
+function formatTime(value: unknown): string {
+  const ms = toMs(value);
+  if (Number.isNaN(ms)) return "Time TBD";
+  return new Intl.DateTimeFormat("en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(new Date(ms));
+}
+
+function formatDay(value: number): string {
+  if (Number.isNaN(value)) return "Date TBD";
+  return new Intl.DateTimeFormat("en-US", {
+    day: "numeric",
+    month: "short",
+  }).format(new Date(value));
+}
+
+function formatWeekday(value: number): string {
+  if (Number.isNaN(value)) return "Upcoming";
+  return new Intl.DateTimeFormat("en-US", {
+    weekday: "long",
+  }).format(new Date(value));
+}
+
+function truncateAddress(value?: string): string {
+  if (!value) return "Unknown organizer";
+  return `${value.slice(0, 6)}…${value.slice(-4)}`;
+}
+
+function extractEventKey(entity: Entity): Hex | null {
+  const raw = entity.attributes.find((attr) => attr.key === "eventKey")?.value;
+  if (typeof raw !== "string") return null;
+  return raw.startsWith("0x") ? (raw as Hex) : null;
+}
+
+function statusClass(status: string): string {
+  return STATUS_STYLES[status] ?? "bg-zinc-700/40 text-zinc-300 border border-white/10";
+}
+
+function statusLabel(status: string): string {
+  return STATUS_LABELS[status] ?? "Registered";
+}
+
+function groupByDay(items: RegisteredEventItem[], view: TimelineView): DayGroup[] {
+  const grouped = new Map<string, DayGroup>();
+
+  for (const item of items) {
+    const ms = item.dateMs;
+    const key = Number.isNaN(ms)
+      ? `tbd-${item.eventKey}`
+      : `${new Date(ms).getFullYear()}-${new Date(ms).getMonth()}-${new Date(ms).getDate()}`;
+
+    const existing = grouped.get(key);
+    if (existing) {
+      existing.items.push(item);
+      continue;
+    }
+
+    grouped.set(key, {
+      key,
+      label: formatDay(ms),
+      weekday: formatWeekday(ms),
+      sortMs: Number.isNaN(ms)
+        ? view === "upcoming"
+          ? Number.MAX_SAFE_INTEGER
+          : Number.MIN_SAFE_INTEGER
+        : ms,
+      items: [item],
+    });
+  }
+
+  const groups = Array.from(grouped.values());
+  groups.sort((a, b) => {
+    if (view === "upcoming") return a.sortMs - b.sortMs;
+    return b.sortMs - a.sortMs;
+  });
+
+  for (const group of groups) {
+    group.items.sort((a, b) => {
+      if (view === "upcoming") return a.dateMs - b.dateMs;
+      return b.dateMs - a.dateMs;
+    });
+  }
+
+  return groups;
+}
 
 export default function HomePage() {
-  const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
-  const [activeCategory, setActiveCategory] = useState("All");
-  const [visibleCount, setVisibleCount] = useState(9);
+  const [view, setView] = useState<TimelineView>("upcoming");
+  const { address, isConnected, isCorrectChain } = useWallet();
+  const {
+    rsvpEntities,
+    isLoading: rsvpLoading,
+    error: rsvpError,
+  } = useMyRsvps();
 
-  // Compose Arkiv-level filters — category pills + FilterBar all go on-chain
-  const eventFilters = useMemo<EventFilters | undefined>(() => {
-    const f: EventFilters = {};
-    // Category from FilterBar dropdown
-    if (filters.category) f.category = filters.category;
-    // Category from pills — overrides dropdown when not "All"
-    if (activeCategory !== "All") f.category = activeCategory;
-    // location is filtered client-side (substring match); omit from on-chain exact-match query
-    if (filters.status) f.status = filters.status as EventStatus;
-    if (filters.dateFrom)
-      f.dateFrom = Math.floor(new Date(filters.dateFrom).getTime() / 1_000);
-    if (filters.dateTo)
-      f.dateTo = Math.floor(
-        new Date(filters.dateTo + "T23:59:59").getTime() / 1_000,
+  const eventKeys = useMemo(
+    () => rsvpEntities.map(extractEventKey).filter((key): key is Hex => key !== null),
+    [rsvpEntities],
+  );
+
+  const registeredEventsQuery = useQuery({
+    queryKey: ["home-registered-events", address, eventKeys.join("|")],
+    enabled: isConnected && isCorrectChain && eventKeys.length > 0,
+    queryFn: async () => {
+      const uniqueKeys = Array.from(new Set(eventKeys));
+      const lookups = await Promise.all(
+        uniqueKeys.map(async (eventKey) => {
+          const result = await getEventByKey(publicClient, eventKey);
+          return { eventKey, result };
+        }),
       );
-    return Object.keys(f).length ? f : undefined;
-  }, [filters, activeCategory]);
 
-  const { events: rawEvents, isLoading, error } = useEvents(eventFilters);
+      const eventMap = new Map<string, { eventEntity: Entity; event: Event }>();
+      for (const lookup of lookups) {
+        if (!lookup.result.success) continue;
+        const eventEntity = lookup.result.data;
+        eventMap.set(lookup.eventKey.toLowerCase(), {
+          eventEntity,
+          event: eventEntity.toJson() as Event,
+        });
+      }
 
-  
-  // Client-side filters: keyword (full-text) and location (substring) only.
-  // Category is now an Arkiv-level query — no matchesCat needed here.
-  const events = useMemo(() => {
-    const kw = filters.keyword.trim().toLowerCase();
-    const loc = filters.location.trim().toLowerCase();
-    return rawEvents.filter((entity) => {
-      const ev = entity.toJson() as Event;
-      const matchesKw =
-        !kw ||
-        (ev.title ?? "").toLowerCase().includes(kw) ||
-        (ev.description ?? "").toLowerCase().includes(kw);
-      const matchesLoc =
-        !loc || (ev.location ?? "").toLowerCase().includes(loc);
-      return matchesKw && matchesLoc;
+      const items: RegisteredEventItem[] = [];
+      for (const rsvpEntity of rsvpEntities) {
+        const eventKey = extractEventKey(rsvpEntity);
+        if (!eventKey) continue;
+
+        const match = eventMap.get(eventKey.toLowerCase());
+        if (!match) continue;
+
+        const status =
+          String(rsvpEntity.attributes.find((attr) => attr.key === "status")?.value ?? "confirmed").toLowerCase();
+
+        const organizerAttr = match.eventEntity.attributes.find((attr) => attr.key === "organizerName")?.value;
+        const organizerName =
+          typeof organizerAttr === "string" && organizerAttr.trim().length > 0
+            ? organizerAttr
+            : truncateAddress(match.eventEntity.owner);
+
+        items.push({
+          eventKey,
+          eventEntity: match.eventEntity,
+          event: match.event,
+          rsvpStatus: status,
+          organizerName,
+          dateMs: toMs(match.event.date),
+        });
+      }
+
+      return items;
+    },
+    staleTime: 30_000,
+  });
+
+  const filteredEvents = useMemo(() => {
+    const source = registeredEventsQuery.data ?? [];
+
+    const selected = source.filter((item) => {
+      const isPast = item.event.status === "ended";
+      return view === "upcoming" ? !isPast : isPast;
     });
-  }, [rawEvents, filters.keyword, filters.location]);
 
-  const visibleEvents = events.slice(0, visibleCount);
+    selected.sort((a, b) => {
+      if (Number.isNaN(a.dateMs)) return 1;
+      if (Number.isNaN(b.dateMs)) return -1;
+      if (view === "upcoming") return a.dateMs - b.dateMs;
+      return b.dateMs - a.dateMs;
+    });
+
+    return selected;
+  }, [registeredEventsQuery.data, view]);
+
+  const groupedEvents = useMemo(
+    () => groupByDay(filteredEvents, view),
+    [filteredEvents, view],
+  );
+
+  const isLoading = rsvpLoading || registeredEventsQuery.isLoading;
+  const error = rsvpError || (registeredEventsQuery.error instanceof Error ? registeredEventsQuery.error.message : null);
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-white">
-      <Navbar active="browse" />
+    <div className="relative min-h-screen overflow-hidden bg-[#060912] text-white">
+      <div
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background:
+            "radial-gradient(circle at 18% 0%, rgba(37,99,235,0.28), transparent 36%), radial-gradient(circle at 80% 2%, rgba(99,102,241,0.22), transparent 30%), linear-gradient(180deg, #0a1120 0%, #060912 55%)",
+        }}
+      />
 
-      {}
-      <section className="relative overflow-hidden border-b border-white/5 bg-zinc-950">
-        {}
-        <div className="pointer-events-none absolute inset-0 opacity-[0.04]"
-          style={{
-            backgroundImage: "radial-gradient(circle at 1px 1px, #7c3aed 1px, transparent 0)",
-            backgroundSize: "40px 40px",
-          }}
-        />
-        <div className="relative mx-auto max-w-4xl px-4 py-20 sm:px-6 text-center">
-          {}
-          <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-violet-700/30 bg-violet-950/30 px-3 py-1 text-xs font-medium text-violet-300">
-            <span className="h-1.5 w-1.5 rounded-full bg-violet-400 animate-pulse" />
-            Event management · Kaolin Testnet
-          </div>
+      <Navbar active="home" />
 
-          <h1 className="mx-auto max-w-3xl text-4xl font-bold tracking-tight text-white sm:text-5xl lg:text-6xl leading-tight">
-            Discover and host
-            <br />
-            <span className="text-violet-400">
-              events
-            </span>
-          </h1>
-
-          <p className="mx-auto mt-5 max-w-xl text-base text-zinc-400 sm:text-lg">
-            Own your events. Own your community. All data lives on Arkiv — no backend, no middleman.
-          </p>
-
-          {}
-          <div className="mt-8 mx-auto max-w-lg">
-            <div className="relative">
-              <Search
-                size={16}
-                className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"
-              />
-              <input
-                type="text"
-                placeholder="Search events by name or description…"
-                value={filters.keyword}
-                onChange={(e) =>
-                  setFilters((f) => ({ ...f, keyword: e.target.value }))
-                }
-                className="w-full rounded-full border border-white/10 bg-zinc-800 pl-10 pr-4 py-3 text-sm text-white placeholder-zinc-500 focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500/30 transition shadow-sm"
-              />
-              {filters.keyword && (
-                <button
-                  onClick={() => setFilters((f) => ({ ...f, keyword: "" }))}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white transition-colors"
-                  aria-label="Clear search"
-                >
-                  <X size={14} />
-                </button>
-              )}
-            </div>
-          </div>
-
-          <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-            <a
-              href="#events"
-              className="inline-flex items-center gap-2 rounded-full bg-violet-600 px-6 py-2.5 text-sm font-semibold text-white hover:bg-violet-500 transition-colors"
-            >
-              Browse Events
-              <ChevronRight size={14} />
-            </a>
-            <Link
-              href="/organizer/onboard"
-              className="inline-flex items-center gap-2 rounded-full border border-white/10 px-6 py-2.5 text-sm font-semibold text-zinc-300 hover:border-white/20 hover:text-white transition-colors"
-            >
-              Host an Event
-            </Link>
-          </div>
-
-          {}
-          <div className="mt-12 grid grid-cols-3 gap-4 max-w-sm mx-auto sm:max-w-md sm:grid-cols-3">
-            <div className="flex flex-col items-center gap-1.5 rounded-xl border border-white/5 bg-zinc-900 p-3">
-              <Shield size={16} className="text-violet-400" />
-              <span className="text-xs font-medium text-zinc-400">Wallet-owned</span>
-            </div>
-            <div className="flex flex-col items-center gap-1.5 rounded-xl border border-white/5 bg-zinc-900 p-3">
-              <Zap size={16} className="text-violet-400" />
-              <span className="text-xs font-medium text-zinc-400">No backend</span>
-            </div>
-            <div className="flex flex-col items-center gap-1.5 rounded-xl border border-white/5 bg-zinc-900 p-3">
-              <Globe size={16} className="text-violet-400" />
-              <span className="text-xs font-medium text-zinc-400">Public access</span>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {}
-      <section id="events" className="mx-auto max-w-7xl px-4 py-14 sm:px-6">
-        {}
-        <div className="mb-8 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+      <main className="relative mx-auto max-w-5xl px-4 pb-14 pt-10 sm:px-6">
+        <div className="mb-8 flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h2 className="text-2xl font-bold text-white">
-              {filters.status === "live" ? "Live Now" : "Upcoming Events"}
-            </h2>
-            <p className="mt-1 text-sm text-zinc-500">
-              Discover events happening around the world
+            <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium text-zinc-300">
+              <Sparkles size={12} className="text-violet-300" />
+              Home timeline
+            </span>
+            <h1 className="mt-4 text-4xl font-bold tracking-tight">Events</h1>
+            <p className="mt-2 text-sm text-zinc-400">
+              Registered events from your wallet.
             </p>
           </div>
-          {!isLoading && !error && (
-            <span className="text-sm text-zinc-600">
-              {events.length} event{events.length !== 1 ? "s" : ""} found
-            </span>
-          )}
-        </div>
 
-        {}
-        <div className="mb-6 flex gap-2 overflow-x-auto pb-1 scrollbar-none">
-          {CATEGORIES.map((cat) => (
+          <div className="inline-flex rounded-xl border border-white/10 bg-white/[0.03] p-1">
             <button
-              key={cat}
-              onClick={() => setActiveCategory(cat)}
-              className={`shrink-0 rounded-full px-4 py-1.5 text-sm font-medium transition-all ${
-                activeCategory === cat
-                  ? "bg-violet-600 text-white"
-                  : "border border-white/10 text-zinc-400 hover:border-white/20 hover:text-white"
+              onClick={() => setView("upcoming")}
+              className={`rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
+                view === "upcoming"
+                  ? "bg-white/10 text-white"
+                  : "text-zinc-400 hover:text-white"
               }`}
             >
-              {cat}
+              Upcoming
             </button>
-          ))}
+            <button
+              onClick={() => setView("past")}
+              className={`rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
+                view === "past" ? "bg-white/10 text-white" : "text-zinc-400 hover:text-white"
+              }`}
+            >
+              Past
+            </button>
+          </div>
         </div>
 
-        {}
-        <div className="mb-8">
-          <FilterBar
-            filters={filters}
-            onChange={setFilters}
-            onClear={() => setFilters(DEFAULT_FILTERS)}
-            showKeyword={false}
+        {!isConnected ? (
+          <EmptyState
+            title="No registered events"
+            description="Connect your wallet, then discover events and RSVP to see them here."
+            actions={
+              <div className="flex flex-wrap justify-center gap-3">
+                <ConnectButton />
+                <Link
+                  href="/events"
+                  className="inline-flex items-center rounded-xl border border-white/10 px-4 py-2 text-sm font-semibold text-zinc-200 hover:border-white/20 hover:text-white transition-colors"
+                >
+                  Discover events
+                </Link>
+              </div>
+            }
           />
-        </div>
-
-        {}
-        {error ? (
-          <ErrorState message={error} onRetry={() => window.location.reload()} />
+        ) : !isCorrectChain ? (
+          <EmptyState
+            title="Switch to Kaolin"
+            description="Your wallet is connected on a different network."
+            actions={<ConnectButton />}
+          />
         ) : isLoading ? (
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <EventCardSkeleton key={i} />
+          <TimelineSkeleton />
+        ) : error ? (
+          <div className="rounded-2xl border border-rose-500/25 bg-rose-500/10 p-6">
+            <div className="flex items-center gap-2 text-rose-300">
+              <AlertTriangle size={16} />
+              <p className="text-sm font-semibold">Could not load your events</p>
+            </div>
+            <p className="mt-2 break-all text-xs text-rose-200/80">{error}</p>
+          </div>
+        ) : groupedEvents.length === 0 ? (
+          <EmptyState
+            title={view === "upcoming" ? "No upcoming registrations" : "No past registrations"}
+            description={
+              view === "upcoming"
+                ? "Discover events and RSVP to see them on your home timeline."
+                : "You do not have past registered events yet."
+            }
+            actions={
+              <Link
+                href="/events"
+                className="inline-flex items-center rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-violet-500 transition-colors"
+              >
+                Discover events
+              </Link>
+            }
+          />
+        ) : (
+          <div className="space-y-8">
+            {groupedEvents.map((group) => (
+              <section key={group.key} className="grid gap-4 md:grid-cols-[150px_1fr] md:gap-8">
+                <div className="md:pt-4">
+                  <p className="text-lg font-semibold text-zinc-100">{group.label}</p>
+                  <p className="text-sm text-zinc-400">{group.weekday}</p>
+                </div>
+
+                <div className="relative md:pl-7">
+                  <div className="absolute bottom-0 left-0 top-0 hidden w-px bg-gradient-to-b from-white/30 via-white/10 to-transparent md:block" />
+
+                  <div className="space-y-4">
+                    {group.items.map((item) => (
+                      <Link
+                        key={`${group.key}-${item.eventKey}`}
+                        href={`/events/${item.eventEntity.key}`}
+                        className="group relative block overflow-hidden rounded-2xl border border-white/10 bg-white/[0.04] backdrop-blur-sm transition-all hover:border-white/20 hover:bg-white/[0.06]"
+                      >
+                        <div className="absolute -left-[28px] top-9 hidden h-3 w-3 rounded-full border border-white/25 bg-zinc-300 md:block" />
+
+                        <div className="flex flex-col gap-4 p-4 sm:flex-row sm:items-start sm:justify-between sm:p-5">
+                          <div className="min-w-0 flex-1 space-y-2.5">
+                            <p className="flex items-center gap-1.5 text-sm text-zinc-400">
+                              <Clock3 size={14} className="shrink-0" />
+                              {formatTime(item.event.date)}
+                            </p>
+
+                            <h2 className="text-xl font-semibold leading-tight text-white group-hover:text-violet-200 transition-colors">
+                              {item.event.title}
+                            </h2>
+
+                            <p className="text-sm text-zinc-300">By {item.organizerName}</p>
+
+                            <p className="flex items-center gap-1.5 text-sm text-zinc-400">
+                              <MapPin size={14} className="shrink-0" />
+                              <span className="truncate">{item.event.location || "Online"}</span>
+                            </p>
+
+                            <span
+                              className={`inline-flex rounded-md px-2.5 py-1 text-xs font-semibold ${statusClass(item.rsvpStatus)}`}
+                            >
+                              {statusLabel(item.rsvpStatus)}
+                            </span>
+                          </div>
+
+                          <EventImage event={item.event} />
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              </section>
             ))}
           </div>
-        ) : events.length === 0 ? (
-          <EmptyState hasFilters={
-            filters.keyword !== "" ||
-            filters.category !== "" ||
-            filters.location !== "" ||
-            filters.dateFrom !== "" ||
-            filters.dateTo !== "" ||
-            filters.status !== "" ||
-            activeCategory !== "All"
-          } onClear={() => { setFilters(DEFAULT_FILTERS); setActiveCategory("All"); }} />
-        ) : (
-          <>
-            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-              {visibleEvents.map((entity) => {
-                const event = entity.toJson() as Event;
-                return (
-                  <EventCard key={entity.key} entity={entity} event={event} />
-                );
-              })}
-            </div>
-
-            {}
-            {visibleCount < events.length && (
-              <div className="mt-12 flex justify-center">
-                <button
-                  onClick={() => setVisibleCount((c) => c + 9)}
-                className="rounded-full border border-white/10 px-8 py-3 text-sm font-semibold text-zinc-300 hover:border-white/20 hover:text-white transition-colors"
-                >
-                  Load more events ({events.length - visibleCount} remaining)
-                </button>
-              </div>
-            )}
-          </>
         )}
-      </section>
+      </main>
 
       <Footer />
     </div>
   );
 }
 
-function EmptyState({ hasFilters, onClear }: { hasFilters?: boolean; onClear?: () => void }) {
+function EventImage({ event }: { event: Event }) {
   return (
-    <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-gray-200 bg-gray-50 py-20 px-6 text-center">
-      <div className="mb-4 text-4xl">{hasFilters ? "🔍" : "🗓"}</div>
-      <h3 className="text-base font-semibold text-gray-900">
-        {hasFilters ? "No matching events" : "No upcoming events yet"}
-      </h3>
-      <p className="mt-2 max-w-xs text-sm text-gray-500">
-        {hasFilters
-          ? "Try adjusting your filters or clearing your search."
-          : "Be the first to host an event."}
-      </p>
-      <div className="mt-6 flex flex-wrap justify-center gap-3">
-        {hasFilters && onClear && (
-          <button
-            onClick={onClear}
-            className="inline-flex items-center gap-1.5 rounded-full border border-gray-200 px-5 py-2 text-sm font-semibold text-gray-700 hover:bg-white hover:border-gray-300 transition-colors"
-          >
-            Clear filters
-          </button>
-        )}
-        <Link
-          href="/organizer/onboard"
-          className="inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 px-5 py-2 text-sm font-semibold text-white hover:opacity-90 transition-opacity"
-        >
-          Host an Event
-        </Link>
+    <div
+      className="h-24 w-full overflow-hidden rounded-xl border border-white/10 bg-zinc-900 sm:w-36"
+      style={
+        event.imageUrl
+          ? {
+              backgroundImage: `linear-gradient(180deg, rgba(10, 17, 32, 0.05), rgba(10, 17, 32, 0.35)), url(${event.imageUrl})`,
+              backgroundSize: "cover",
+              backgroundPosition: "center",
+            }
+          : {
+              backgroundImage:
+                "linear-gradient(140deg, rgba(59, 130, 246, 0.35), rgba(124, 58, 237, 0.35))",
+            }
+      }
+    >
+      <div className="flex h-full items-end justify-between p-2.5">
+        <span className="rounded-md bg-black/40 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-zinc-100">
+          {event.category || "Event"}
+        </span>
       </div>
     </div>
   );
 }
 
-function ErrorState({
-  message,
-  onRetry,
+function EmptyState({
+  title,
+  description,
+  actions,
 }: {
-  message: string;
-  onRetry: () => void;
+  title: string;
+  description: string;
+  actions: ReactNode;
 }) {
   return (
-    <div className="flex flex-col items-center justify-center rounded-2xl border border-red-800/30 bg-red-950/10 py-16 px-6 text-center">
-      <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-red-950/40 border border-red-700/30">
-        <AlertTriangle size={22} className="text-red-400" />
+    <div className="rounded-2xl border border-dashed border-white/15 bg-white/[0.03] px-6 py-14 text-center">
+      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full border border-white/15 bg-white/[0.04]">
+        <CalendarDays size={22} className="text-zinc-400" />
       </div>
-      <h3 className="text-base font-semibold text-white">
-        Failed to load events
-      </h3>
-      <p className="mt-2 max-w-xs text-xs text-red-400 font-mono break-all">
-        {message}
-      </p>
-      <button
-        onClick={onRetry}
-        className="mt-6 rounded-full border border-red-800/40 px-5 py-2 text-sm font-semibold text-red-400 hover:bg-red-950/30 transition-colors"
-      >
-        Try again
-      </button>
+      <h2 className="mt-5 text-lg font-semibold text-white">{title}</h2>
+      <p className="mx-auto mt-2 max-w-md text-sm text-zinc-400">{description}</p>
+      <div className="mt-6">{actions}</div>
+    </div>
+  );
+}
+
+function TimelineSkeleton() {
+  return (
+    <div className="space-y-6 animate-pulse">
+      {Array.from({ length: 3 }).map((_, index) => (
+        <div key={index} className="grid gap-4 md:grid-cols-[150px_1fr] md:gap-8">
+          <div className="space-y-2">
+            <div className="h-5 w-20 rounded bg-zinc-800" />
+            <div className="h-4 w-28 rounded bg-zinc-800" />
+          </div>
+          <div className="space-y-3">
+            <div className="h-32 rounded-2xl border border-white/10 bg-white/[0.04]" />
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
