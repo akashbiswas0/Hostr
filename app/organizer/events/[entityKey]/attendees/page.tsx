@@ -1,31 +1,35 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import type { Hex } from "viem";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import type { Entity } from "@arkiv-network/sdk";
-import { AlertTriangle, Lock, ShieldOff, ArrowLeft, Download, Check, ScanLine } from "lucide-react";
+import { AlertTriangle, Lock, ShieldOff, ArrowLeft, Download, Check, ScanLine, XCircle, BanIcon } from "lucide-react";
 import { useEvent } from "@/hooks/useEvent";
 import { useWallet } from "@/hooks/useWallet";
 import { publicClient } from "@/lib/arkiv/client";
 import { confirmRsvp, rejectRsvp } from "@/lib/arkiv/entities/rsvp";
+import { autoPromoteCapacityStatus } from "@/lib/arkiv/entities/event";
 import { getRsvpsByEvent, getApprovalsByEvent, getRejectionsByEvent, getApprovalForRsvp, getRejectionForRsvp } from "@/lib/arkiv/queries/rsvps";
 import { createCheckinEntity, getCheckinsByEvent, hasAttendeeCheckedIn } from "@/lib/arkiv/entities/checkin";
 import { createPoAEntity } from "@/lib/arkiv/entities/attendance";
 import { OrganizerNav } from "@/components/OrganizerNav";
 import { ConnectButton } from "@/components/ConnectButton";
+import { ConfirmModal } from "@/components/ConfirmModal";
 import { friendlyError } from "@/lib/arkiv/errors";
 import type { RSVP, RSVPStatus } from "@/lib/arkiv/types";
+
+type EffectiveStatus = RSVPStatus | "rejected" | "not-going";
 
 interface AttendeeRow {
   entity: Entity;
   rsvpKey: Hex;
   ownerAddress: Hex;
   data: RSVP;
-  status: RSVPStatus;
+  status: EffectiveStatus;
 }
 
 function truncateAddress(addr: string) {
@@ -70,12 +74,14 @@ function downloadCsv(filename: string, csv: string) {
   URL.revokeObjectURL(url);
 }
 
-function Chip({ status }: { status: RSVPStatus }) {
-  const map: Record<RSVPStatus, string> = {
+function Chip({ status }: { status: EffectiveStatus }) {
+  const map: Record<EffectiveStatus, string> = {
     pending: "bg-violet-900/50 text-violet-300 border-violet-700/30",
     confirmed: "bg-emerald-900/50 text-emerald-300 border-emerald-700/30",
     waitlisted: "bg-amber-900/50 text-amber-300 border-amber-700/30",
     "checked-in": "bg-blue-900/50 text-blue-300 border-blue-700/30",
+    rejected: "bg-rose-900/50 text-rose-300 border-rose-700/30",
+    "not-going": "bg-zinc-800 text-zinc-400 border-zinc-700/30",
   };
   return (
     <span
@@ -120,6 +126,8 @@ export default function AttendeesPage() {
     },
     enabled: !!entityKey,
   });
+
+  const [rejectTarget, setRejectTarget] = useState<AttendeeRow | null>(null);
 
   // Approval entities (owned by organizer, one per approved pending RSVP)
   const {
@@ -251,6 +259,8 @@ export default function AttendeesPage() {
       toast.success("Request approved ✓");
       refetchApprovals();
       refetchRsvps();
+      // Capacity-status promotion is now handled here (not on RSVP submission)
+      autoPromoteCapacityStatus(walletClient!, publicClient, entityKey).catch(() => {});
     },
     onError: (e) => toast.error(friendlyError(e instanceof Error ? e.message : "Approval failed")),
   });
@@ -351,10 +361,12 @@ export default function AttendeesPage() {
     const statusAttr = ent.attributes.find((a) => a.key === "status");
     const rsvpAttrStatus = (statusAttr?.value as RSVPStatus) ?? "confirmed";
 
-    // Derive effective status: checkin > approval override > raw status
-    let status: RSVPStatus;
+    // Derive effective status: checkin > rejection > approval > raw status
+    let status: EffectiveStatus;
     if (isCheckedIn) {
-      status = "checked-in";
+      status = "checked-in";    } else if (rsvpAttrStatus === "not-going") {
+      status = "not-going";    } else if (rsvpAttrStatus === "pending" && rejectedRsvpKeys.has(rsvpKeyLower)) {
+      status = "rejected";
     } else if (rsvpAttrStatus === "pending" && approvedRsvpKeys.has(rsvpKeyLower)) {
       // Organizer approved this pending request
       status = "confirmed";
@@ -371,15 +383,15 @@ export default function AttendeesPage() {
     };
   });
 
-  // Pending = status still "pending" AND not in rejectedRsvpKeys (rejected ones are filtered out entirely)
-  const pending = allRows.filter(
-    (r) => r.status === "pending" && !rejectedRsvpKeys.has((r.rsvpKey as string).toLowerCase()),
-  );
+  // Pending = status still "pending" AND not yet approved or rejected
+  const pending = allRows.filter((r) => r.status === "pending");
   const confirmed = allRows.filter(
     (r) => r.status === "confirmed" || r.status === "checked-in",
   );
   const waitlisted = allRows.filter((r) => r.status === "waitlisted");
   const checkedIn = allRows.filter((r) => r.status === "checked-in");
+  const rejected = allRows.filter((r) => r.status === "rejected");
+  const notGoing = allRows.filter((r) => r.status === "not-going");
 
   function handleExport() {
     const csv = buildCsv(confirmed);
@@ -429,6 +441,18 @@ export default function AttendeesPage() {
               <p className="text-xl font-bold text-white">{waitlisted.length}</p>
               <p>Waitlisted</p>
             </div>
+            {rejected.length > 0 && (
+              <div className="rounded-lg border border-rose-700/30 bg-rose-950/20 px-4 py-2 text-center text-xs text-rose-300">
+                <p className="text-xl font-bold text-white">{rejected.length}</p>
+                <p>Rejected</p>
+              </div>
+            )}
+            {notGoing.length > 0 && (
+              <div className="rounded-lg border border-zinc-700/30 bg-zinc-800/30 px-4 py-2 text-center text-xs text-zinc-400">
+                <p className="text-xl font-bold text-white">{notGoing.length}</p>
+                <p>Not Going</p>
+              </div>
+            )}
             <button
               onClick={handleExport}
               className="rounded-lg border border-white/10 px-3 py-2 text-xs font-medium text-zinc-300 hover:border-white/20 hover:text-white transition-colors flex items-center gap-1.5"
@@ -456,11 +480,7 @@ export default function AttendeesPage() {
                 key={row.rsvpKey}
                 row={row}
                 onApprove={() => approveMutation.mutate({ rsvpKey: row.rsvpKey, ownerAddress: row.ownerAddress })}
-                onReject={() => {
-                  if (confirm(`Reject ${row.data.attendeeName || "this request"}?`)) {
-                    rejectMutation.mutate({ rsvpKey: row.rsvpKey, ownerAddress: row.ownerAddress });
-                  }
-                }}
+                onReject={() => setRejectTarget(row)}
                 isApproving={approveMutation.isPending && (approveMutation.variables as { rsvpKey: Hex })?.rsvpKey === row.rsvpKey}
                 isRejecting={rejectMutation.isPending && (rejectMutation.variables as { rsvpKey: Hex })?.rsvpKey === row.rsvpKey}
               />
@@ -515,6 +535,68 @@ export default function AttendeesPage() {
         )}
 
         {}
+        {rejected.length > 0 && (
+          <Section title="Rejected" count={rejected.length} loading={isRsvpLoading}>
+            {rejected.map((row) => (
+              <div
+                key={row.rsvpKey}
+                className="flex flex-col gap-2 px-5 py-4 sm:flex-row sm:items-center sm:gap-6 opacity-60"
+              >
+                <div className="min-w-0 flex-1 space-y-0.5">
+                  <p className="font-mono text-xs text-violet-400 truncate">
+                    {row.ownerAddress ? truncateAddress(row.ownerAddress) : "—"}
+                  </p>
+                  <p className="text-sm font-medium text-white truncate">
+                    {row.data.attendeeName || "Anonymous"}
+                  </p>
+                  {row.data.attendeeEmail && (
+                    <p className="text-xs text-zinc-500 truncate">{row.data.attendeeEmail}</p>
+                  )}
+                  {row.data.message && (
+                    <p className="text-xs text-zinc-600 italic truncate">"{row.data.message}"</p>
+                  )}
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  <Chip status="rejected" />
+                  <XCircle size={14} className="text-rose-500" />
+                </div>
+              </div>
+            ))}
+          </Section>
+        )}
+
+        {}
+        {notGoing.length > 0 && (
+          <Section title="Not Going" count={notGoing.length} loading={isRsvpLoading}>
+            {notGoing.map((row) => (
+              <div
+                key={row.rsvpKey}
+                className="flex flex-col gap-2 px-5 py-4 sm:flex-row sm:items-center sm:gap-6 opacity-50"
+              >
+                <div className="min-w-0 flex-1 space-y-0.5">
+                  <p className="font-mono text-xs text-violet-400 truncate">
+                    {row.ownerAddress ? truncateAddress(row.ownerAddress) : "—"}
+                  </p>
+                  <p className="text-sm font-medium text-white truncate">
+                    {row.data.attendeeName || "Anonymous"}
+                  </p>
+                  {row.data.attendeeEmail && (
+                    <p className="text-xs text-zinc-500 truncate">{row.data.attendeeEmail}</p>
+                  )}
+                  {row.data.message && (
+                    <p className="text-xs text-zinc-600 italic truncate">"{row.data.message}"</p>
+                  )}
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  <Chip status="not-going" />
+                  <BanIcon size={13} className="text-zinc-500" />
+                </div>
+              </div>
+            ))}
+          </Section>
+        )}
+
+        {}
         {checkInMutation.isError && (
           <div className="rounded-lg border border-red-800/40 bg-red-950/20 px-4 py-3">
             <p className="text-xs text-red-400 font-mono">
@@ -523,6 +605,19 @@ export default function AttendeesPage() {
           </div>
         )}
       </main>
+
+      <ConfirmModal
+        open={!!rejectTarget}
+        title={`Reject ${rejectTarget?.data.attendeeName || "this request"}?`}
+        message="The attendee's request will be declined. This cannot be undone."
+        confirmLabel="Reject"
+        destructive
+        onConfirm={() => {
+          if (rejectTarget)
+            rejectMutation.mutate({ rsvpKey: rejectTarget.rsvpKey, ownerAddress: rejectTarget.ownerAddress });
+        }}
+        onClose={() => setRejectTarget(null)}
+      />
     </div>
   );
 }

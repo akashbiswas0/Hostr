@@ -9,8 +9,7 @@ import { X, Lock, AlertTriangle, Clock, CheckCircle2, XCircle, ExternalLink, Lin
 
 import { useWallet } from "@/hooks/useWallet";
 import { publicClient } from "@/lib/arkiv/client";
-import { createRsvpEntity, promoteFirstWaitlisted } from "@/lib/arkiv/entities/rsvp"
-import { updateRsvpCount, autoPromoteCapacityStatus } from "@/lib/arkiv/entities/event"
+import { createRsvpEntity } from "@/lib/arkiv/entities/rsvp"
 import { getRsvpByAttendee } from "@/lib/arkiv/queries/rsvps"
 import { ConnectButton } from "@/components/ConnectButton";
 import { friendlyError } from "@/lib/arkiv/errors";
@@ -134,8 +133,8 @@ export function RsvpModal({
         message: message.trim() || undefined,
       };
 
-      // If event requires approval → pending; if full → waitlisted; otherwise confirmed
-      const status = isFull ? "waitlisted" : requiresRsvp ? "pending" : "confirmed";
+      // All RSVPs start as pending — organizer must approve before attendee sees confirmed
+      const status = isFull ? "waitlisted" : "pending";
 
       const createRes = await createRsvpEntity(
         walletClient,
@@ -148,30 +147,14 @@ export function RsvpModal({
 
       const { entityKey: newEntityKey, txHash: newTxHash } = createRes.data;
 
-      // Only increment rsvpCount for immediately confirmed RSVPs
-      if (!isFull && !requiresRsvp) {
-        const countRes = await updateRsvpCount(
-          walletClient,
-          publicClient,
-          entity.key as Hex,
-          true,
-        );
-        if (!countRes.success) throw new Error(countRes.error);
-      }
-
       setTxHash(newTxHash);
       setRsvpEntityKey(newEntityKey);
       setStep("success");
       toast.success(
         isFull
           ? "Added to waitlist ✓"
-          : requiresRsvp
-          ? "Request submitted — awaiting organizer approval ✓"
-          : "RSVP confirmed ✓",
+          : "Request submitted — awaiting organizer approval ✓",
       );
-      if (!isFull && !requiresRsvp) {
-        autoPromoteCapacityStatus(walletClient, publicClient, entity.key as Hex).catch(() => {});
-      }
       onSuccess();
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -272,11 +255,7 @@ function FormStep({
   message: string; setMessage: (v: string) => void;
   onSubmit: (e: React.FormEvent) => void;
 }) {
-  const actionLabel = isFull
-    ? "Join Waitlist"
-    : requiresRsvp
-    ? "Request to Join"
-    : "RSVP to Event";
+  const actionLabel = isFull ? "Join Waitlist" : "Request to Join";
 
   return (
     <div className="p-6 space-y-5">
@@ -296,7 +275,7 @@ function FormStep({
             </span>
           </div>
         )}
-        {!isFull && requiresRsvp && (
+        {!isFull && (
           <div className="mt-2 flex items-center gap-2 rounded-lg bg-violet-950/40 border border-violet-700/30 px-3 py-2">
             <Lock size={13} className="text-violet-300 shrink-0" />
             <span className="text-violet-300 text-xs font-medium">
@@ -386,11 +365,7 @@ function FormStep({
             disabled={!name || !email}
             className="w-full rounded-xl bg-violet-600 py-3 text-sm font-semibold text-white hover:bg-violet-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-lg shadow-violet-900/30 flex items-center justify-center gap-2"
           >
-            {isFull
-              ? "Join Waitlist"
-              : requiresRsvp
-              ? "Send Request"
-              : "Confirm RSVP"}
+            {isFull ? "Join Waitlist" : "Send Request"}
             <ArrowRight size={14} />
           </button>
         </form>
@@ -402,11 +377,7 @@ function FormStep({
 // ─── Step: Submitting ─────────────────────────────────────────────────────────
 
 function SubmittingStep({ isFull, requiresRsvp }: { isFull: boolean; requiresRsvp: boolean }) {
-  const label = isFull
-    ? "Joining waitlist…"
-    : requiresRsvp
-    ? "Submitting request…"
-    : "Submitting RSVP…";
+  const label = isFull ? "Joining waitlist…" : "Submitting request…";
   return (
     <div className="p-10 flex flex-col items-center gap-5">
       <div className="relative h-14 w-14">
@@ -443,7 +414,7 @@ function SuccessStep({
   rsvpEntityKey: Hex | null;
   onClose: () => void;
 }) {
-  const isPending = !isFull && requiresRsvp;
+  const isPending = !isFull;
 
   return (
     <div className="p-8 flex flex-col items-center gap-5">

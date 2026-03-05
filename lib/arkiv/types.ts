@@ -4,7 +4,7 @@ export type ArkivResult<T> =
 
 export type EventStatus = "draft" | "upcoming" | "live" | "ended";
 
-export type RSVPStatus = "pending" | "confirmed" | "waitlisted" | "checked-in";
+export type RSVPStatus = "pending" | "confirmed" | "waitlisted" | "checked-in" | "not-going";
 
 export interface OrganizerProfile {
   name: string;

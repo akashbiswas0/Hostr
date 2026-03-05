@@ -1,22 +1,22 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import type { Hex } from "viem";
 import type { Entity } from "@arkiv-network/sdk";
 import { QRCodeSVG } from "qrcode.react";
-import { Lock, AlertTriangle, Calendar, MapPin, Ticket } from "lucide-react";
-
+import { Lock, AlertTriangle, Calendar, MapPin, Ticket, BanIcon } from "lucide-react";
 import { useMyRsvps } from "@/hooks/useRsvp";
 import { useEvent } from "@/hooks/useEvent";
 import { useWallet } from "@/hooks/useWallet";
+import { ConfirmModal } from "@/components/ConfirmModal";
 import { publicClient } from "@/lib/arkiv/client";
-import { deleteRsvp, promoteFirstWaitlisted } from "@/lib/arkiv/entities/rsvp";
+import { updateRsvpStatus, promoteFirstWaitlisted } from "@/lib/arkiv/entities/rsvp";
 import { getRsvpsByEvent, getApprovalForRsvp, getRejectionForRsvp } from "@/lib/arkiv/queries/rsvps";
 import { updateRsvpCount } from "@/lib/arkiv/entities/event";
 import { friendlyError } from "@/lib/arkiv/errors";
-import { assertOwnership } from "@/lib/arkiv/client";
 import { ConnectButton } from "@/components/ConnectButton";
 import { Navbar } from "@/components/Navbar";
 import { AddressBadge } from "@/components/AddressBadge";
@@ -56,8 +56,9 @@ const STATUS_STYLE: Record<string, { dot: string; label: string; text: string }>
   pending: { dot: "bg-violet-400 animate-pulse", label: "Pending approval", text: "text-violet-300" },
   confirmed: { dot: "bg-emerald-400", label: "Confirmed", text: "text-emerald-300" },
   waitlisted: { dot: "bg-amber-400", label: "Waitlisted", text: "text-amber-300" },
-  "checked-in": { dot: "bg-violet-400 animate-pulse", label: "Checked in", text: "text-violet-300" },
-  rejected: { dot: "bg-rose-500", label: "Rejected", text: "text-rose-400" },
+  "checked-in": { dot: "bg-blue-400 animate-pulse", label: "Checked in", text: "text-blue-300" },
+  rejected: { dot: "bg-rose-500", label: "Rejected by organizer", text: "text-rose-400" },
+  "not-going": { dot: "bg-zinc-500", label: "Not going", text: "text-zinc-400" },
 };
 
 export default function MyRsvpsPage() {
@@ -151,6 +152,8 @@ function RsvpRow({
   walletClient: WalletArkivClient<Transport, Chain, Account> | null;
   onCancelled: () => void;
 }) {
+  const [confirmOpen, setConfirmOpen] = useState(false);
+
   const rsvp = rsvpEntity.toJson() as RSVP;
   const eventKey = rsvpEntity.attributes.find((a) => a.key === "eventKey")
     ?.value as Hex | undefined;
@@ -183,6 +186,8 @@ function RsvpRow({
   // Derive effective status: organizer approval/rejection overrides raw pending status
   const effectiveStatus = isCheckedIn
     ? "checked-in"
+    : rsvpStatus === "not-going"
+    ? "not-going"
     : rsvpStatus === "pending" && approvalEntity
     ? "confirmed"
     : rsvpStatus === "pending" && rejectionEntity
@@ -191,33 +196,31 @@ function RsvpRow({
 
   const { event, isLoading: eventLoading } = useEvent(eventKey);
   const isEventEnded = event?.status === "ended";
-  // Show QR only for offline events (has location, no virtual link) and confirmed/checked-in status
+  // Show QR only for offline, confirmed/checked-in RSVPs
   const isOffline = !!(event?.location && !event?.virtualLink);
-  const showQr = isOffline && (effectiveStatus === "confirmed" || effectiveStatus === "checked-in" || isCheckedIn);
+  const showQr = isOffline && (effectiveStatus === "confirmed" || effectiveStatus === "checked-in");
 
-  const cancelMutation = useMutation({
+  // "Not Going" mutation — updates status on-chain, decrements count if was confirmed
+  const notGoingMutation = useMutation({
     mutationFn: async () => {
       if (!walletClient) throw new Error("Wallet not connected");
-
-      // Pre-check ownership before attempting on-chain delete
-      assertOwnership(rsvpEntity, walletClient.account.address);
-      
-      const deleteRes = await deleteRsvp(walletClient, rsvpEntity.key as Hex);
-      if (!deleteRes.success) throw new Error(deleteRes.error);
-      
-      if (eventKey && (effectiveStatus === "confirmed" || effectiveStatus === "checked-in")) {
-        const countRes = await updateRsvpCount(
-          walletClient,
-          publicClient,
-          eventKey,
-          false,
-        );
-        if (!countRes.success) throw new Error(countRes.error);
-        await promoteFirstWaitlisted(walletClient, publicClient, eventKey);
+      const wasConfirmed =
+        effectiveStatus === "confirmed" || effectiveStatus === "checked-in";
+      const res = await updateRsvpStatus(
+        walletClient,
+        publicClient,
+        rsvpEntity.key as Hex,
+        "not-going",
+      );
+      if (!res.success) throw new Error(res.error);
+      if (wasConfirmed && eventKey) {
+        // Decrement confirmed count and promote next waitlisted attendee
+        await updateRsvpCount(walletClient, publicClient, eventKey, false).catch(() => {});
+        await promoteFirstWaitlisted(walletClient, publicClient, eventKey).catch(() => {});
       }
     },
     onSuccess: () => {
-      toast.success("RSVP cancelled");
+      toast.success("Marked as not going");
       onCancelled();
     },
     onError: (e) => toast.error(friendlyError(e)),
@@ -288,34 +291,41 @@ function RsvpRow({
           {}
           <ChainLink entityKey={rsvpEntity.key} label="Verified ✓" />
 
-          {}
-          {!isCheckedIn && !isEventEnded && effectiveStatus !== "rejected" && (
-            <button
-              onClick={() => {
-                if (
-                  confirm(
-                    "Cancel your RSVP? This cannot be undone.",
-                  )
-                ) {
-                  cancelMutation.mutate();
-                }
-              }}
-              disabled={cancelMutation.isPending}
-              className="rounded-lg border border-rose-800/40 bg-rose-950/20 px-3 py-1.5 text-xs font-medium text-rose-400 hover:bg-rose-950/40 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              {cancelMutation.isPending ? "Cancelling…" : "Cancel RSVP"}
-            </button>
+          {/* Not Going button — shown for any active status that can be withdrawn */}
+          {!isCheckedIn &&
+            !isEventEnded &&
+            effectiveStatus !== "rejected" &&
+            effectiveStatus !== "not-going" && (
+            <>
+              <button
+                onClick={() => setConfirmOpen(true)}
+                disabled={notGoingMutation.isPending}
+                className="flex items-center gap-1.5 rounded-lg border border-zinc-700/60 bg-zinc-800/60 px-3 py-1.5 text-xs font-medium text-zinc-400 hover:border-rose-700/40 hover:bg-rose-950/20 hover:text-rose-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                <BanIcon size={11} />
+                {notGoingMutation.isPending ? "Updating…" : "Not Going"}
+              </button>
+              <ConfirmModal
+                open={confirmOpen}
+                title="Mark as Not Going?"
+                message="This will record that you are no longer attending. The organizer will be notified. This cannot be undone."
+                confirmLabel="Not Going"
+                destructive
+                onConfirm={() => notGoingMutation.mutate()}
+                onClose={() => setConfirmOpen(false)}
+              />
+            </>
           )}
         </div>
       </div>
 
-      {}
-      {cancelMutation.isError && (
+      {/* Error feedback */}
+      {notGoingMutation.isError && (
         <div className="border-t border-red-800/30 bg-red-950/20 px-5 py-2">
           <p className="text-xs text-red-400 font-mono">
-            {cancelMutation.error instanceof Error
-              ? cancelMutation.error.message
-              : "Cancel failed"}
+            {notGoingMutation.error instanceof Error
+              ? notGoingMutation.error.message
+              : "Update failed"}
           </p>
         </div>
       )}
