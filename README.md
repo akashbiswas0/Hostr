@@ -2,6 +2,41 @@
 
 Hostr is a wallet-native event app built on Arkiv. Organizers create and run events on-chain, attendees request tickets, rsvp and attendance/POA flows are recorded as linked Arkiv entities.
 
+## Setup Guide
+
+### 1) Clone the repository
+
+```bash
+git clone <https://github.com/akashbiswas0/Hostr>
+cd Hostr
+```
+
+### 2) Install dependencies
+
+```bash
+npm install
+```
+
+### 3) Configure environment variables
+
+```bash
+cp .env.example .env
+```
+
+Update `.env` as needed:
+
+- `OPENROUTER_API_KEY`: required for AI search/image generation routes.
+- `IMAGEDB_PRIVATE_KEY`: required for image DB writes.
+- `ARKIV_RPC_URL`, `ARKIV_WS_URL`, `ARKIV_CHAIN_ID`: set if you want to override network defaults.
+
+### 4) Run locally
+
+```bash
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000).
+
 ## Arkiv Integration
 
 
@@ -71,7 +106,7 @@ erDiagram
     HOSTEVENT ||--o{ EVENT_CAPACITY_FLAG : "eventKey FK"
     HOSTEVENT ||--o{ EVENT_TRENDING_FLAG : "eventKey FK"
 
-    TICKET ||--o| TICKET_DECISION_RSVP : "ticketKey FK [RSVP]"
+    TICKET ||--o| TICKET_DECISION : "ticketKey FK [RSVP]"
     TICKET ||--o| CHECKIN : "ticketKey FK"
     CHECKIN ||--o| POA : "checkinKey FK"
 ```
