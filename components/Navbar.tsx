@@ -106,7 +106,7 @@ export function Navbar({ active }: NavbarProps) {
                 className="block py-2 text-sm font-medium text-zinc-300 hover:text-white"
                 onClick={() => setMobileOpen(false)}
               >
-                POP
+                POA
               </Link>
               <Link
                 href={settingsHref}

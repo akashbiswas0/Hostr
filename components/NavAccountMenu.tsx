@@ -108,7 +108,7 @@ export function NavAccountMenu({ className }: NavAccountMenuProps) {
           </Link>
           <Link href="/attendee/pope" onClick={() => setOpen(false)} className={menuItemClass}>
             <BadgeCheck size={15} />
-            POP
+            POA
           </Link>
           <Link href={profileHref} onClick={() => setOpen(false)} className={menuItemClass}>
             <User size={15} />

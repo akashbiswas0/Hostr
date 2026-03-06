@@ -216,16 +216,16 @@ export default function PopePage() {
         style={{ fontFamily: defaultAppearance.fontFamily }}
       >
         <div className="mb-6">
-          <h1 className="text-3xl font-bold tracking-tight">POP</h1>
+          <h1 className="text-3xl font-bold tracking-tight">POA</h1>
           <p className="mt-1 text-sm text-zinc-400">
-            All POP items held by your connected wallet.
+            All POA items held by your connected wallet.
           </p>
         </div>
 
         {!isConnected ? (
           <EmptyState
             title="Connect your wallet"
-            description="Connect to load your POP collection."
+            description="Connect to load your POA collection."
             action={<ConnectButton />}
           />
         ) : !isCorrectChain ? (
@@ -238,7 +238,7 @@ export default function PopePage() {
           <div className="rounded-2xl border border-rose-500/25 bg-rose-500/10 p-5">
             <div className="flex items-center gap-2 text-rose-300">
               <AlertTriangle size={15} />
-              <p className="text-sm font-semibold">Could not load POP items</p>
+              <p className="text-sm font-semibold">Could not load POA items</p>
             </div>
             <p className="mt-2 text-xs text-rose-200/80 break-all">{error}</p>
           </div>
@@ -246,8 +246,8 @@ export default function PopePage() {
           <TimelineSkeleton />
         ) : groups.length === 0 ? (
           <EmptyState
-            title="No POP items yet"
-            description="Check in to events and your POP collection will appear here."
+            title="No POA items yet"
+            description="Check in to events and your POA collection will appear here."
             action={
               <Link
                 href="/events"
@@ -304,7 +304,7 @@ function PopeCard({ item }: { item: PopeTimelineItem }) {
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <span className="inline-flex items-center gap-1 rounded-md bg-violet-500/20 px-2 py-1 text-xs font-semibold text-violet-200">
               <BadgeCheck size={12} />
-              POP
+              POA
             </span>
             <span className="inline-flex items-center gap-1 text-xs text-zinc-400">
               <Clock3 size={12} />
