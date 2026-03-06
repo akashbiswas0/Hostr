@@ -20,6 +20,9 @@ import {
 } from "@/lib/arkiv/queries/tickets";
 import { getCheckinsByEvent } from "@/lib/arkiv/queries/checkins";
 import { getOrganizerByWallet } from "@/lib/arkiv/queries/profiles";
+import dynamic from "next/dynamic";
+const EventDetailMap = dynamic(() => import("@/components/EventDetailMap"), { ssr: false })
+
 import { ConnectButton } from "@/components/ConnectButton";
 import { StatusBadge } from "@/components/StatusBadge";
 import { RsvpModal } from "@/components/RsvpModal";
@@ -314,6 +317,25 @@ export default function EventDetailPage() {
                 </p>
               </div>
             </section>
+
+            {event.lat && event.lng ? (
+              <div className="mt-6">
+                <p className="mb-2 flex items-center gap-2 text-sm font-semibold text-[#e7d3e9]">
+                  <MapPin size={14} /> Location
+                </p>
+                <EventDetailMap
+                  lat={event.lat}
+                  lng={event.lng}
+                  title={event.title}
+                  address={event.location}
+                />
+              </div>
+            ) : event.location ? (
+              <div className="mt-4 flex items-center gap-2 text-sm text-[#ceb2d1]">
+                <MapPin size={14} />
+                <span>{event.location}</span>
+              </div>
+            ) : null}
 
             {/* Organizer */}
             <section>

@@ -66,6 +66,8 @@ export interface Event {
   language?: string;
   audienceLevel?: "all" | "beginner" | "intermediate" | "advanced";
   visibility?: "public" | "unlisted";
+  lat?: number;
+  lng?: number;
 }
 
 export interface Ticket {

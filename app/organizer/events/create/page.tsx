@@ -31,7 +31,10 @@ import {
   X,
 } from "lucide-react";
 
+import dynamic from "next/dynamic";
 import { uploadEventImage } from "@/lib/imagedb";
+
+const LocationPicker = dynamic(() => import("@/components/LocationPicker"), { ssr: false });
 
 import { ConnectButton } from "@/components/ConnectButton";
 import { OrganizerNav } from "@/components/OrganizerNav";
@@ -55,7 +58,40 @@ const displayFont = Space_Grotesk({
   display: "swap",
 });
 
-type FormState = Omit<Event, "status" | "category"> & { category: Category | "" };
+const THEME_OPTIONS = [
+  { id: "minimal", label: "Minimal", preview: "linear-gradient(145deg, #ece6f2 0%, #b7b1c5 100%)" },
+  { id: "quantum", label: "Quantum", preview: "linear-gradient(145deg, #7cdbff 0%, #d078ff 50%, #6f83ff 100%)" },
+  { id: "warp", label: "Warp", preview: "radial-gradient(circle at 50% 50%, #320337 0%, #0f0a1a 42%, #6de2ff 100%)" },
+  { id: "emoji", label: "Emoji", preview: "linear-gradient(145deg, #ffd4f6 0%, #c8a1ff 100%)" },
+  { id: "confetti", label: "Confetti", preview: "linear-gradient(145deg, #7f17f0 0%, #c64ffd 45%, #ff79d7 100%)" },
+  { id: "pattern", label: "Pattern", preview: "linear-gradient(145deg, #6f54ff 0%, #5f8fff 50%, #95a1ff 100%)" },
+  { id: "seasonal", label: "Seasonal", preview: "linear-gradient(145deg, #63c2ff 0%, #4d8fff 50%, #0f4f86 100%)" },
+] as const;
+
+const FONT_PRESETS = [
+  "Default",
+  "Museo",
+  "Factoria",
+  "Ivy Presto",
+  "Ivy Mode",
+  "Google",
+  "Roc",
+  "Nunito",
+  "Degular",
+  "Pearl",
+  "Geist Mono",
+  "New Spirit",
+  "Departure",
+  "Garamond",
+  "Futura",
+  "Alternate",
+] as const;
+
+type FormState = Omit<Event, "status" | "category"> & {
+  category: Category | ""
+  lat?: number
+  lng?: number
+};
 
 const EMPTY_FORM: FormState = {
   title: "",
@@ -66,6 +102,8 @@ const EMPTY_FORM: FormState = {
   location: "",
   virtualLink: "",
   capacity: 100,
+  lat: undefined,
+  lng: undefined,
   requiresRsvp: false,
   imageUrl: "",
 };
@@ -174,6 +212,8 @@ export default function CreateEventPage() {
 
     const eventData: Event = {
       ...form,
+      lat: form.lat,
+      lng: form.lng,
       category: form.category as Category,
       virtualLink: form.virtualLink?.trim() || undefined,
       status: visibility === "public" ? "upcoming" : "draft",
@@ -403,12 +443,14 @@ export default function CreateEventPage() {
               subtitle="Offline location or virtual link"
               className="mt-3"
             >
-              <input
-                type="text"
+              <LocationPicker
                 value={form.location}
-                onChange={(event) => setField("location", event.target.value)}
-                placeholder="123 Main St, San Francisco"
-                className={fieldInputCls}
+                onChange={(address) => setField("location", address)}
+                onLocationChange={({ address, lat, lng }) => {
+                  setField("location", address)
+                  setField("lat", lat)
+                  setField("lng", lng)
+                }}
               />
               <input
                 type="url"
