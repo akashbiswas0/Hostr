@@ -16,6 +16,7 @@ import {
 import { ConnectButton } from "@/components/ConnectButton";
 import { Footer } from "@/components/Footer";
 import { Navbar } from "@/components/Navbar";
+import { getDecisionForTicket } from "@/lib/arkiv/queries/tickets";
 import { useMyTickets } from "@/hooks/useTicket";
 import { useWallet } from "@/hooks/useWallet";
 import { useEventImage } from "@/hooks/useEventImage";
@@ -48,6 +49,7 @@ const STATUS_STYLES: Record<string, string> = {
   waitlisted: "bg-orange-500/20 text-orange-300 border border-orange-400/25",
   "checked-in": "bg-violet-500/20 text-violet-300 border border-violet-400/25",
   rejected: "bg-rose-500/20 text-rose-300 border border-rose-400/25",
+  "not-going": "bg-zinc-700/40 text-zinc-300 border border-white/10",
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -56,6 +58,7 @@ const STATUS_LABELS: Record<string, string> = {
   waitlisted: "Waitlisted",
   "checked-in": "Checked in",
   rejected: "Rejected",
+  "not-going": "Not going",
 };
 
 function toMs(value: unknown): number {
@@ -109,6 +112,25 @@ function statusClass(status: string): string {
 
 function statusLabel(status: string): string {
   return STATUS_LABELS[status] ?? "Registered";
+}
+
+async function getEffectiveTicketStatus(ticketEntity: Entity): Promise<string> {
+  const currentStatus = String(
+    ticketEntity.attributes.find((attr) => attr.key === "status")?.value ?? "pending",
+  ).toLowerCase();
+
+  if (currentStatus !== "pending") return currentStatus;
+
+  const decisionResult = await getDecisionForTicket(publicClient, ticketEntity.key as Hex);
+  if (!decisionResult.success || !decisionResult.data) return currentStatus;
+
+  const decision = String(
+    decisionResult.data.attributes.find((attr) => attr.key === "decision")?.value ?? "",
+  ).toLowerCase();
+
+  if (decision === "approved") return "confirmed";
+  if (decision === "rejected") return "rejected";
+  return currentStatus;
 }
 
 function groupByDay(items: RegisteredEventItem[], view: TimelineView): DayGroup[] {
@@ -168,9 +190,20 @@ export default function HomePage() {
     () => ticketEntities.map(extractEventKey).filter((key): key is Hex => key !== null),
     [ticketEntities],
   );
+  const ticketSnapshot = useMemo(
+    () =>
+      ticketEntities
+        .map((entity) => {
+          const status = String(entity.attributes.find((attr) => attr.key === "status")?.value ?? "");
+          return `${String(entity.key).toLowerCase()}:${status}`;
+        })
+        .sort()
+        .join("|"),
+    [ticketEntities],
+  );
 
   const registeredEventsQuery = useQuery({
-    queryKey: ["home-registered-events", address, eventKeys.join("|")],
+    queryKey: ["home-registered-events", address, eventKeys.join("|"), ticketSnapshot],
     enabled: isConnected && isCorrectChain && eventKeys.length > 0,
     queryFn: async () => {
       const uniqueKeys = Array.from(new Set(eventKeys));
@@ -191,6 +224,14 @@ export default function HomePage() {
         });
       }
 
+      const ticketStatusEntries = await Promise.all(
+        ticketEntities.map(async (ticketEntity) => [
+          String(ticketEntity.key).toLowerCase(),
+          await getEffectiveTicketStatus(ticketEntity),
+        ] as const),
+      );
+      const ticketStatusMap = new Map(ticketStatusEntries);
+
       const items: RegisteredEventItem[] = [];
       for (const rsvpEntity of ticketEntities) {
         const eventKey = extractEventKey(rsvpEntity);
@@ -200,7 +241,8 @@ export default function HomePage() {
         if (!match) continue;
 
         const status =
-          String(rsvpEntity.attributes.find((attr) => attr.key === "status")?.value ?? "confirmed").toLowerCase();
+          ticketStatusMap.get(String(rsvpEntity.key).toLowerCase()) ??
+          String(rsvpEntity.attributes.find((attr) => attr.key === "status")?.value ?? "pending").toLowerCase();
 
         const organizerAttr = match.eventEntity.attributes.find((attr) => attr.key === "organizerName")?.value;
         const organizerName =
@@ -270,7 +312,7 @@ export default function HomePage() {
             </span>
             <h1 className="mt-4 text-4xl font-bold tracking-tight">Events</h1>
             <p className="mt-2 text-sm text-zinc-400">
-              Registered events from your wallet.
+              Events you ahve registered for
             </p>
           </div>
 

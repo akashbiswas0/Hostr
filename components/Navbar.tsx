@@ -36,7 +36,7 @@ export function Navbar({ active }: NavbarProps) {
           href="/"
           className="shrink-0 text-base font-bold tracking-tight text-white"
         >
-          Hostr
+          Hoster
         </Link>
 
         <div className="hidden items-center gap-8 pl-4 sm:flex md:pl-8">
@@ -46,18 +46,15 @@ export function Navbar({ active }: NavbarProps) {
           <Link href="/events" className={linkCls("events")}>
             Events
           </Link>
-          <Link href="/organizer/dashboard" className={linkCls("dashboard")}>
-            Dashboard
-          </Link>
+        </div>
+
+        <div className="ml-auto hidden items-center gap-3 sm:flex">
           <Link
             href="/organizer/events/create"
             className="text-sm font-semibold text-violet-200/65 transition-colors hover:text-violet-100/85"
           >
             Create Event
           </Link>
-        </div>
-
-        <div className="ml-auto hidden min-w-[216px] items-center justify-end gap-3 sm:flex">
           <NavAccountMenu />
         </div>
 
@@ -85,13 +82,6 @@ export function Navbar({ active }: NavbarProps) {
             onClick={() => setMobileOpen(false)}
           >
             Events
-          </Link>
-          <Link
-            href="/organizer/dashboard"
-            className="block py-2 text-sm font-medium text-zinc-400/85 hover:text-white"
-            onClick={() => setMobileOpen(false)}
-          >
-            Dashboard
           </Link>
           <Link
             href="/organizer/events/create"
