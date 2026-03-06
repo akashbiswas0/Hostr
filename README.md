@@ -53,6 +53,30 @@ Maintenance behavior:
 - Search tokens and derived flag entities are replaced on event updates to avoid stale derived rows.
 - Event purge is guarded: `purgeHostEventIfNoTickets` refuses deletion while attendee-owned tickets exist, then batch-deletes organizer-owned dependent entities (`ticket_decision`, `checkin`, `poa`, search tokens, flags) with the event.
 
+### ER diagram (wallets + explicit relationships)
+
+```mermaid
+erDiagram
+    ORGANIZER_WALLET ||--|| ORGANIZER_PROFILE : owns
+    ORGANIZER_WALLET ||--o{ HOSTEVENT : owns
+    ATTENDEE_WALLET ||--|| USER_PROFILE : owns
+    ATTENDEE_WALLET ||--o{ TICKET : owns
+    ATTENDEE_WALLET ||--o{ POA : receives
+
+    ORGANIZER_PROFILE ||--o{ HOSTEVENT : "organizerKey FK"
+    HOSTEVENT ||--o{ TICKET : "eventKey FK"
+    HOSTEVENT ||--o{ TICKET_DECISION : "eventKey FK"
+    HOSTEVENT ||--o{ CHECKIN : "eventKey FK"
+    HOSTEVENT ||--o{ POA : "eventKey FK"
+    HOSTEVENT ||--o{ EVENT_SEARCH_TOKEN : "eventKey FK"
+    HOSTEVENT ||--o{ EVENT_CAPACITY_FLAG : "eventKey FK"
+    HOSTEVENT ||--o{ EVENT_TRENDING_FLAG : "eventKey FK"
+
+    TICKET ||--o| TICKET_DECISION : "ticketKey FK"
+    TICKET ||--o| CHECKIN : "ticketKey FK"
+    CHECKIN ||--o| POA : "checkinKey FK"
+```
+
 
 
 ### State transitions are explicit and enforced in code:
@@ -94,4 +118,3 @@ Reliability and reconciliation features:
 - `lib/arkiv/queries/` (filter/sort/discovery query model)
 - `lib/arkiv/ownership.ts` (owner-only mutation guards)
 - `lib/arkiv/types.ts` and `lib/arkiv/constants.ts` (schema + entity constants)
-
