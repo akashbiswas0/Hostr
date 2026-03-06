@@ -52,6 +52,9 @@ export interface Event {
   imageUrl?: string;
   themeId?: string;
   fontPreset?: string;
+  timezone?: string;
+  themeColor?: string;
+  emojiSymbol?: string;
   coverImageUrl?: string;
   posterImageUrl?: string;
   thumbnailImageUrl?: string;

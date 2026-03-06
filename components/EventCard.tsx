@@ -86,7 +86,6 @@ export function EventCard({ entity, event }: EventCardProps) {
     <Link
       href={`/events/${entity.key}`}
       className="group flex flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#1a1224]/85 transition-all duration-200 hover:border-white/25 hover:bg-[#211730]"
-      style={{ fontFamily: appearance.fontFamily }}
     >
       {}
       <div className="relative aspect-square w-full overflow-hidden" style={{ background: appearance.theme.cardGradient }}>

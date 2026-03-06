@@ -17,11 +17,14 @@ import {
   MapPin,
   ExternalLink,
   Check,
+  Share2,
+  Copy,
 } from "lucide-react";
 import { useEvent } from "@/hooks/useEvent";
 import { useTicket } from "@/hooks/useTicket";
 import { useWallet } from "@/hooks/useWallet";
 import { useEventImage } from "@/hooks/useEventImage";
+import toast from "react-hot-toast";
 import { publicClient } from "@/lib/arkiv/client";
 import {
   getTicketsByEvent,
@@ -42,6 +45,8 @@ import { Navbar } from "@/components/Navbar";
 import { ChainLink } from "@/components/ChainLink";
 import type { OrganizerProfile, Ticket } from "@/lib/arkiv/types";
 import type { Entity } from "@arkiv-network/sdk";
+import { resolveEventAppearance, type ThemeInfo } from "@/lib/eventAppearance";
+import { getTimeZoneOffsetLabel, normalizeEventTimeZone, toCityName } from "@/lib/timezone";
 
 const EXPLORER = "https://explorer.kaolin.hoodi.arkiv.network";
 
@@ -54,7 +59,7 @@ function toMs(value: unknown): number {
   return isNaN(t) ? NaN : t;
 }
 
-function formatDateFull(value: unknown) {
+function formatDateFull(value: unknown, timeZone: string) {
   const ms = toMs(value);
   if (isNaN(ms)) return "Date TBD";
   return new Intl.DateTimeFormat("en-US", {
@@ -65,24 +70,25 @@ function formatDateFull(value: unknown) {
     hour: "numeric",
     minute: "2-digit",
     timeZoneName: "short",
+    timeZone,
   }).format(new Date(ms));
 }
 
-function formatMonth(value: unknown) {
+function formatMonth(value: unknown, timeZone: string) {
   const ms = toMs(value);
   if (isNaN(ms)) return "TBD";
-  return new Intl.DateTimeFormat("en-US", { month: "short" })
+  return new Intl.DateTimeFormat("en-US", { month: "short", timeZone })
     .format(new Date(ms))
     .toUpperCase();
 }
 
-function formatDayNumber(value: unknown) {
+function formatDayNumber(value: unknown, timeZone: string) {
   const ms = toMs(value);
   if (isNaN(ms)) return "--";
-  return new Intl.DateTimeFormat("en-US", { day: "numeric" }).format(new Date(ms));
+  return new Intl.DateTimeFormat("en-US", { day: "numeric", timeZone }).format(new Date(ms));
 }
 
-function formatTimeRange(start: unknown, end: unknown) {
+function formatTimeRange(start: unknown, end: unknown, timeZone: string) {
   const startMs = toMs(start);
   const endMs = toMs(end);
   if (isNaN(startMs) || isNaN(endMs)) return "Time TBD";
@@ -90,6 +96,7 @@ function formatTimeRange(start: unknown, end: unknown) {
   const fmt = new Intl.DateTimeFormat("en-US", {
     hour: "numeric",
     minute: "2-digit",
+    timeZone,
   });
 
   return `${fmt.format(new Date(startMs))} - ${fmt.format(new Date(endMs))}`;
@@ -183,7 +190,7 @@ export default function EventDetailPage() {
   const confirmedAttendees = useMemo(() => {
     return (attendeeQuery.data ?? []).filter((ent) => {
       const statusAttr = ent.attributes.find((a) => a.key === "status");
-      const status = (statusAttr?.value as string) ?? "confirmed";
+      const status = (statusAttr?.value as string) ?? "pending";
       if (status === "confirmed") return true;
       if (status === "pending" && approvedRsvpKeys.has((ent.key as string).toLowerCase())) return true;
       return false;
@@ -221,6 +228,50 @@ export default function EventDetailPage() {
   const isEnded = event?.status === "ended";
   const featuredCity = getFeaturedCity(event?.location);
   const isOffline = !!(event?.location && !event?.virtualLink);
+
+  async function handleCopyInviteLink() {
+    const shareUrl =
+      typeof window !== "undefined" ? `${window.location.origin}/events/${entityKey}` : `/events/${entityKey}`;
+
+    if (typeof navigator === "undefined" || !navigator.clipboard) {
+      toast.error("Copy is not available on this browser.");
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      toast.success("Event link copied");
+    } catch {
+      toast.error("Failed to copy event link");
+    }
+  }
+
+  async function handleInviteFriend() {
+    const shareUrl =
+      typeof window !== "undefined" ? `${window.location.origin}/events/${entityKey}` : `/events/${entityKey}`;
+    const eventTitle = event?.title?.trim() || "this event";
+    const shareText = `Join me at ${eventTitle}`;
+
+    if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
+      try {
+        await navigator.share({
+          title: eventTitle,
+          text: shareText,
+          url: shareUrl,
+        });
+        return;
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+      }
+    }
+
+    if (typeof navigator === "undefined" || !navigator.clipboard) {
+      toast.error("Sharing is not available on this browser.");
+      return;
+    }
+
+    await handleCopyInviteLink();
+  }
 
   const myRsvpStatus = (rsvpEntity?.attributes.find((a) => a.key === "status")?.value as string) ?? null;
 
@@ -273,9 +324,15 @@ export default function EventDetailPage() {
     );
   }
 
+  const eventTimeZone = normalizeEventTimeZone(event.timezone);
+  const appearance = resolveEventAppearance(event);
+
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[#05070d] text-zinc-100">
-      <Backdrop />
+    <div
+      className="relative min-h-screen overflow-hidden text-zinc-100"
+      style={{ fontFamily: appearance.fontFamily }}
+    >
+      <Backdrop theme={appearance.theme} />
 
       <div className="relative z-10">
         <Navbar active="events" />
@@ -288,7 +345,7 @@ export default function EventDetailPage() {
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={heroImgUrl} alt={event.title} className="aspect-square w-full object-cover" />
                 ) : (
-                  <div className="flex aspect-square items-end bg-[radial-gradient(circle_at_top,rgba(86,112,255,0.35),transparent_58%),linear-gradient(160deg,#0e1330,#0a0d16)] p-4">
+                  <div className="flex aspect-square items-end p-4" style={{ background: appearance.theme.heroGradient }}>
                     <p className="line-clamp-3 text-xl font-extrabold text-white">{event.title}</p>
                   </div>
                 )}
@@ -385,23 +442,26 @@ export default function EventDetailPage() {
 
               <div className="grid gap-3 sm:grid-cols-[66px_minmax(0,1fr)]">
                 <div className="rounded-2xl border border-white/15 bg-black/45 p-2 text-center backdrop-blur-md">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-400">{formatMonth(event.date)}</p>
-                  <p className="text-2xl font-extrabold leading-none text-white">{formatDayNumber(event.date)}</p>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-400">{formatMonth(event.date, eventTimeZone)}</p>
+                  <p className="text-2xl font-extrabold leading-none text-white">{formatDayNumber(event.date, eventTimeZone)}</p>
                 </div>
 
                 <div className="rounded-2xl border border-white/15 bg-black/45 px-3 py-2.5 backdrop-blur-md">
                   <div className="flex items-start gap-2.5">
-                    <div className="mt-0.5 rounded-lg border border-white/10 bg-white/[0.06] p-1.5">
+                    <div className="rounded-lg border border-white/10 bg-white/[0.06] p-1.5">
                       <Calendar size={15} className="text-zinc-200" />
                     </div>
                     <div className="min-w-0">
-                      <p className="text-sm font-semibold text-white">{formatTimeRange(event.date, event.endDate)}</p>
-                      <p className="mt-0.5 text-xs text-zinc-300">{formatDateFull(event.date)}</p>
+                      <p className="text-sm font-semibold text-white">{formatTimeRange(event.date, event.endDate, eventTimeZone)}</p>
+                      <p className="mt-0.5 text-xs text-zinc-300">{formatDateFull(event.date, eventTimeZone)}</p>
+                      <p className="mt-0.5 text-[11px] text-zinc-400">
+                        {toCityName(eventTimeZone)} ({getTimeZoneOffsetLabel(eventTimeZone)})
+                      </p>
                     </div>
                   </div>
 
                   <div className="mt-2.5 flex items-start gap-2.5">
-                    <div className="mt-0.5 rounded-lg border border-white/10 bg-white/[0.06] p-1.5">
+                    <div className="rounded-lg border border-white/10 bg-white/[0.06] p-1.5">
                       <MapPin size={15} className="text-zinc-200" />
                     </div>
                     <div className="min-w-0">
@@ -427,12 +487,14 @@ export default function EventDetailPage() {
                   isFull={isFull}
                   isConnected={isConnected}
                   isCorrectChain={isCorrectChain}
-                hasRsvp={hasRsvp}
-                rsvpLoading={rsvpLoading}
-                myRsvp={myRsvp}
-                myRsvpStatus={effectiveMyRsvpStatus}
-                onOpen={() => setRsvpModalOpen(true)}
-              />
+                  hasRsvp={hasRsvp}
+                  rsvpLoading={rsvpLoading}
+                  myRsvp={myRsvp}
+                  myRsvpStatus={effectiveMyRsvpStatus}
+                  onOpen={() => setRsvpModalOpen(true)}
+                  onInvite={handleInviteFriend}
+                  onCopyLink={handleCopyInviteLink}
+                />
 
                 <div className="rounded-2xl border border-white/14 bg-black/40 p-3 backdrop-blur-md">
                   <p className="text-xs font-semibold uppercase tracking-[0.08em] text-zinc-400">On-chain info</p>
@@ -582,6 +644,8 @@ interface RsvpCardProps {
   myRsvp: Ticket | null;
   myRsvpStatus: string | null;
   onOpen: () => void;
+  onInvite: () => void;
+  onCopyLink: () => void;
 }
 
 function RsvpCard({
@@ -594,6 +658,8 @@ function RsvpCard({
   myRsvp,
   myRsvpStatus,
   onOpen,
+  onInvite,
+  onCopyLink,
 }: RsvpCardProps) {
   return (
     <div className="rounded-2xl border border-white/14 bg-black/45 p-4 backdrop-blur-md">
@@ -696,7 +762,25 @@ function RsvpCard({
         </button>
       )}
 
-      
+      <div className="mt-4 border-t border-white/10 pt-3">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-400">Share event</p>
+        <div className="mt-2 flex flex-wrap gap-2">
+          <button
+            onClick={onInvite}
+            className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.08] px-3 py-1.5 text-sm font-semibold text-zinc-100 transition hover:bg-white/[0.14]"
+          >
+            <Share2 size={14} className="text-zinc-300" />
+            Invite a Friend
+          </button>
+          <button
+            onClick={onCopyLink}
+            className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.08] px-3 py-1.5 text-sm font-semibold text-zinc-100 transition hover:bg-white/[0.14]"
+          >
+            <Copy size={14} className="text-zinc-300" />
+            Copy Link
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -812,12 +896,20 @@ function TagPill({ label }: { label: string }) {
   );
 }
 
-function Backdrop() {
+function Backdrop({ theme }: { theme: ThemeInfo }) {
   return (
     <div className="pointer-events-none absolute inset-0">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_8%,rgba(67,97,238,0.24),transparent_44%),radial-gradient(circle_at_88%_18%,rgba(224,120,41,0.14),transparent_40%),linear-gradient(180deg,#070a10_0%,#05070d_55%,#04050a_100%)]" />
-      <div className="absolute inset-0 opacity-25 [background-image:repeating-conic-gradient(from_200deg_at_50%_50%,rgba(124,58,237,0.18)_0deg,transparent_7deg,transparent_18deg)]" />
-      <div className="absolute inset-0 opacity-20 [background-image:radial-gradient(rgba(255,255,255,0.18)_0.55px,transparent_0.55px)] [background-size:3px_3px]" />
+      <div className="absolute inset-0" style={{ background: theme.detailBackground }} />
+      {theme.detailOverlay && (
+        <div
+          className="absolute inset-0 opacity-40"
+          style={{
+            backgroundImage: theme.detailOverlay,
+            backgroundSize: theme.detailOverlaySize ?? "280px 280px",
+          }}
+        />
+      )}
+      <div className="absolute inset-0 opacity-16 [background-image:radial-gradient(rgba(255,255,255,0.16)_0.55px,transparent_0.55px)] [background-size:3px_3px]" />
     </div>
   );
 }

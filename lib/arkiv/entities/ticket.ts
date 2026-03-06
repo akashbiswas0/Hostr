@@ -143,6 +143,9 @@ async function applyDecisionStatusToTicket(
     if (attr.key === "lastActionAt") return { key: "lastActionAt", value: unixNow() };
     return attr;
   });
+  if (!attrs.some((attr) => attr.key === "status")) {
+    attrs.push({ key: "status", value: nextStatus });
+  }
   if (!attrs.some((attr) => attr.key === "lastActionAt")) {
     attrs.push({ key: "lastActionAt", value: unixNow() });
   }
@@ -254,6 +257,9 @@ export async function updateTicketStatus(
       if (attr.key === "lastActionAt") return { key: "lastActionAt", value: unixNow() };
       return attr;
     });
+    if (!attrs.some((attr) => attr.key === "status")) {
+      attrs.push({ key: "status", value: status });
+    }
     if (!attrs.some((attr) => attr.key === "lastActionAt")) {
       attrs.push({ key: "lastActionAt", value: unixNow() });
     }

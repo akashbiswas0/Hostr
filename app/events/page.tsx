@@ -77,6 +77,14 @@ function formatDateTime(value: unknown): string {
   }).format(new Date(ms));
 }
 
+function getPrimaryLocationName(location: string): string {
+  const trimmed = location.trim();
+  if (!trimmed) return "Online";
+  if (trimmed.toLowerCase() === "online") return "Online";
+  const [primary] = trimmed.split(",");
+  return primary?.trim() || trimmed;
+}
+
 function PopularThumb({ event }: { event: Event }) {
   const imgUrl = useEventImage(event.imageUrl);
   const appearance = resolveEventAppearance(event);
@@ -171,7 +179,6 @@ export default function EventsPage() {
 
       <main
         className="relative mx-auto max-w-6xl px-4 pb-16 pt-10 sm:px-6"
-        style={{ fontFamily: defaultAppearance.fontFamily }}
       >
         <header className="max-w-4xl">
           <h1 className="text-4xl font-bold tracking-tight">Discover Events</h1>
@@ -227,7 +234,6 @@ export default function EventsPage() {
                 <div className="grid gap-4 sm:grid-cols-2">
                   {popularEvents.map((entity) => {
                     const event = entity.toJson() as Event;
-                    const appearance = resolveEventAppearance(event);
                     return (
                       <Link
                         key={entity.key}
@@ -235,7 +241,6 @@ export default function EventsPage() {
                         className="group flex items-center gap-4 rounded-2xl border border-white/10 p-3 transition-all hover:border-white/20"
                         style={{
                           background: "rgba(255, 255, 255, 0.04)",
-                          fontFamily: appearance.fontFamily,
                         }}
                       >
                         <PopularThumb event={event} />
@@ -310,7 +315,7 @@ export default function EventsPage() {
                           <MapPin size={16} />
                         </span>
                         <div>
-                          <p className="font-semibold text-white">{item.location}</p>
+                          <p className="font-semibold text-white">{getPrimaryLocationName(item.location)}</p>
                           <p className="text-sm text-zinc-400">{item.count} event{item.count > 1 ? "s" : ""}</p>
                         </div>
                       </div>

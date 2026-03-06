@@ -420,7 +420,6 @@ function OrganizerTimelineCard({
       className="block rounded-xl border border-white/10 p-2.5 transition-colors hover:border-white/20"
       style={{
         background: "linear-gradient(120deg, rgba(33,33,33,0.86), rgba(38,38,38,0.86))",
-        fontFamily: appearance.fontFamily,
       }}
     >
       <div className="grid gap-2.5 sm:grid-cols-[minmax(0,1fr)_100px]">

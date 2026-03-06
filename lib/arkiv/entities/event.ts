@@ -6,7 +6,13 @@ import type { Account, Chain, Hex, Transport } from "viem";
 import { ENTITY_TYPES } from "../constants";
 import { assertCallerOwnsHostEvent } from "../ownership";
 import type { ArkivResult, Event, EventStatus, TicketDecision, TicketStatus } from "../types";
-import { normalizeEventFontPreset, normalizeEventThemeId } from "../../eventAppearance";
+import {
+  normalizeEventEmojiSymbol,
+  normalizeEventFontPreset,
+  normalizeEventThemeColor,
+  normalizeEventThemeId,
+} from "../../eventAppearance";
+import { normalizeEventTimeZone } from "../../timezone";
 import {
   boolToNumber,
   ensureEvenSeconds,
@@ -50,10 +56,16 @@ function computePriceTier(data: Event): "free" | "paid" | "donation" {
 function normalizeEventPayload(data: Event): Event {
   const themeId = normalizeEventThemeId(data.themeId);
   const fontPreset = normalizeEventFontPreset(data.fontPreset);
+  const timezone = normalizeEventTimeZone(data.timezone);
+  const themeColor = normalizeEventThemeColor(themeId, data.themeColor);
+  const emojiSymbol = normalizeEventEmojiSymbol(themeId, data.emojiSymbol);
   return {
     ...data,
     themeId,
     fontPreset,
+    timezone,
+    themeColor,
+    emojiSymbol,
     coverImageUrl: normalizeMediaUrl(data.coverImageUrl ?? data.imageUrl),
     posterImageUrl: normalizeMediaUrl(data.posterImageUrl ?? data.imageUrl),
     thumbnailImageUrl: normalizeMediaUrl(data.thumbnailImageUrl ?? data.imageUrl),
@@ -87,6 +99,9 @@ function eventAttributes(
   const poapTemplateId = (data.poapTemplateId ?? "").trim();
   const themeId = normalizeEventThemeId(data.themeId);
   const fontPreset = normalizeEventFontPreset(data.fontPreset);
+  const timezone = normalizeEventTimeZone(data.timezone);
+  const themeColor = normalizeEventThemeColor(themeId, data.themeColor);
+  const emojiSymbol = normalizeEventEmojiSymbol(themeId, data.emojiSymbol);
 
   return [
     { key: "type", value: ENTITY_TYPES.HOSTEVENT },
@@ -115,7 +130,7 @@ function eventAttributes(
     { key: "startMonth", value: new Date(startAt * 1_000).getUTCMonth() + 1 },
     { key: "dayOfWeek", value: new Date(startAt * 1_000).getUTCDay() },
     { key: "durationMinutes", value: Math.max(0, Math.floor((endAt - startAt) / 60)) },
-    { key: "timezone", value: "UTC" },
+    { key: "timezone", value: timezone },
     { key: "organizerWallet", value: ownerWallet },
     { key: "organizer", value: ownerWallet },
     { key: "organizerKey", value: organizerKey ?? "" },
@@ -135,6 +150,8 @@ function eventAttributes(
     { key: "audienceLevel", value: data.audienceLevel ?? "all" },
     { key: "themeId", value: themeId },
     { key: "fontPreset", value: fontPreset },
+    { key: "themeColor", value: themeColor },
+    { key: "emojiSymbol", value: emojiSymbol },
     { key: "coverImageUrl", value: coverImageUrl },
     { key: "posterImageUrl", value: posterImageUrl },
     { key: "thumbnailImageUrl", value: thumbnailImageUrl },

@@ -102,6 +102,13 @@ export function Navbar({ active }: NavbarProps) {
                 View Profile
               </Link>
               <Link
+                href="/attendee/pope"
+                className="block py-2 text-sm font-medium text-zinc-300 hover:text-white"
+                onClick={() => setMobileOpen(false)}
+              >
+                POP
+              </Link>
+              <Link
                 href={settingsHref}
                 className="block py-2 text-sm font-medium text-zinc-300 hover:text-white"
                 onClick={() => setMobileOpen(false)}

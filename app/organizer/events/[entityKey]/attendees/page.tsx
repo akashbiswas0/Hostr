@@ -37,6 +37,9 @@ interface AttendeeRow {
   status: EffectiveStatus;
 }
 
+const ORGANIZER_GLASS_BG =
+  "radial-gradient(circle at 18% 0%, rgba(37,99,235,0.28), transparent 36%), radial-gradient(circle at 80% 2%, rgba(99,102,241,0.22), transparent 30%), linear-gradient(180deg, #0a1120 0%, #060912 55%)";
+
 function truncateAddress(addr: string) {
   if (!addr) return "—";
   return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
@@ -81,12 +84,12 @@ function downloadCsv(filename: string, csv: string) {
 
 function Chip({ status }: { status: EffectiveStatus }) {
   const map: Record<EffectiveStatus, string> = {
-    pending: "bg-violet-900/50 text-violet-300 border-violet-700/30",
-    confirmed: "bg-emerald-900/50 text-emerald-300 border-emerald-700/30",
-    waitlisted: "bg-amber-900/50 text-amber-300 border-amber-700/30",
-    "checked-in": "bg-blue-900/50 text-blue-300 border-blue-700/30",
-    rejected: "bg-rose-900/50 text-rose-300 border-rose-700/30",
-    "not-going": "bg-zinc-800 text-zinc-400 border-zinc-700/30",
+    pending: "border-violet-300/35 bg-violet-500/15 text-violet-100",
+    confirmed: "border-emerald-300/35 bg-emerald-500/15 text-emerald-100",
+    waitlisted: "border-amber-300/35 bg-amber-500/15 text-amber-100",
+    "checked-in": "border-blue-300/35 bg-blue-500/15 text-blue-100",
+    rejected: "border-rose-300/35 bg-rose-500/15 text-rose-100",
+    "not-going": "border-white/20 bg-white/[0.08] text-zinc-200",
   };
   return (
     <span
@@ -292,9 +295,10 @@ export default function AttendeesPage() {
 
   if (!isConnected || !isCorrectChain) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-zinc-950 p-6">
-        <div className="text-center space-y-4">
-          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-zinc-900 border border-white/10 mx-auto">
+      <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#060912] p-6 text-white">
+        <div className="pointer-events-none absolute inset-0" style={{ background: ORGANIZER_GLASS_BG }} />
+        <div className="relative space-y-4 text-center">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full border border-white/15 bg-white/[0.05] backdrop-blur-sm">
             {isConnected ? <AlertTriangle size={24} className="text-amber-400" /> : <Lock size={24} className="text-violet-400" />}
           </div>
           <h2 className="text-lg font-bold text-white">
@@ -310,10 +314,11 @@ export default function AttendeesPage() {
 
   if (!eventEntity) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-zinc-950 p-6">
-        <div className="text-center space-y-3">
+      <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#060912] p-6 text-white">
+        <div className="pointer-events-none absolute inset-0" style={{ background: ORGANIZER_GLASS_BG }} />
+        <div className="relative space-y-3 text-center">
           <p className="text-white font-bold">Event not found</p>
-          <Link href="/organizer/dashboard" className="flex items-center justify-center gap-1.5 text-sm text-violet-400 hover:underline">
+          <Link href="/organizer/dashboard" className="flex items-center justify-center gap-1.5 text-sm text-violet-300 transition-colors hover:text-white">
             <ArrowLeft size={14} /> Dashboard
           </Link>
         </div>
@@ -327,16 +332,17 @@ export default function AttendeesPage() {
     eventEntity.owner.toLowerCase() !== address.toLowerCase()
   ) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-zinc-950 p-6">
-        <div className="text-center space-y-3">
-          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-zinc-900 border border-white/10 mx-auto">
+      <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#060912] p-6 text-white">
+        <div className="pointer-events-none absolute inset-0" style={{ background: ORGANIZER_GLASS_BG }} />
+        <div className="relative space-y-3 text-center">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full border border-white/15 bg-white/[0.05] backdrop-blur-sm">
             <ShieldOff size={22} className="text-rose-400" />
           </div>
           <p className="text-white font-bold">Not authorized</p>
-          <p className="text-sm text-zinc-400">
+          <p className="text-sm text-zinc-300">
             Only the event owner can manage attendees.
           </p>
-          <Link href="/organizer/dashboard" className="flex items-center justify-center gap-1.5 text-sm text-violet-400 hover:underline">
+          <Link href="/organizer/dashboard" className="flex items-center justify-center gap-1.5 text-sm text-violet-300 transition-colors hover:text-white">
             <ArrowLeft size={14} /> Dashboard
           </Link>
         </div>
@@ -353,7 +359,7 @@ export default function AttendeesPage() {
     const rsvpKeyLower = (ent.key as string).toLowerCase();
 
     const statusAttr = ent.attributes.find((a) => a.key === "status");
-    const rsvpAttrStatus = (statusAttr?.value as TicketStatus) ?? "confirmed";
+    const rsvpAttrStatus = (statusAttr?.value as TicketStatus) ?? "pending";
 
     let status: EffectiveStatus;
     if (isCheckedIn) {
@@ -392,16 +398,17 @@ export default function AttendeesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-white">
+    <div className="relative min-h-screen overflow-hidden bg-[#060912] text-white">
+      <div className="pointer-events-none absolute inset-0" style={{ background: ORGANIZER_GLASS_BG }} />
       <Navbar active="dashboard" />
 
-      <main className="mx-auto max-w-4xl px-4 py-10 sm:px-6 space-y-8">
+      <main className="relative mx-auto max-w-4xl space-y-8 px-4 py-10 sm:px-6">
         {}
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="space-y-4">
           <div>
             <Link
               href="/organizer/dashboard"
-              className="flex items-center gap-1.5 text-sm text-zinc-500 hover:text-white transition-colors"
+              className="flex items-center gap-1.5 text-sm text-zinc-400 transition-colors hover:text-white"
             >
               <ArrowLeft size={14} /> Dashboard
             </Link>
@@ -409,54 +416,39 @@ export default function AttendeesPage() {
               {event?.title ?? "Attendees"}
             </h1>
             {event?.date && (
-              <p className="mt-0.5 text-xs text-zinc-500">{formatDate(event.date)}</p>
+              <p className="mt-0.5 text-xs text-zinc-400">{formatDate(event.date)}</p>
             )}
           </div>
 
-          {}
-          <div className="flex items-center gap-3 self-start">
-            {pending.length > 0 && (
-              <div className="rounded-lg border border-violet-700/30 bg-violet-950/30 px-4 py-2 text-center text-xs text-violet-300">
-                <p className="text-xl font-bold text-white">{pending.length}</p>
-                <p>Pending</p>
-              </div>
-            )}
-            <div className="rounded-lg border border-white/5 bg-zinc-900 px-4 py-2 text-center text-xs text-zinc-400">
-              <p className="text-xl font-bold text-white">{confirmed.length}</p>
-              <p>Confirmed</p>
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div className="grid w-full grid-cols-2 gap-3 sm:w-auto sm:grid-cols-4">
+              <HeaderStat label="Pending" value={pending.length} tone="violet" />
+              <HeaderStat label="Confirmed" value={confirmed.length} />
+              <HeaderStat label="Checked In" value={checkedIn.length} />
+              <HeaderStat label="Waitlisted" value={waitlisted.length} />
             </div>
-            <div className="rounded-lg border border-white/5 bg-zinc-900 px-4 py-2 text-center text-xs text-zinc-400">
-              <p className="text-xl font-bold text-white">{checkedIn.length}</p>
-              <p>Checked In</p>
+
+            <div className="flex flex-wrap items-center gap-2">
+              {rejected.length > 0 && (
+                <div className="rounded-lg border border-rose-300/35 bg-rose-500/15 px-3 py-2 text-center text-xs text-rose-100 backdrop-blur-sm">
+                  <p className="text-base font-bold text-white">{rejected.length}</p>
+                  <p>Rejected</p>
+                </div>
+              )}
+              {notGoing.length > 0 && (
+                <div className="rounded-lg border border-white/12 bg-white/[0.04] px-3 py-2 text-center text-xs text-zinc-300 backdrop-blur-sm">
+                  <p className="text-base font-bold text-white">{notGoing.length}</p>
+                  <p>Not Going</p>
+                </div>
+              )}
+              
+              <Link
+                href={`/organizer/events/${entityKey}/checkin`}
+                className="flex items-center gap-1.5 rounded-lg border border-violet-300/35 bg-violet-500/15 px-3 py-2 text-xs font-medium text-violet-100 transition-colors hover:bg-violet-500/25 hover:text-white"
+              >
+                <ScanLine size={13} /> Check-in Scanner
+              </Link>
             </div>
-            <div className="rounded-lg border border-white/5 bg-zinc-900 px-4 py-2 text-center text-xs text-zinc-400">
-              <p className="text-xl font-bold text-white">{waitlisted.length}</p>
-              <p>Waitlisted</p>
-            </div>
-            {rejected.length > 0 && (
-              <div className="rounded-lg border border-rose-700/30 bg-rose-950/20 px-4 py-2 text-center text-xs text-rose-300">
-                <p className="text-xl font-bold text-white">{rejected.length}</p>
-                <p>Rejected</p>
-              </div>
-            )}
-            {notGoing.length > 0 && (
-              <div className="rounded-lg border border-zinc-700/30 bg-zinc-800/30 px-4 py-2 text-center text-xs text-zinc-400">
-                <p className="text-xl font-bold text-white">{notGoing.length}</p>
-                <p>Not Going</p>
-              </div>
-            )}
-            <button
-              onClick={handleExport}
-              className="rounded-lg border border-white/10 px-3 py-2 text-xs font-medium text-zinc-300 hover:border-white/20 hover:text-white transition-colors flex items-center gap-1.5"
-            >
-              <Download size={13} /> Export CSV
-            </button>
-            <Link
-              href={`/organizer/events/${entityKey}/checkin`}
-              className="rounded-lg border border-violet-700/40 bg-violet-950/30 px-3 py-2 text-xs font-medium text-violet-300 hover:bg-violet-900/40 hover:text-white transition-colors flex items-center gap-1.5"
-            >
-              <ScanLine size={13} /> Check-in Scanner
-            </Link>
           </div>
         </div>
 
@@ -545,7 +537,7 @@ export default function AttendeesPage() {
                     <p className="text-xs text-zinc-500 truncate">{row.data.attendeeEmail}</p>
                   )}
                   {row.data.message && (
-                    <p className="text-xs text-zinc-600 italic truncate">&quot;{row.data.message}&quot;</p>
+                    <p className="text-xs text-zinc-500 italic truncate">&quot;{row.data.message}&quot;</p>
                   )}
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
@@ -576,7 +568,7 @@ export default function AttendeesPage() {
                     <p className="text-xs text-zinc-500 truncate">{row.data.attendeeEmail}</p>
                   )}
                   {row.data.message && (
-                    <p className="text-xs text-zinc-600 italic truncate">&quot;{row.data.message}&quot;</p>
+                    <p className="text-xs text-zinc-500 italic truncate">&quot;{row.data.message}&quot;</p>
                   )}
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
@@ -590,8 +582,8 @@ export default function AttendeesPage() {
 
         {}
         {checkInMutation.isError && (
-          <div className="rounded-lg border border-red-800/40 bg-red-950/20 px-4 py-3">
-            <p className="text-xs text-red-400 font-mono">
+          <div className="rounded-xl border border-rose-400/25 bg-rose-500/10 px-4 py-3 backdrop-blur-sm">
+            <p className="font-mono text-xs text-rose-200">
               {(checkInMutation.error as Error)?.message ?? "Check-in failed"}
             </p>
           </div>
@@ -628,19 +620,19 @@ function Section({
   return (
     <div>
       <div className="mb-3 flex items-center gap-2">
-        <h2 className="text-sm font-semibold text-zinc-300">{title}</h2>
-        <span className="rounded-full bg-zinc-800 px-2 py-0.5 text-xs text-zinc-400">
+        <h2 className="text-sm font-semibold text-zinc-200">{title}</h2>
+        <span className="rounded-full border border-white/12 bg-white/[0.05] px-2 py-0.5 text-xs text-zinc-300">
           {count}
         </span>
       </div>
 
-      <div className="rounded-2xl border border-white/5 bg-zinc-900 divide-y divide-white/5">
+      <div className="divide-y divide-white/10 rounded-2xl border border-white/12 bg-white/[0.04] backdrop-blur-sm">
         {loading ? (
           <>
             {[0, 1, 2].map((i) => (
               <div key={i} className="flex items-center gap-4 px-5 py-4 animate-pulse">
-                <div className="h-3 w-32 rounded bg-zinc-800" />
-                <div className="h-3 w-24 rounded bg-zinc-800 ml-auto" />
+                <div className="h-3 w-32 rounded bg-white/[0.08]" />
+                <div className="ml-auto h-3 w-24 rounded bg-white/[0.08]" />
               </div>
             ))}
           </>
@@ -672,17 +664,17 @@ function AttendeeRowItem({
     <div className="flex flex-col gap-2 px-5 py-4 sm:flex-row sm:items-center sm:gap-6">
       {}
       <div className="min-w-0 flex-1 space-y-0.5">
-        <p className="font-mono text-xs text-violet-400 truncate">
+        <p className="font-mono text-xs text-violet-300 truncate">
           {row.ownerAddress ? truncateAddress(row.ownerAddress) : "—"}
         </p>
         <p className="text-sm font-medium text-white truncate">
           {row.data.attendeeName || "Anonymous"}
         </p>
         {row.data.attendeeEmail && (
-          <p className="text-xs text-zinc-500 truncate">{row.data.attendeeEmail}</p>
+          <p className="text-xs text-zinc-400 truncate">{row.data.attendeeEmail}</p>
         )}
         {row.data.message && (
-          <p className="text-xs text-zinc-600 italic truncate">&quot;{row.data.message}&quot;</p>
+          <p className="text-xs text-zinc-500 italic truncate">&quot;{row.data.message}&quot;</p>
         )}
       </div>
 
@@ -693,7 +685,7 @@ function AttendeeRowItem({
           <button
             onClick={onCheckIn}
             disabled={isCheckingIn}
-            className="rounded-lg bg-emerald-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center gap-1.5"
+            className="flex items-center gap-1.5 rounded-lg bg-emerald-500/90 px-3 py-1.5 text-xs font-semibold text-emerald-950 transition-colors hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-40"
           >
             {isCheckingIn ? (
               <>
@@ -728,17 +720,17 @@ function PendingRowItem({
   return (
     <div className="flex flex-col gap-2 px-5 py-4 sm:flex-row sm:items-center sm:gap-6">
       <div className="min-w-0 flex-1 space-y-0.5">
-        <p className="font-mono text-xs text-violet-400 truncate">
+        <p className="font-mono text-xs text-violet-300 truncate">
           {row.ownerAddress ? truncateAddress(row.ownerAddress) : "—"}
         </p>
         <p className="text-sm font-medium text-white truncate">
           {row.data.attendeeName || "Anonymous"}
         </p>
         {row.data.attendeeEmail && (
-          <p className="text-xs text-zinc-500 truncate">{row.data.attendeeEmail}</p>
+          <p className="text-xs text-zinc-400 truncate">{row.data.attendeeEmail}</p>
         )}
         {row.data.message && (
-          <p className="text-xs text-zinc-600 italic truncate">&quot;{row.data.message}&quot;</p>
+          <p className="text-xs text-zinc-500 italic truncate">&quot;{row.data.message}&quot;</p>
         )}
       </div>
       <div className="flex shrink-0 items-center gap-2">
@@ -746,14 +738,14 @@ function PendingRowItem({
         <button
           onClick={onApprove}
           disabled={isApproving || isRejecting}
-          className="rounded-lg bg-emerald-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          className="rounded-lg bg-emerald-500/90 px-3 py-1.5 text-xs font-semibold text-emerald-950 transition-colors hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-40"
         >
           {isApproving ? "Approving…" : "Approve"}
         </button>
         <button
           onClick={onReject}
           disabled={isApproving || isRejecting}
-          className="rounded-lg border border-rose-800/40 bg-rose-950/20 px-3 py-1.5 text-xs font-semibold text-rose-400 hover:bg-rose-950/40 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          className="rounded-lg border border-rose-300/35 bg-rose-500/15 px-3 py-1.5 text-xs font-semibold text-rose-100 transition-colors hover:bg-rose-500/25 disabled:cursor-not-allowed disabled:opacity-40"
         >
           {isRejecting ? "Rejecting…" : "Reject"}
         </button>
@@ -764,17 +756,40 @@ function PendingRowItem({
 
 function EmptyRow({ message }: { message: string }) {
   return (
-    <div className="px-5 py-8 text-center text-sm text-zinc-600">{message}</div>
+    <div className="px-5 py-8 text-center text-sm text-zinc-400">{message}</div>
+  );
+}
+
+function HeaderStat({
+  label,
+  value,
+  tone = "neutral",
+}: {
+  label: string;
+  value: number;
+  tone?: "neutral" | "violet";
+}) {
+  const cls =
+    tone === "violet"
+      ? "border-violet-300/35 bg-violet-500/15 text-violet-100"
+      : "border-white/12 bg-white/[0.04] text-zinc-300";
+
+  return (
+    <div className={`rounded-lg border px-4 py-2 text-center text-xs backdrop-blur-sm ${cls}`}>
+      <p className="text-xl font-bold text-white">{value}</p>
+      <p>{label}</p>
+    </div>
   );
 }
 
 function FullSkeleton() {
   return (
-    <div className="min-h-screen bg-zinc-950 animate-pulse">
-      <div className="h-14 bg-zinc-900 border-b border-white/5" />
-      <div className="mx-auto max-w-4xl px-4 py-10 sm:px-6 space-y-6">
-        <div className="h-8 w-64 rounded bg-zinc-800" />
-        <div className="h-64 rounded-2xl bg-zinc-900" />
+    <div className="relative min-h-screen animate-pulse overflow-hidden bg-[#060912] text-white">
+      <div className="pointer-events-none absolute inset-0" style={{ background: ORGANIZER_GLASS_BG }} />
+      <div className="h-14 border-b border-white/10 bg-white/[0.03] backdrop-blur-sm" />
+      <div className="relative mx-auto max-w-4xl space-y-6 px-4 py-10 sm:px-6">
+        <div className="h-8 w-64 rounded bg-white/[0.08]" />
+        <div className="h-64 rounded-2xl border border-white/12 bg-white/[0.04]" />
       </div>
     </div>
   );

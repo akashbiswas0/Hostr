@@ -14,6 +14,60 @@ import {
 } from "../v2";
 
 const CONTENT_TYPE = "application/json" as const;
+const ATTENDANCE_ENTITY_DEBUG_PREFIX = "[poa-entity]";
+const RETRYABLE_TXPOOL_PATTERNS: RegExp[] = [
+  /txpool/i,
+  /nonce too low/i,
+  /already known/i,
+  /replacement transaction underpriced/i,
+  /transaction underpriced/i,
+  /rate limit/i,
+  /timeout|timed? ?out/i,
+];
+
+function toErrorLog(error: unknown): Record<string, unknown> {
+  if (error instanceof Error) {
+    return {
+      name: error.name,
+      message: error.message,
+      stack: error.stack,
+    };
+  }
+  return {
+    type: typeof error,
+    value: String(error ?? ""),
+    raw: error,
+  };
+}
+
+function isRetryableTxPoolError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error ?? "");
+  return RETRYABLE_TXPOOL_PATTERNS.some((pattern) => pattern.test(message));
+}
+
+async function sleep(ms: number): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function waitForEntityVisibility(
+  publicClient: PublicArkivClient,
+  entityKey: Hex,
+): Promise<void> {
+  const delaysMs = [0, 700, 1_200, 2_000];
+  let lastError: unknown = null;
+  for (let i = 0; i < delaysMs.length; i += 1) {
+    if (delaysMs[i] > 0) await sleep(delaysMs[i]);
+    try {
+      await publicClient.getEntity(entityKey);
+      return;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError instanceof Error
+    ? lastError
+    : new Error(`PoA entity ${entityKey} not visible after retries.`);
+}
 
 export interface ProofOfAttendance {
   eventKey: string;
@@ -136,6 +190,13 @@ export async function createPoAEntity(
   checkinKey: Hex,
 ): Promise<ArkivResult<{ entityKey: Hex; txHash: Hex }>> {
   try {
+    console.info(`${ATTENDANCE_ENTITY_DEBUG_PREFIX} createPoAEntity:start`, {
+      eventKey,
+      ticketKey,
+      attendeeWallet,
+      checkinKey,
+      callerWallet: walletClient.account.address,
+    });
     await assertCallerOwnsHostEvent(publicClient, eventKey, walletClient.account.address);
     const derived = await assertRefs(publicClient, eventKey, ticketKey, checkinKey, attendeeWallet);
 
@@ -179,14 +240,71 @@ export async function createPoAEntity(
       ],
       expiresIn: Math.floor(ExpirationTime.fromDays(730)),
     });
-
-    await walletClient.changeOwnership({
-      entityKey: result.entityKey as Hex,
-      newOwner: attendeeWallet,
+    console.info(`${ATTENDANCE_ENTITY_DEBUG_PREFIX} createPoAEntity:poa-created`, {
+      entityKey: (result as { entityKey?: Hex }).entityKey,
+      txHash: (result as { txHash?: Hex }).txHash,
     });
+
+    const poaKey = result.entityKey as Hex;
+    try {
+      await waitForEntityVisibility(publicClient, poaKey);
+      console.info(`${ATTENDANCE_ENTITY_DEBUG_PREFIX} createPoAEntity:poa-visible`, { entityKey: poaKey });
+    } catch (visibilityError) {
+      console.warn(`${ATTENDANCE_ENTITY_DEBUG_PREFIX} createPoAEntity:poa-visibility-wait-failed`, {
+        entityKey: poaKey,
+        error: toErrorLog(visibilityError),
+      });
+    }
+
+    const retryDelaysMs = [0, 1_200, 2_500];
+    let ownershipChanged = false;
+    let lastChangeOwnerError: unknown = null;
+    for (let i = 0; i < retryDelaysMs.length; i += 1) {
+      if (retryDelaysMs[i] > 0) await sleep(retryDelaysMs[i]);
+      try {
+        await walletClient.changeOwnership({
+          entityKey: poaKey,
+          newOwner: attendeeWallet,
+        });
+        ownershipChanged = true;
+        console.info(`${ATTENDANCE_ENTITY_DEBUG_PREFIX} createPoAEntity:ownership-changed`, {
+          entityKey: poaKey,
+          newOwner: attendeeWallet,
+          attempt: i + 1,
+        });
+        break;
+      } catch (changeOwnerError) {
+        lastChangeOwnerError = changeOwnerError;
+        const retryable = isRetryableTxPoolError(changeOwnerError);
+        console.warn(`${ATTENDANCE_ENTITY_DEBUG_PREFIX} createPoAEntity:ownership-change-attempt-failed`, {
+          entityKey: poaKey,
+          newOwner: attendeeWallet,
+          attempt: i + 1,
+          retryable,
+          error: toErrorLog(changeOwnerError),
+        });
+        if (!retryable) break;
+      }
+    }
+
+    if (!ownershipChanged) {
+      throw lastChangeOwnerError instanceof Error
+        ? lastChangeOwnerError
+        : new Error("Failed to transfer PoA ownership after retries.");
+    }
 
     return { success: true, data: result as { entityKey: Hex; txHash: Hex } };
   } catch (error) {
+    console.error(`${ATTENDANCE_ENTITY_DEBUG_PREFIX} createPoAEntity:failed`, {
+      context: {
+        eventKey,
+        ticketKey,
+        attendeeWallet,
+        checkinKey,
+        callerWallet: walletClient.account.address,
+      },
+      error: toErrorLog(error),
+    });
     return {
       success: false,
       error: error instanceof Error ? error.message : String(error),

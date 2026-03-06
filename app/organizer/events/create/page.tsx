@@ -1,13 +1,6 @@
 "use client";
 
-import {
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type ChangeEvent,
-  type ReactNode,
-} from "react";
+import { useMemo, useRef, useState, type ChangeEvent, type ReactNode } from "react";
 import { Space_Grotesk } from "next/font/google";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -22,10 +15,7 @@ import {
   Image as ImageIcon,
   Lock,
   MapPin,
-  Palette,
-  Sparkles,
   Ticket,
-  Type,
   Users,
   WandSparkles,
   X,
@@ -40,6 +30,9 @@ const AIImageGenerator = dynamic(
   { ssr: false },
 );
 
+import { DateTimePopover } from "@/components/DateTimePopover";
+import { EventAppearancePanel } from "@/components/EventAppearancePanel";
+import { TimeZonePopover } from "@/components/TimeZonePopover";
 import { ConnectButton } from "@/components/ConnectButton";
 import { Navbar } from "@/components/Navbar";
 import { useOrganizer } from "@/hooks/useOrganizer";
@@ -49,12 +42,20 @@ import { createHostEventEntity } from "@/lib/arkiv/entities/event";
 import { EVENT_CATEGORIES, type Category } from "@/lib/arkiv/categories";
 import type { Event } from "@/lib/arkiv/types";
 import {
-  EVENT_FONT_PRESETS,
-  EVENT_THEME_OPTIONS,
+  DEFAULT_EMOJI_SYMBOL,
+  DEFAULT_MINIMAL_THEME_COLOR,
   getEventFontFamily,
+  resolveEventAppearance,
   type EventFontPreset,
   type EventThemeId,
 } from "@/lib/eventAppearance";
+import {
+  browserTimeZone,
+  getTimeZoneOffsetLabel,
+  toCityName,
+  toUtcMsFromZonedLocal,
+  zonedLocalToUtcIso,
+} from "@/lib/timezone";
 
 const displayFont = Space_Grotesk({
   subsets: ["latin"],
@@ -62,39 +63,10 @@ const displayFont = Space_Grotesk({
   display: "swap",
 });
 
-const THEME_OPTIONS = [
-  { id: "minimal", label: "Minimal", preview: "linear-gradient(145deg, #ece6f2 0%, #b7b1c5 100%)" },
-  { id: "quantum", label: "Quantum", preview: "linear-gradient(145deg, #7cdbff 0%, #d078ff 50%, #6f83ff 100%)" },
-  { id: "warp", label: "Warp", preview: "radial-gradient(circle at 50% 50%, #320337 0%, #0f0a1a 42%, #6de2ff 100%)" },
-  { id: "emoji", label: "Emoji", preview: "linear-gradient(145deg, #ffd4f6 0%, #c8a1ff 100%)" },
-  { id: "confetti", label: "Confetti", preview: "linear-gradient(145deg, #7f17f0 0%, #c64ffd 45%, #ff79d7 100%)" },
-  { id: "pattern", label: "Pattern", preview: "linear-gradient(145deg, #6f54ff 0%, #5f8fff 50%, #95a1ff 100%)" },
-  { id: "seasonal", label: "Seasonal", preview: "linear-gradient(145deg, #63c2ff 0%, #4d8fff 50%, #0f4f86 100%)" },
-] as const;
-
-const FONT_PRESETS = [
-  "Default",
-  "Museo",
-  "Factoria",
-  "Ivy Presto",
-  "Ivy Mode",
-  "Google",
-  "Roc",
-  "Nunito",
-  "Degular",
-  "Pearl",
-  "Geist Mono",
-  "New Spirit",
-  "Departure",
-  "Garamond",
-  "Futura",
-  "Alternate",
-] as const;
-
 type FormState = Omit<Event, "status" | "category"> & {
-  category: Category | ""
-  lat?: number
-  lng?: number
+  category: Category | "";
+  lat?: number;
+  lng?: number;
 };
 
 const EMPTY_FORM: FormState = {
@@ -112,34 +84,24 @@ const EMPTY_FORM: FormState = {
   imageUrl: "",
 };
 
-function getValidationError(form: FormState): string | null {
+function getValidationError(form: FormState, timeZone: string): string | null {
   if (!form.title.trim()) return "Event name is required.";
   if (!form.description.trim()) return "Description is required.";
   if (!form.category) return "Category is required.";
   if (!form.date) return "Start date is required.";
   if (!form.endDate) return "End date is required.";
-  if (new Date(form.date) >= new Date(form.endDate)) return "End time must be after start time.";
-  if (!form.location.trim() && !form.virtualLink?.trim()) return "Add a location or virtual link.";
+
+  const startMs = toUtcMsFromZonedLocal(form.date, timeZone);
+  const endMs = toUtcMsFromZonedLocal(form.endDate, timeZone);
+  if (!Number.isNaN(startMs) && !Number.isNaN(endMs) && startMs >= endMs) {
+    return "End time must be after start time.";
+  }
+
+  if (!form.location.trim() && !form.virtualLink?.trim()) {
+    return "Add a location or virtual link.";
+  }
   if (!form.capacity || form.capacity < 1) return "Capacity must be at least 1.";
   return null;
-}
-
-function isFormValid(form: FormState): boolean {
-  return getValidationError(form) === null;
-}
-
-function getUtcOffsetLabel(date = new Date()): string {
-  const offsetMinutes = -date.getTimezoneOffset();
-  const sign = offsetMinutes >= 0 ? "+" : "-";
-  const absolute = Math.abs(offsetMinutes);
-  const hh = String(Math.floor(absolute / 60)).padStart(2, "0");
-  const mm = String(absolute % 60).padStart(2, "0");
-  return `GMT${sign}${hh}:${mm}`;
-}
-
-function toCityName(timeZone: string): string {
-  const city = timeZone.split("/").at(-1) ?? timeZone;
-  return city.replaceAll("_", " ");
 }
 
 export default function CreateEventPage() {
@@ -154,38 +116,33 @@ export default function CreateEventPage() {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [selectedTheme, setSelectedTheme] = useState<EventThemeId>("minimal");
   const [selectedFont, setSelectedFont] = useState<EventFontPreset>("Default");
-  const [fontMenuOpen, setFontMenuOpen] = useState(false);
+  const [selectedThemeColor, setSelectedThemeColor] = useState(DEFAULT_MINIMAL_THEME_COLOR);
+  const [selectedEmojiSymbol, setSelectedEmojiSymbol] = useState(DEFAULT_EMOJI_SYMBOL);
+  const [selectedTimeZone, setSelectedTimeZone] = useState<string>(() => browserTimeZone());
+  const [appearancePanelOpen, setAppearancePanelOpen] = useState(false);
   const [aiModalOpen, setAiModalOpen] = useState(false);
-  const [aiGenerating, setAiGenerating] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const fontMenuRef = useRef<HTMLDivElement>(null);
 
-  const timeZone = useMemo(
-    () => Intl.DateTimeFormat().resolvedOptions().timeZone ?? "UTC",
-    [],
+  const validationError = useMemo(
+    () => getValidationError(form, selectedTimeZone),
+    [form, selectedTimeZone],
   );
-  const utcOffset = useMemo(() => getUtcOffsetLabel(), []);
-  const validationError = useMemo(() => getValidationError(form), [form]);
   const valid = validationError === null;
-  const selectedThemeMeta = useMemo(
-    () => EVENT_THEME_OPTIONS.find((theme) => theme.id === selectedTheme) ?? EVENT_THEME_OPTIONS[0],
-    [selectedTheme],
-  );
   const selectedFontFamily = useMemo(
     () => getEventFontFamily(selectedFont),
     [selectedFont],
   );
-
-  useEffect(() => {
-    function onDocumentClick(event: MouseEvent) {
-      if (!fontMenuRef.current?.contains(event.target as Node)) {
-        setFontMenuOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", onDocumentClick);
-    return () => document.removeEventListener("mousedown", onDocumentClick);
-  }, []);
+  const liveAppearance = useMemo(
+    () =>
+      resolveEventAppearance({
+        themeId: selectedTheme,
+        fontPreset: selectedFont,
+        themeColor: selectedThemeColor,
+        emojiSymbol: selectedEmojiSymbol,
+      }),
+    [selectedTheme, selectedFont, selectedThemeColor, selectedEmojiSymbol],
+  );
 
   function setField<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -198,17 +155,16 @@ export default function CreateEventPage() {
       toast.error("Image must be under 25 MB");
       return;
     }
+
     const localPreview = URL.createObjectURL(file);
     setImagePreview(localPreview);
-    console.log("[imageUpload] starting upload", { name: file.name, size: file.size, type: file.type });
     const uploadToast = toast.loading("Uploading image...");
+
     try {
       const mediaId = await uploadEventImage(file);
-      console.log("[imageUpload] success, media_id:", mediaId);
       setField("imageUrl", mediaId);
       toast.success("Image uploaded ✓", { id: uploadToast });
     } catch (err) {
-      console.error("[imageUpload] failed:", err);
       toast.error(`Image upload failed: ${err instanceof Error ? err.message : String(err)}`, { id: uploadToast });
       setImagePreview(null);
       setField("imageUrl", "");
@@ -222,6 +178,13 @@ export default function CreateEventPage() {
       return;
     }
 
+    const startIso = zonedLocalToUtcIso(form.date, selectedTimeZone);
+    const endIso = zonedLocalToUtcIso(form.endDate, selectedTimeZone);
+    if (!startIso || !endIso) {
+      toast.error("Invalid date/time selected.");
+      return;
+    }
+
     setSubmitting(true);
     setError("");
 
@@ -229,11 +192,16 @@ export default function CreateEventPage() {
       ...form,
       lat: form.lat,
       lng: form.lng,
+      date: startIso,
+      endDate: endIso,
       category: form.category as Category,
       virtualLink: form.virtualLink?.trim() || undefined,
       status: visibility === "public" ? "upcoming" : "draft",
       themeId: selectedTheme,
       fontPreset: selectedFont,
+      themeColor: selectedThemeColor,
+      emojiSymbol: selectedEmojiSymbol,
+      timezone: selectedTimeZone,
     };
 
     const res = await createHostEventEntity(
@@ -299,35 +267,46 @@ export default function CreateEventPage() {
 
   return (
     <div
-      className={`min-h-screen bg-[#47174d] text-[#f3e8f4] ${displayFont.className}`}
-      style={{ fontFamily: selectedFontFamily }}
+      className={`relative min-h-screen overflow-hidden text-[#f3e8f4] ${displayFont.className}`}
+      style={{ fontFamily: selectedFontFamily, background: liveAppearance.theme.detailBackground }}
     >
-      <Navbar active="dashboard" />
+      {liveAppearance.theme.detailOverlay && (
+        <div
+          className="pointer-events-none absolute inset-0 opacity-50"
+          style={{
+            backgroundImage: liveAppearance.theme.detailOverlay,
+            backgroundSize: liveAppearance.theme.detailOverlaySize ?? "280px 280px",
+          }}
+        />
+      )}
+      <div className="pointer-events-none absolute inset-0 opacity-15 [background-image:radial-gradient(rgba(255,255,255,0.18)_0.55px,transparent_0.55px)] [background-size:3px_3px]" />
 
-      <main className="mx-auto max-w-[1120px] px-4 pb-52 pt-8 sm:px-6 lg:px-8">
-        <div className="grid gap-7 xl:grid-cols-[320px_minmax(0,1fr)]">
-          <aside className="space-y-4">
+      <div className="relative z-10">
+        <Navbar active="dashboard" />
+
+        <main className="mx-auto max-w-[1040px] px-4 pb-10 pt-2 sm:px-6 lg:px-8">
+          <div className="grid gap-4 xl:grid-cols-[270px_minmax(0,1fr)]">
+          <aside className="space-y-3">
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="relative block aspect-square w-full overflow-hidden rounded-2xl border border-white/15 bg-[#633566] shadow-[0_18px_60px_-30px_rgba(0,0,0,0.75)]"
+              className="relative block aspect-square w-full overflow-hidden rounded-2xl border border-white/15 bg-[#633566] shadow-[0_14px_44px_-28px_rgba(0,0,0,0.75)]"
             >
               {imagePreview ? (
-
                 <img src={imagePreview} alt="Cover preview" className="h-full w-full aspect-square object-cover" />
               ) : (
-                <div className="relative flex h-full w-full items-center justify-center p-6">
+                <div className="relative flex h-full w-full items-center justify-center p-5">
                   <div
                     className="absolute inset-0 opacity-95"
-                    style={{ background: selectedThemeMeta.preview }}
+                    style={{ background: liveAppearance.theme.heroGradient }}
                   />
-                  <p className="relative max-w-[220px] text-center text-[2.3rem] font-black uppercase leading-[0.9] text-black/85">
+                  <p className="relative max-w-[200px] text-center text-[2rem] font-black uppercase leading-[0.9] text-black/85">
                     Party like it&apos;s the last one
                   </p>
                 </div>
               )}
-              <span className="absolute bottom-3 right-3 inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/35 bg-black/55 text-white">
-                <ImageIcon size={16} />
+              <span className="absolute bottom-2.5 right-2.5 inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/35 bg-black/55 text-white">
+                <ImageIcon size={15} />
               </span>
             </button>
 
@@ -339,44 +318,32 @@ export default function CreateEventPage() {
               onChange={handleImageUpload}
             />
 
-            {/* Upload / AI Generate row */}
-            <div className="flex items-center gap-2 mt-2">
+            <div className="grid grid-cols-[1fr_46px] gap-1.5">
               <button
                 type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="flex-1 flex items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-[#69406d]/50 px-3 py-2 text-xs font-semibold text-[#e3cae5] hover:bg-[#7a4a7f] transition-colors"
+                onClick={() => setAppearancePanelOpen(true)}
+                className="flex items-center gap-2.5 rounded-xl border border-white/10 bg-[#69406d]/70 px-2.5 py-1 text-left"
               >
-                <ImageIcon size={13} /> Upload
-              </button>
-              <button
-                type="button"
-                onClick={() => setAiModalOpen(true)}
-                className="flex-1 flex items-center justify-center gap-1.5 rounded-lg border border-fuchsia-400/30 bg-fuchsia-500/20 px-3 py-2 text-xs font-semibold text-fuchsia-200 hover:bg-fuchsia-500/40 transition-colors"
-              >
-                <WandSparkles size={13} /> AI Generate
-              </button>
-            </div>
-
-            <div className="grid grid-cols-[1fr_54px] gap-2">
-              <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-[#69406d]/70 px-3 py-2">
                 <div
-                  className="h-10 w-10 rounded-lg border border-white/25"
-                  style={{ background: selectedThemeMeta.preview }}
+                  className="h-9 w-9 rounded-lg border border-white/25"
+                  style={{ background: liveAppearance.theme.preview }}
                 />
                 <div className="min-w-0">
                   <p className="text-xs text-[#ceb8d0]">Theme</p>
-                  <p className="truncate text-lg font-semibold leading-none text-white">{selectedThemeMeta.label}</p>
+                  <p className="truncate text-sm font-semibold leading-none text-white">
+                    {liveAppearance.theme.label}
+                  </p>
                 </div>
                 <ChevronsUpDown size={16} className="ml-auto text-[#cfb5d1]" />
-              </div>
+              </button>
 
               <button
                 type="button"
                 onClick={() => setAiModalOpen(true)}
                 title="Generate with AI"
-                className="inline-flex h-full items-center justify-center rounded-xl border border-white/10 bg-[#69406d]/70 text-[#e3cae5] transition-colors hover:bg-fuchsia-500/40 hover:text-white hover:border-fuchsia-400/50"
+                className="inline-flex h-full items-center justify-center rounded-xl border border-white/10 bg-[#69406d]/70 text-[#e3cae5] transition-colors hover:border-fuchsia-400/50 hover:bg-fuchsia-500/40 hover:text-white"
               >
-                <WandSparkles size={18} />
+                <WandSparkles size={14} />
               </button>
             </div>
 
@@ -403,13 +370,13 @@ export default function CreateEventPage() {
           </aside>
 
           <section>
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-[#69406d]/65 px-3 py-2">
+            <div className="flex flex-wrap items-center justify-between gap-1.5">
+              <div className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-[#69406d]/65 px-2.5 py-1">
                 <Globe size={14} className="text-[#dbc3dd]" />
                 <select
                   value={form.category}
                   onChange={(event) => setField("category", event.target.value as Category | "")}
-                  className="min-w-[180px] appearance-none bg-transparent text-sm font-semibold text-white outline-none"
+                  className="min-w-[170px] appearance-none bg-transparent text-xs font-semibold text-white outline-none"
                 >
                   <option value="" className="bg-[#4f2953] text-white">Select category</option>
                   {EVENT_CATEGORIES.map((category) => (
@@ -421,12 +388,12 @@ export default function CreateEventPage() {
                 <ChevronsUpDown size={14} className="text-[#dbc3dd]" />
               </div>
 
-              <div className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-[#69406d]/65 px-3 py-2">
+              <div className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-[#69406d]/65 px-2.5 py-1">
                 <Globe size={14} className="text-[#dbc3dd]" />
                 <select
                   value={visibility}
                   onChange={(event) => setVisibility(event.target.value as "public" | "draft")}
-                  className="appearance-none bg-transparent text-sm font-semibold text-white outline-none"
+                  className="appearance-none bg-transparent text-xs font-semibold text-white outline-none"
                 >
                   <option value="public" className="bg-[#4f2953] text-white">Public</option>
                   <option value="draft" className="bg-[#4f2953] text-white">Draft</option>
@@ -440,35 +407,35 @@ export default function CreateEventPage() {
               value={form.title}
               onChange={(event) => setField("title", event.target.value)}
               placeholder="Event Name"
-              className="mt-4 w-full border-none bg-transparent text-4xl font-semibold tracking-tight text-[#dfcbe1] placeholder:text-[#b596b8] outline-none sm:text-6xl"
+              className="mt-1.5 w-full border-none bg-transparent text-2xl font-semibold tracking-tight text-[#dfcbe1] placeholder:text-[#b596b8] outline-none sm:text-[2.5rem]"
             />
 
-            <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1fr)_170px]">
-              <div className="space-y-2 rounded-2xl border border-white/10 bg-[#6a406f]/70 p-3">
-                <TimeRow
+            <div className="mt-1.5 grid gap-1.5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+              <div className="space-y-1 rounded-2xl border border-white/10 bg-[#6a406f]/70 p-2">
+                <DateTimePopover
                   label="Start"
                   value={form.date}
                   onChange={(value) => setField("date", value)}
+                  timeZone={selectedTimeZone}
                 />
-                <TimeRow
+                <DateTimePopover
                   label="End"
                   value={form.endDate}
                   min={form.date}
                   onChange={(value) => setField("endDate", value)}
+                  timeZone={selectedTimeZone}
                 />
               </div>
 
-              <div className="rounded-2xl border border-white/10 bg-[#6a406f]/70 p-4">
-                <p className="flex items-center gap-2 text-sm text-[#ceb8d0]">
-                  <Globe size={14} />
-                  Timezone
+              <div className="rounded-2xl border border-white/10 bg-[#6a406f]/70 p-2">
+                <TimeZonePopover value={selectedTimeZone} onChange={setSelectedTimeZone} />
+                <p className="mt-2 text-xs text-[#dec9df]">
+                  Event schedule timezone: {toCityName(selectedTimeZone)} ({getTimeZoneOffsetLabel(selectedTimeZone)})
                 </p>
-                <p className="mt-2 text-2xl font-semibold text-white">{utcOffset}</p>
-                <p className="text-sm text-[#dec9df]">{toCityName(timeZone)}</p>
               </div>
             </div>
 
-            {form.date && form.endDate && form.date >= form.endDate && (
+            {form.date && form.endDate && toUtcMsFromZonedLocal(form.date, selectedTimeZone) >= toUtcMsFromZonedLocal(form.endDate, selectedTimeZone) && (
               <p className="mt-2 text-xs text-rose-300">End time must be after start time.</p>
             )}
 
@@ -476,15 +443,15 @@ export default function CreateEventPage() {
               icon={<MapPin size={16} />}
               title="Add Event Location"
               subtitle="Offline location or virtual link"
-              className="mt-3"
+              className="mt-1.5"
             >
               <LocationPicker
                 value={form.location}
                 onChange={(address) => setField("location", address)}
                 onLocationChange={({ address, lat, lng }) => {
-                  setField("location", address)
-                  setField("lat", lat)
-                  setField("lng", lng)
+                  setField("location", address);
+                  setField("lat", lat);
+                  setField("lng", lng);
                 }}
               />
               <input
@@ -496,7 +463,7 @@ export default function CreateEventPage() {
               />
             </FieldBlock>
 
-            <FieldBlock icon={<AlignLeft size={16} />} title="Add Description" className="mt-3">
+            <FieldBlock icon={<AlignLeft size={16} />} title="Add Description" className="mt-1.5">
               <textarea
                 rows={3}
                 value={form.description}
@@ -512,8 +479,8 @@ export default function CreateEventPage() {
               </p>
             )}
 
-            <p className="mt-4 text-sm font-semibold text-[#dfcade]">Event Options</p>
-            <div className="mt-2 overflow-hidden rounded-2xl border border-white/10 bg-[#6a406f]/70">
+            <p className="mt-2 text-sm font-semibold text-[#dfcade]">Event Options</p>
+            <div className="mt-1 overflow-hidden rounded-2xl border border-white/10 bg-[#6a406f]/70">
               <OptionRow icon={<Ticket size={15} />} label="Ticket Price">
                 <span className="font-semibold text-[#dfc7e0]">Free</span>
               </OptionRow>
@@ -524,13 +491,13 @@ export default function CreateEventPage() {
                   role="switch"
                   aria-checked={form.requiresRsvp}
                   onClick={() => setField("requiresRsvp", !form.requiresRsvp)}
-                  className={`relative h-7 w-12 rounded-full transition-colors ${
+                  className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full p-0.5 transition-colors ${
                     form.requiresRsvp ? "bg-fuchsia-400/80" : "bg-white/30"
                   }`}
                 >
                   <span
-                    className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform ${
-                      form.requiresRsvp ? "translate-x-[23px]" : "translate-x-[2px]"
+                    className={`block h-6 w-6 rounded-full bg-white shadow transition-transform ${
+                      form.requiresRsvp ? "translate-x-5" : "translate-x-0"
                     }`}
                   />
                 </button>
@@ -543,20 +510,20 @@ export default function CreateEventPage() {
                   max={100_000}
                   value={form.capacity}
                   onChange={(event) => setField("capacity", Number(event.target.value))}
-                  className="w-28 rounded-lg border border-white/20 bg-black/20 px-3 py-1.5 text-right text-sm font-semibold text-white outline-none focus:border-fuchsia-300"
+                  className="w-24 rounded-lg border border-white/20 bg-black/20 px-3 py-1.5 text-right text-sm font-semibold text-white outline-none focus:border-fuchsia-300"
                 />
               </OptionRow>
             </div>
 
             {error && (
-              <div className="mt-4 rounded-lg border border-rose-200/25 bg-rose-900/30 px-4 py-3 text-xs text-rose-100">
+              <div className="mt-2 rounded-lg border border-rose-200/25 bg-rose-900/30 px-3 py-2 text-xs text-rose-100">
                 {error}
               </div>
             )}
 
             {!valid && validationError && (
-              <p className="mt-4 rounded-lg border border-amber-300/20 bg-amber-900/25 px-4 py-2 text-xs text-amber-200">
-                ⚠ {validationError}
+              <p className="mt-2 rounded-lg border border-amber-300/20 bg-amber-900/25 px-3 py-2 text-xs text-amber-200">
+                {validationError}
               </p>
             )}
 
@@ -564,7 +531,7 @@ export default function CreateEventPage() {
               type="button"
               onClick={handleSubmit}
               disabled={!valid || submitting}
-              className="mt-4 w-full rounded-xl bg-[#f4f2f6] py-3.5 text-3xl font-semibold text-[#2f1733] transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-50 sm:text-[2rem]"
+              className="mt-2 w-full rounded-xl bg-[#f4f2f6] py-2 text-xl font-semibold text-[#2f1733] transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-50 sm:text-2xl"
             >
               {submitting ? (
                 <span className="inline-flex items-center gap-2 text-lg sm:text-xl">
@@ -576,20 +543,21 @@ export default function CreateEventPage() {
               )}
             </button>
           </section>
-        </div>
-      </main>
+          </div>
+        </main>
+      </div>
 
-      <ThemeDock
+      <EventAppearancePanel
+        open={appearancePanelOpen}
+        onClose={() => setAppearancePanelOpen(false)}
         selectedTheme={selectedTheme}
         selectedFont={selectedFont}
-        fontMenuOpen={fontMenuOpen}
-        fontMenuRef={fontMenuRef}
-        onThemeChange={setSelectedTheme}
-        onFontChange={(font) => {
-          setSelectedFont(font);
-          setFontMenuOpen(false);
-        }}
-        onFontToggle={() => setFontMenuOpen((prev) => !prev)}
+        selectedThemeColor={selectedThemeColor}
+        selectedEmojiSymbol={selectedEmojiSymbol}
+        onThemeChange={(theme) => setSelectedTheme(theme)}
+        onFontChange={(font) => setSelectedFont(font)}
+        onThemeColorChange={setSelectedThemeColor}
+        onEmojiSymbolChange={setSelectedEmojiSymbol}
       />
 
       <AIImageGenerator
@@ -598,18 +566,16 @@ export default function CreateEventPage() {
         isOpen={aiModalOpen}
         onClose={() => setAiModalOpen(false)}
         onSelectImage={async (dataUrl) => {
-          // Show preview immediately
           setImagePreview(dataUrl);
 
-          // Upload via existing imagedb flow
           const uploadToast = toast.loading("Uploading AI image...");
           try {
-            const blob = await fetch(dataUrl).then((r) => r.blob());
+            const blob = await fetch(dataUrl).then((response) => response.blob());
             const file = new File([blob], "ai-generated.png", { type: "image/png" });
             const mediaId = await uploadEventImage(file);
             setField("imageUrl", mediaId);
             toast.success("AI image uploaded ✓", { id: uploadToast });
-          } catch (err) {
+          } catch {
             toast.error("Upload failed", { id: uploadToast });
             setImagePreview(null);
             setField("imageUrl", "");
@@ -621,33 +587,8 @@ export default function CreateEventPage() {
   );
 }
 
-function TimeRow({
-  label,
-  value,
-  min,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  min?: string;
-  onChange: (value: string) => void;
-}) {
-  return (
-    <div className="grid grid-cols-[58px_minmax(0,1fr)] items-center gap-3">
-      <p className="text-lg font-semibold text-[#e9d7ea]">{label}</p>
-      <input
-        type="datetime-local"
-        min={min}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="w-full rounded-lg border border-white/15 bg-[#7a527d]/70 px-3 py-2 text-sm font-semibold text-white outline-none [color-scheme:dark] focus:border-fuchsia-200"
-      />
-    </div>
-  );
-}
-
 const fieldInputCls =
-  "w-full rounded-lg border border-white/15 bg-[#7a527d]/45 px-3 py-2 text-sm text-[#f6ecf7] placeholder:text-[#ceb2d1] outline-none focus:border-fuchsia-200";
+  "w-full rounded-lg border border-white/15 bg-[#7a527d]/45 px-2.5 py-1 text-sm text-[#f6ecf7] placeholder:text-[#ceb2d1] outline-none focus:border-fuchsia-200";
 
 function FieldBlock({
   icon,
@@ -663,15 +604,15 @@ function FieldBlock({
   children: ReactNode;
 }) {
   return (
-    <div className={`rounded-xl border border-white/10 bg-[#6a406f]/70 px-4 py-3 ${className ?? ""}`}>
-      <div className="mb-2 flex items-center gap-2 text-[#e7d3e9]">
+    <div className={`rounded-xl border border-white/10 bg-[#6a406f]/70 px-3 py-2 ${className ?? ""}`}>
+      <div className="mb-1 flex items-center gap-1.5 text-[#e7d3e9]">
         <span className="text-[#d5bad8]">{icon}</span>
         <div>
-          <p className="text-lg font-semibold leading-none">{title}</p>
-          {subtitle && <p className="mt-1 text-sm text-[#cfb4d2]">{subtitle}</p>}
+          <p className="text-sm font-semibold leading-none">{title}</p>
+          {subtitle && <p className="mt-0.5 text-xs text-[#cfb4d2]">{subtitle}</p>}
         </div>
       </div>
-      <div className="space-y-2">{children}</div>
+      <div className="space-y-1">{children}</div>
     </div>
   );
 }
@@ -688,135 +629,14 @@ function OptionRow({
   last?: boolean;
 }) {
   return (
-    <div className={`flex items-center justify-between gap-3 px-4 py-3 ${last ? "" : "border-b border-white/10"}`}>
-      <div className="flex items-center gap-2 text-xl font-semibold text-[#e6d2e8]">
+    <div className={`flex items-center justify-between gap-2.5 px-3 py-2 ${last ? "" : "border-b border-white/10"}`}>
+      <div className="flex items-center gap-1.5 text-base font-semibold text-[#e6d2e8]">
         <span className="text-[#d5bad8]">{icon}</span>
         <span>{label}</span>
       </div>
       {children}
     </div>
   );
-}
-
-function ThemeDock({
-  selectedTheme,
-  selectedFont,
-  fontMenuOpen,
-  fontMenuRef,
-  onThemeChange,
-  onFontChange,
-  onFontToggle,
-}: {
-  selectedTheme: EventThemeId;
-  selectedFont: EventFontPreset;
-  fontMenuOpen: boolean;
-  fontMenuRef: React.RefObject<HTMLDivElement | null>;
-  onThemeChange: (themeId: EventThemeId) => void;
-  onFontChange: (font: EventFontPreset) => void;
-  onFontToggle: () => void;
-}) {
-  return (
-    <aside className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-[#2b1231]/95 backdrop-blur-md">
-      <div className="mx-auto max-w-[1120px] px-4 pb-4 pt-3 sm:px-6 lg:px-8">
-        <div className="mb-3 flex items-start gap-3 overflow-x-auto pb-1">
-          {EVENT_THEME_OPTIONS.map((theme) => (
-            <button
-              key={theme.id}
-              type="button"
-              onClick={() => onThemeChange(theme.id)}
-              className="flex shrink-0 flex-col items-center gap-1"
-            >
-              <span
-                className={`h-14 w-20 rounded-xl border ${
-                  theme.id === selectedTheme ? "border-white shadow-[0_0_0_2px_rgba(255,255,255,0.15)]" : "border-white/20"
-                }`}
-                style={{ background: theme.preview }}
-              />
-              <span className={`text-xs font-semibold ${theme.id === selectedTheme ? "text-white" : "text-[#b898bd]"}`}>
-                {theme.label}
-              </span>
-            </button>
-          ))}
-        </div>
-
-        <div className="grid gap-2 md:grid-cols-4">
-          <DockChip icon={<Palette size={14} />} label="Colour" value="Custom" />
-          <DockChip icon={<Sparkles size={14} />} label="Style" value="Auto" />
-
-          <div ref={fontMenuRef} className="relative">
-            <DockChip
-              asButton
-              icon={<Type size={14} />}
-              label="Font"
-              value={selectedFont}
-              onClick={onFontToggle}
-            />
-            {fontMenuOpen && (
-              <div className="absolute bottom-[calc(100%+0.55rem)] left-1/2 z-50 w-[min(92vw,420px)] -translate-x-1/2 rounded-2xl border border-white/15 bg-[#261729]/95 p-3 shadow-2xl backdrop-blur md:left-0 md:translate-x-0">
-                <div className="grid grid-cols-4 gap-2">
-                  {EVENT_FONT_PRESETS.map((font) => (
-                    <button
-                      key={font}
-                      type="button"
-                      onClick={() => onFontChange(font)}
-                      className={`rounded-lg border px-2 py-2 text-left transition-colors ${
-                        selectedFont === font
-                          ? "border-white/70 bg-white/12 text-white"
-                          : "border-white/15 bg-white/5 text-[#cab2cd] hover:bg-white/10"
-                      }`}
-                    >
-                      <span className="block text-xl leading-none" style={{ fontFamily: getEventFontFamily(font) }}>
-                        Ag
-                      </span>
-                      <span className="mt-1 block truncate text-xs font-semibold">{font}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-
-          <DockChip icon={<Globe size={14} />} label="Display" value="Auto" />
-        </div>
-      </div>
-    </aside>
-  );
-}
-
-function DockChip({
-  icon,
-  label,
-  value,
-  asButton = false,
-  onClick,
-}: {
-  icon: ReactNode;
-  label: string;
-  value: string;
-  asButton?: boolean;
-  onClick?: () => void;
-}) {
-  const content = (
-    <span className="flex items-center justify-between gap-3">
-      <span className="inline-flex items-center gap-2">
-        <span className="text-[#ddc6df]">{icon}</span>
-        <span className="text-lg font-semibold text-[#e4d2e7]">{label}</span>
-      </span>
-      <span className="text-lg font-semibold text-[#bba0bf]">{value}</span>
-    </span>
-  );
-
-  const cls = "w-full rounded-xl border border-white/10 bg-[#5d3763]/70 px-4 py-2 text-left";
-
-  if (asButton) {
-    return (
-      <button type="button" className={cls} onClick={onClick}>
-        {content}
-      </button>
-    );
-  }
-
-  return <div className={cls}>{content}</div>;
 }
 
 function FullSkeleton() {

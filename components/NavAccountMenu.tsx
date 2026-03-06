@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  BadgeCheck,
   ChevronDown,
   LayoutDashboard,
   LogOut,
@@ -104,6 +105,10 @@ export function NavAccountMenu({ className }: NavAccountMenuProps) {
           <Link href="/organizer/dashboard" onClick={() => setOpen(false)} className={menuItemClass}>
             <LayoutDashboard size={15} />
             Dashboard
+          </Link>
+          <Link href="/attendee/pope" onClick={() => setOpen(false)} className={menuItemClass}>
+            <BadgeCheck size={15} />
+            POP
           </Link>
           <Link href={profileHref} onClick={() => setOpen(false)} className={menuItemClass}>
             <User size={15} />

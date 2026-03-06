@@ -26,7 +26,7 @@ import { publicClient } from "@/lib/arkiv/client";
 import { ENTITY_TYPES } from "@/lib/arkiv/constants";
 import { createCheckinEntity } from "@/lib/arkiv/entities/checkin";
 import { createPoAEntity } from "@/lib/arkiv/entities/attendance";
-import { getApprovalForTicket } from "@/lib/arkiv/queries/tickets";
+import { getDecisionForTicket } from "@/lib/arkiv/queries/tickets";
 import { hasAttendeeCheckedIn } from "@/lib/arkiv/queries/checkins";
 import { friendlyError } from "@/lib/arkiv/errors";
 import { Navbar } from "@/components/Navbar";
@@ -69,6 +69,26 @@ function toMs(value: unknown): number {
 }
 
 const EXPLORER = "https://explorer.kaolin.hoodi.arkiv.network";
+const CHECKIN_DEBUG_PREFIX = "[checkin-scanner]";
+
+function makeTraceId(): string {
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function toErrorLog(error: unknown): Record<string, unknown> {
+  if (error instanceof Error) {
+    return {
+      name: error.name,
+      message: error.message,
+      stack: error.stack,
+    };
+  }
+  return {
+    type: typeof error,
+    value: String(error ?? ""),
+    raw: error,
+  };
+}
 
 export default function CheckinPage() {
   const params = useParams();
@@ -84,19 +104,51 @@ export default function CheckinPage() {
 
   const processRsvpKey = useCallback(
     async (rawKey: string) => {
-      if (!walletClient || !event) return;
-      if (processingRef.current) return;
+      const traceId = makeTraceId();
+      console.info(`${CHECKIN_DEBUG_PREFIX}[${traceId}] Received scan/manual input`, {
+        rawKey,
+        eventKey: entityKey,
+        hasWalletClient: Boolean(walletClient),
+        eventLoaded: Boolean(event),
+        walletAddress: walletClient?.account.address,
+      });
+      if (!walletClient || !event) {
+        console.warn(`${CHECKIN_DEBUG_PREFIX}[${traceId}] Skipping scan processing: missing walletClient or event`, {
+          hasWalletClient: Boolean(walletClient),
+          eventLoaded: Boolean(event),
+        });
+        return;
+      }
+      if (processingRef.current) {
+        console.warn(`${CHECKIN_DEBUG_PREFIX}[${traceId}] Ignoring duplicate scan while previous one is in progress`);
+        return;
+      }
       processingRef.current = true;
 
       const rsvpKey = rawKey.trim() as Hex;
       setState({ kind: "verifying", rsvpKey });
 
       try {
+        console.info(`${CHECKIN_DEBUG_PREFIX}[${traceId}] Start verification pipeline`, {
+          rsvpKey,
+          eventKey: entityKey,
+        });
 
         let rsvpEntity;
         try {
+          console.time(`${CHECKIN_DEBUG_PREFIX}[${traceId}] getEntity(ticket)`);
           rsvpEntity = await publicClient.getEntity(rsvpKey);
+          console.timeEnd(`${CHECKIN_DEBUG_PREFIX}[${traceId}] getEntity(ticket)`);
+          console.info(`${CHECKIN_DEBUG_PREFIX}[${traceId}] Ticket fetched`, {
+            ticketKey: rsvpEntity.key,
+            owner: rsvpEntity.owner,
+            attrCount: rsvpEntity.attributes.length,
+          });
         } catch {
+          console.timeEnd(`${CHECKIN_DEBUG_PREFIX}[${traceId}] getEntity(ticket)`);
+          console.error(`${CHECKIN_DEBUG_PREFIX}[${traceId}] Ticket lookup failed`, {
+            rsvpKey,
+          });
           setState({
             kind: "error",
             message: "Ticket entity not found. Make sure you scanned the correct QR code.",
@@ -106,29 +158,73 @@ export default function CheckinPage() {
 
         const typeAttr = rsvpEntity.attributes.find((a) => a.key === "type");
         if (typeAttr?.value !== ENTITY_TYPES.TICKET) {
+          console.error(`${CHECKIN_DEBUG_PREFIX}[${traceId}] Invalid scanned entity type`, {
+            expected: ENTITY_TYPES.TICKET,
+            actual: typeAttr?.value,
+            rsvpKey,
+          });
           setState({ kind: "error", message: "Invalid QR code — this is not a ticket entity." });
           return;
         }
 
         const eventKeyAttr = rsvpEntity.attributes.find((a) => a.key === "eventKey");
         if ((eventKeyAttr?.value as string)?.toLowerCase() !== entityKey.toLowerCase()) {
+          console.error(`${CHECKIN_DEBUG_PREFIX}[${traceId}] Ticket belongs to different event`, {
+            scannedTicketEventKey: eventKeyAttr?.value,
+            expectedEventKey: entityKey,
+          });
           setState({ kind: "error", message: "This RSVP belongs to a different event." });
           return;
         }
 
         const statusAttr = rsvpEntity.attributes.find((a) => a.key === "status");
-        const status = statusAttr?.value as string;
+        const status = String(statusAttr?.value ?? "pending").toLowerCase();
+        console.info(`${CHECKIN_DEBUG_PREFIX}[${traceId}] Ticket status resolved`, {
+          rawStatus: statusAttr?.value,
+          normalizedStatus: status,
+        });
 
         if (status === "waitlisted") {
+          console.warn(`${CHECKIN_DEBUG_PREFIX}[${traceId}] Check-in blocked: waitlisted ticket`, {
+            rsvpKey,
+          });
           setState({ kind: "error", message: "Cannot check in — this RSVP is on the waitlist." });
           return;
         }
 
         if (status !== "confirmed" && status !== "checked-in") {
+          if (status !== "pending") {
+            console.error(`${CHECKIN_DEBUG_PREFIX}[${traceId}] Check-in blocked: unsupported ticket status`, {
+              status,
+              rsvpKey,
+            });
+            setState({
+              kind: "error",
+              message: "Cannot check in — this RSVP is not in a confirmed state.",
+            });
+            return;
+          }
 
-          const approvalRes = await getApprovalForTicket(publicClient, rsvpKey);
-          const isApproved = approvalRes.success && approvalRes.data !== null;
+          console.time(`${CHECKIN_DEBUG_PREFIX}[${traceId}] getDecisionForTicket`);
+          const decisionRes = await getDecisionForTicket(publicClient, rsvpKey);
+          console.timeEnd(`${CHECKIN_DEBUG_PREFIX}[${traceId}] getDecisionForTicket`);
+          const decision = String(
+            decisionRes.success
+              ? decisionRes.data?.attributes.find((a) => a.key === "decision")?.value ?? ""
+              : "",
+          ).toLowerCase();
+          console.info(`${CHECKIN_DEBUG_PREFIX}[${traceId}] Decision lookup completed`, {
+            querySuccess: decisionRes.success,
+            decisionEntityKey: decisionRes.success ? decisionRes.data?.key : null,
+            decision,
+            error: decisionRes.success ? null : decisionRes.error,
+          });
+          const isApproved = decision === "approved";
           if (!isApproved) {
+            console.error(`${CHECKIN_DEBUG_PREFIX}[${traceId}] Check-in blocked: pending ticket without latest approval`, {
+              decision,
+              rsvpKey,
+            });
             setState({
               kind: "error",
               message: "Cannot check in — this RSVP has not been approved yet.",
@@ -142,9 +238,25 @@ export default function CheckinPage() {
         const attendeeWallet = ((walletAttr?.value as string) || rsvpEntity.owner || "") as Hex;
         const rsvpData = rsvpEntity.toJson() as Ticket;
         const attendeeName = rsvpData.attendeeName || truncate(attendeeWallet);
+        console.info(`${CHECKIN_DEBUG_PREFIX}[${traceId}] Attendee info resolved`, {
+          attendeeWallet,
+          attendeeName,
+          walletFromAttr: walletAttr?.value,
+          ownerFallback: rsvpEntity.owner,
+        });
 
+        console.time(`${CHECKIN_DEBUG_PREFIX}[${traceId}] hasAttendeeCheckedIn`);
         const alreadyRes = await hasAttendeeCheckedIn(publicClient, entityKey, attendeeWallet);
+        console.timeEnd(`${CHECKIN_DEBUG_PREFIX}[${traceId}] hasAttendeeCheckedIn`);
+        console.info(`${CHECKIN_DEBUG_PREFIX}[${traceId}] Existing check-in lookup`, {
+          querySuccess: alreadyRes.success,
+          alreadyCheckedIn: alreadyRes.success ? alreadyRes.data : null,
+          error: alreadyRes.success ? null : alreadyRes.error,
+        });
         if (alreadyRes.success && alreadyRes.data) {
+          console.warn(`${CHECKIN_DEBUG_PREFIX}[${traceId}] Check-in skipped: attendee already checked in`, {
+            attendeeWallet,
+          });
           setState({ kind: "already-checked-in", attendeeName });
           return;
         }
@@ -153,7 +265,13 @@ export default function CheckinPage() {
         const endDateSeconds = isNaN(endMs)
           ? Math.floor(Date.now() / 1_000) + 3_600
           : Math.floor(endMs / 1_000);
+        console.info(`${CHECKIN_DEBUG_PREFIX}[${traceId}] End date computed`, {
+          rawEndDate: event.endDate,
+          parsedEndMs: endMs,
+          endDateSeconds,
+        });
 
+        console.time(`${CHECKIN_DEBUG_PREFIX}[${traceId}] createCheckinEntity`);
         const res = await createCheckinEntity(
           walletClient,
           publicClient,
@@ -163,9 +281,12 @@ export default function CheckinPage() {
           rsvpKey,
           "qr",
         );
+        console.timeEnd(`${CHECKIN_DEBUG_PREFIX}[${traceId}] createCheckinEntity`);
+        console.info(`${CHECKIN_DEBUG_PREFIX}[${traceId}] createCheckinEntity result`, res);
         if (!res.success) throw new Error(res.error);
 
         try {
+          console.time(`${CHECKIN_DEBUG_PREFIX}[${traceId}] createPoAEntity`);
           await createPoAEntity(
             walletClient,
             publicClient,
@@ -174,9 +295,21 @@ export default function CheckinPage() {
             attendeeWallet,
             res.data.entityKey,
           );
-        } catch {  }
+          console.timeEnd(`${CHECKIN_DEBUG_PREFIX}[${traceId}] createPoAEntity`);
+          console.info(`${CHECKIN_DEBUG_PREFIX}[${traceId}] PoA created successfully`, {
+            checkinKey: res.data.entityKey,
+          });
+        } catch (poaError) {
+          console.timeEnd(`${CHECKIN_DEBUG_PREFIX}[${traceId}] createPoAEntity`);
+          console.warn(`${CHECKIN_DEBUG_PREFIX}[${traceId}] PoA creation failed (non-blocking)`, toErrorLog(poaError));
+        }
 
         toast.success(`${attendeeName} checked in ✓`);
+        console.info(`${CHECKIN_DEBUG_PREFIX}[${traceId}] Check-in flow completed`, {
+          attendeeName,
+          attendeeWallet,
+          txHash: res.data.txHash,
+        });
         setState({
           kind: "success",
           attendeeName,
@@ -184,11 +317,19 @@ export default function CheckinPage() {
           txHash: res.data.txHash,
         });
       } catch (err) {
+        const friendly = friendlyError(err);
+        console.error(`${CHECKIN_DEBUG_PREFIX}[${traceId}] Check-in flow failed`, {
+          rawError: toErrorLog(err),
+          friendlyMessage: friendly,
+          rsvpInput: rawKey,
+          eventKey: entityKey,
+        });
         setState({
           kind: "error",
-          message: friendlyError(err),
+          message: friendly,
         });
       } finally {
+        console.info(`${CHECKIN_DEBUG_PREFIX}[${traceId}] Verification pipeline finished`);
         processingRef.current = false;
       }
     },

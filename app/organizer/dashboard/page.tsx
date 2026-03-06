@@ -68,6 +68,9 @@ const TAB_LABEL: Record<EventStatus, string> = {
   archived: "Archived",
 };
 
+const ORGANIZER_GLASS_BG =
+  "radial-gradient(circle at 18% 0%, rgba(37,99,235,0.28), transparent 36%), radial-gradient(circle at 80% 2%, rgba(99,102,241,0.22), transparent 30%), linear-gradient(180deg, #0a1120 0%, #060912 55%)";
+
 export default function DashboardPage() {
   const router = useRouter();
   const { address, isConnected, isCorrectChain } = useWallet();
@@ -123,9 +126,10 @@ export default function DashboardPage() {
 
   if (!isConnected || !isCorrectChain) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-zinc-950 p-6">
-        <div className="text-center space-y-4 max-w-sm">
-          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-zinc-900 border border-white/10 mx-auto">
+      <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#060912] p-6 text-white">
+        <div className="pointer-events-none absolute inset-0" style={{ background: ORGANIZER_GLASS_BG }} />
+        <div className="relative max-w-sm space-y-4 text-center">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full border border-white/15 bg-white/[0.05] backdrop-blur-sm">
             {isConnected
               ? <AlertTriangle size={24} className="text-amber-400" />
               : <Lock size={24} className="text-violet-400" />}
@@ -133,7 +137,7 @@ export default function DashboardPage() {
           <h2 className="text-lg font-bold text-white">
             {isConnected ? "Wrong network" : "Connect your wallet"}
           </h2>
-          <p className="text-sm text-zinc-400">
+          <p className="text-sm text-zinc-300">
             {isConnected
               ? "Switch to Kaolin to access the dashboard."
               : "Connect your wallet to manage your events."}
@@ -154,10 +158,11 @@ export default function DashboardPage() {
   });
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-white">
+    <div className="relative min-h-screen overflow-hidden bg-[#060912] text-white">
+      <div className="pointer-events-none absolute inset-0" style={{ background: ORGANIZER_GLASS_BG }} />
       <Navbar active="dashboard" />
 
-      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
+      <main className="relative mx-auto max-w-7xl px-4 py-8 sm:px-6">
         {}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
           <div>
@@ -165,14 +170,14 @@ export default function DashboardPage() {
               {organizer?.name ?? "Dashboard"}
             </h1>
             {address && (
-              <p className="mt-0.5 text-sm text-zinc-500 font-mono">
+              <p className="mt-0.5 font-mono text-sm text-zinc-400">
                 {truncate(address)}
               </p>
             )}
           </div>
           <Link
             href="/organizer/events/create"
-            className="inline-flex items-center gap-2 rounded-lg bg-violet-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-500 transition-colors"
+            className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-violet-500 to-indigo-500 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_10px_30px_rgba(99,102,241,0.35)] transition hover:brightness-110"
           >
             <Plus size={16} />
             Create Event
@@ -187,29 +192,29 @@ export default function DashboardPage() {
               <button
                 key={t}
                 onClick={() => setTab(t)}
-                className={`rounded-xl border p-4 text-left transition-colors ${
+                className={`rounded-xl border p-4 text-left transition-all ${
                   tab === t
-                    ? "border-violet-600/50 bg-violet-950/30"
-                    : "border-white/5 bg-zinc-900 hover:border-white/10"
+                    ? "border-violet-300/35 bg-violet-500/15 backdrop-blur-sm"
+                    : "border-white/12 bg-white/[0.04] backdrop-blur-sm hover:border-white/20 hover:bg-white/[0.06]"
                 }`}
               >
                 <p className="text-2xl font-bold text-white">{count}</p>
-                <p className="text-xs text-zinc-500 mt-0.5">{TAB_LABEL[t]}</p>
+                <p className="mt-0.5 text-xs text-zinc-400">{TAB_LABEL[t]}</p>
               </button>
             );
           })}
         </div>
 
         {}
-        <div className="flex gap-1 mb-5 p-1 rounded-xl bg-zinc-900 border border-white/5 w-fit">
+        <div className="mb-5 flex w-fit gap-1 rounded-xl border border-white/12 bg-white/[0.04] p-1 backdrop-blur-sm">
           {TABS.map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
               className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                 tab === t
-                  ? "bg-zinc-700 text-white"
-                  : "text-zinc-500 hover:text-white"
+                  ? "border border-white/20 bg-white/[0.12] text-white"
+                  : "text-zinc-400 hover:text-white"
               }`}
             >
               {TAB_LABEL[t]}
@@ -219,8 +224,8 @@ export default function DashboardPage() {
 
         {}
         {(statusMutation.isError || deleteMutation.isError) && (
-          <div className="mb-4 rounded-lg border border-red-800/40 bg-red-950/20 px-4 py-3">
-            <p className="text-xs text-red-400 font-mono">
+          <div className="mb-4 rounded-xl border border-rose-400/25 bg-rose-500/10 px-4 py-3 backdrop-blur-sm">
+            <p className="font-mono text-xs text-rose-200">
               {statusMutation.error instanceof Error
                 ? statusMutation.error.message
                 : deleteMutation.error instanceof Error
@@ -250,8 +255,8 @@ export default function DashboardPage() {
               return (
                 <div
                   key={entityKey}
-                  className={`rounded-2xl border bg-zinc-900 p-5 transition-opacity ${
-                    isDeleting ? "opacity-40 pointer-events-none" : "border-white/5"
+                  className={`rounded-2xl border bg-white/[0.04] p-5 backdrop-blur-sm transition-opacity ${
+                    isDeleting ? "pointer-events-none opacity-40" : "border-white/12"
                   }`}
                 >
                   <div className="flex flex-col sm:flex-row sm:items-center gap-4">
@@ -266,7 +271,7 @@ export default function DashboardPage() {
                         </Link>
                         <StatusBadge status={ev.status} />
                       </div>
-                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-zinc-500">
+                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-zinc-400">
                         <span className="flex items-center gap-1"><Calendar size={11} />{formatDate(ev.date)}</span>
                         <span className="flex items-center gap-1"><MapPin size={11} />{ev.location}</span>
                         <span className="flex items-center gap-1">
@@ -331,13 +336,13 @@ export default function DashboardPage() {
                       {}
                       <Link
                         href={`/organizer/events/${entityKey}/attendees`}
-                        className="rounded-lg border border-white/10 px-3 py-1.5 text-xs font-medium text-zinc-300 hover:border-white/20 hover:text-white transition-colors"
+                        className="rounded-lg border border-white/20 bg-white/[0.04] px-3 py-1.5 text-xs font-medium text-zinc-200 transition-colors hover:border-white/30 hover:bg-white/[0.09] hover:text-white"
                       >
                         Attendees
                       </Link>
                       <Link
                         href={`/organizer/events/${entityKey}/edit`}
-                        className="rounded-lg border border-white/10 px-3 py-1.5 text-xs font-medium text-zinc-300 hover:border-white/20 hover:text-white transition-colors"
+                        className="rounded-lg border border-white/20 bg-white/[0.04] px-3 py-1.5 text-xs font-medium text-zinc-200 transition-colors hover:border-white/30 hover:bg-white/[0.09] hover:text-white"
                       >
                         Edit
                       </Link>
@@ -348,7 +353,7 @@ export default function DashboardPage() {
                           setConfirmDeleteKey({ key: entityKey, title: ev.title })
                         }
                         disabled={deleteMutation.isPending}
-                        className="rounded-lg border border-rose-800/40 px-3 py-1.5 text-xs font-medium text-rose-500 hover:bg-rose-950/20 disabled:opacity-40 transition-colors"
+                        className="rounded-lg border border-rose-400/35 bg-rose-500/10 px-3 py-1.5 text-xs font-medium text-rose-200 transition-colors hover:bg-rose-500/20 disabled:opacity-40"
                       >
                         Archive
                       </button>
@@ -392,9 +397,9 @@ function ActionBtn({
   variant: "violet" | "emerald" | "zinc";
 }) {
   const colors = {
-    violet: "bg-violet-600 hover:bg-violet-500 text-white",
-    emerald: "bg-emerald-700 hover:bg-emerald-600 text-white",
-    zinc: "bg-zinc-700 hover:bg-zinc-600 text-white",
+    violet: "bg-gradient-to-r from-violet-500 to-indigo-500 text-white shadow-[0_8px_24px_rgba(99,102,241,0.35)] hover:brightness-110",
+    emerald: "bg-emerald-500/90 text-emerald-950 hover:bg-emerald-400",
+    zinc: "border border-white/20 bg-white/[0.08] text-white hover:bg-white/[0.14]",
   };
 
   return (
@@ -402,7 +407,7 @@ function ActionBtn({
       onClick={onClick}
       disabled={disabled || loading}
       title={title}
-      className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${colors[variant]}`}
+      className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-40 ${colors[variant]}`}
     >
       {loading ? "…" : label}
     </button>
@@ -445,14 +450,14 @@ function EmptyTab({ status }: { status: EventStatus }) {
   const { icon, title, msg, cta, ctaLabel } = config[status];
 
   return (
-    <div className="rounded-2xl border border-dashed border-white/10 py-16 text-center px-6">
-      <div className="flex h-14 w-14 items-center justify-center rounded-full bg-zinc-900 border border-white/5 mx-auto mb-3">{icon}</div>
-      <p className="text-sm font-semibold text-zinc-300">{title}</p>
-      <p className="mt-1.5 text-xs text-zinc-500 max-w-xs mx-auto">{msg}</p>
+    <div className="rounded-2xl border border-dashed border-white/15 bg-white/[0.03] px-6 py-16 text-center backdrop-blur-sm">
+      <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full border border-white/12 bg-white/[0.04]">{icon}</div>
+      <p className="text-sm font-semibold text-zinc-200">{title}</p>
+      <p className="mx-auto mt-1.5 max-w-xs text-xs text-zinc-400">{msg}</p>
       {cta && ctaLabel && (
         <Link
           href={cta}
-          className="mt-5 inline-flex items-center gap-1.5 rounded-lg bg-violet-600 px-4 py-2 text-xs font-semibold text-white hover:bg-violet-500 transition-colors"
+          className="mt-5 inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-violet-500 to-indigo-500 px-4 py-2 text-xs font-semibold text-white shadow-[0_8px_26px_rgba(99,102,241,0.35)] transition hover:brightness-110"
         >
           {ctaLabel} <ArrowRight size={12} />
         </Link>
@@ -463,18 +468,19 @@ function EmptyTab({ status }: { status: EventStatus }) {
 
 function DashboardSkeleton() {
   return (
-    <div className="min-h-screen bg-zinc-950 animate-pulse">
-      <div className="h-14 border-b border-white/5 bg-zinc-900" />
-      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 space-y-6">
-        <div className="h-8 w-48 rounded bg-zinc-800" />
+    <div className="relative min-h-screen animate-pulse overflow-hidden bg-[#060912] text-white">
+      <div className="pointer-events-none absolute inset-0" style={{ background: ORGANIZER_GLASS_BG }} />
+      <div className="h-14 border-b border-white/10 bg-white/[0.03] backdrop-blur-sm" />
+      <div className="relative mx-auto max-w-7xl space-y-6 px-4 py-8 sm:px-6">
+        <div className="h-8 w-48 rounded bg-white/[0.08]" />
         <div className="grid grid-cols-4 gap-3">
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="h-20 rounded-xl bg-zinc-900" />
+            <div key={i} className="h-20 rounded-xl border border-white/10 bg-white/[0.05]" />
           ))}
         </div>
         <div className="space-y-3">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="h-20 rounded-2xl bg-zinc-900" />
+            <div key={i} className="h-20 rounded-2xl border border-white/10 bg-white/[0.05]" />
           ))}
         </div>
       </div>
