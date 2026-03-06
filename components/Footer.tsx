@@ -30,8 +30,8 @@ export function Footer() {
             <Link href="/events" className="hover:text-zinc-400 transition-colors">
               Events
             </Link>
-            <Link href="/my-rsvps" className="hover:text-zinc-400 transition-colors">
-              My RSVPs
+            <Link href="/organizer/events/create" className="hover:text-zinc-400 transition-colors">
+              Create Event
             </Link>
             <Link href="/organizer/onboard" className="hover:text-zinc-400 transition-colors">
               Become an Organizer

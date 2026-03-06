@@ -4,14 +4,9 @@ import { useState } from "react";
 import Link from "next/link";
 import { Calendar, MapPin, Users } from "lucide-react";
 import type { Entity } from "@arkiv-network/sdk";
-import { CATEGORY_STYLE, DEFAULT_CATEGORY_STYLE } from "@/lib/arkiv/categories";
 import type { Event } from "@/lib/arkiv/types";
-import { StatusBadge } from "./StatusBadge";
 import { useEventImage } from "@/hooks/useEventImage";
-
-function getCategoryStyle(category: string) {
-  return CATEGORY_STYLE[category as keyof typeof CATEGORY_STYLE] ?? DEFAULT_CATEGORY_STYLE;
-}
+import { resolveEventAppearance } from "@/lib/eventAppearance";
 
 function toMs(value: unknown): number {
   if (value == null || value === "") return NaN;
@@ -74,16 +69,12 @@ export function EventCardSkeleton() {
 }
 
 export function EventCard({ entity, event }: EventCardProps) {
-  const { cardGradient, badge } = getCategoryStyle(event.category);
+  const appearance = resolveEventAppearance(event);
   const imgUrl = useEventImage(event.imageUrl);
   const [imgError, setImgError] = useState(false);
 
   const rsvpCount = Number(
     entity.attributes.find((a) => a.key === "rsvpCount")?.value ?? 0,
-  );
-  const capacityPct = Math.min(
-    100,
-    Math.round((rsvpCount / Math.max(1, event.capacity)) * 100),
   );
   const isFull = rsvpCount >= event.capacity;
   const isEnded = event.status === "ended";
@@ -94,10 +85,11 @@ export function EventCard({ entity, event }: EventCardProps) {
   return (
     <Link
       href={`/events/${entity.key}`}
-      className="group flex flex-col rounded-2xl bg-zinc-900 border border-white/5 overflow-hidden hover:border-white/10 hover:bg-zinc-800/80 transition-all duration-200 cursor-pointer"
+      className="group flex flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#1a1224]/85 transition-all duration-200 hover:border-white/25 hover:bg-[#211730]"
+      style={{ fontFamily: appearance.fontFamily }}
     >
       {}
-      <div className={`relative h-28 bg-gradient-to-br ${cardGradient} overflow-hidden`}>
+      <div className="relative h-28 overflow-hidden" style={{ background: appearance.theme.cardGradient }}>
         {imgUrl && !imgError && (
           <img
             src={imgUrl}
@@ -108,7 +100,7 @@ export function EventCard({ entity, event }: EventCardProps) {
         )}
         {}
         <span
-          className={`absolute top-3 left-3 text-xs font-semibold rounded-full px-2.5 py-0.5 ${badge}`}
+          className="absolute top-3 left-3 rounded-full border border-white/35 bg-black/35 px-2.5 py-0.5 text-xs font-semibold text-white"
         >
           {event.category}
         </span>
@@ -121,7 +113,7 @@ export function EventCard({ entity, event }: EventCardProps) {
       {}
       <div className="flex flex-col flex-1 p-4 gap-3">
         {}
-        <h3 className="font-semibold text-white text-base leading-snug line-clamp-2 group-hover:text-violet-300 transition-colors">
+        <h3 className="line-clamp-2 text-base font-semibold leading-snug text-white transition-colors group-hover:text-fuchsia-200">
           {event.title}
         </h3>
 
@@ -171,7 +163,13 @@ export function EventCard({ entity, event }: EventCardProps) {
               Join Waitlist
             </div>
           ) : (
-            <div className="w-full rounded-full bg-violet-600 py-2 text-center text-xs font-semibold text-white group-hover:bg-violet-500 transition-colors">
+            <div
+              className="w-full rounded-full py-2 text-center text-xs font-semibold transition duration-200 group-hover:brightness-110"
+              style={{
+                backgroundColor: appearance.theme.accentColor,
+                color: appearance.theme.accentTextColor,
+              }}
+            >
               RSVP
             </div>
           )}

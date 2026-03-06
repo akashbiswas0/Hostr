@@ -6,6 +6,7 @@ import type { Account, Chain, Hex, Transport } from "viem";
 import { ENTITY_TYPES } from "../constants";
 import { assertCallerOwnsHostEvent } from "../ownership";
 import type { ArkivResult, Event, EventStatus, TicketDecision, TicketStatus } from "../types";
+import { normalizeEventFontPreset, normalizeEventThemeId } from "../../eventAppearance";
 import {
   boolToNumber,
   ensureEvenSeconds,
@@ -47,8 +48,12 @@ function computePriceTier(data: Event): "free" | "paid" | "donation" {
 }
 
 function normalizeEventPayload(data: Event): Event {
+  const themeId = normalizeEventThemeId(data.themeId);
+  const fontPreset = normalizeEventFontPreset(data.fontPreset);
   return {
     ...data,
+    themeId,
+    fontPreset,
     coverImageUrl: normalizeMediaUrl(data.coverImageUrl ?? data.imageUrl),
     posterImageUrl: normalizeMediaUrl(data.posterImageUrl ?? data.imageUrl),
     thumbnailImageUrl: normalizeMediaUrl(data.thumbnailImageUrl ?? data.imageUrl),
@@ -80,6 +85,8 @@ function eventAttributes(
   const poapImageUrl = normalizeMediaUrl(data.poapImageUrl ?? coverImageUrl);
   const poapAnimationUrl = normalizeMediaUrl(data.poapAnimationUrl);
   const poapTemplateId = (data.poapTemplateId ?? "").trim();
+  const themeId = normalizeEventThemeId(data.themeId);
+  const fontPreset = normalizeEventFontPreset(data.fontPreset);
 
   return [
     { key: "type", value: ENTITY_TYPES.HOSTEVENT },
@@ -126,6 +133,8 @@ function eventAttributes(
     { key: "priceMax", value: Math.max(0, Number(data.priceMax ?? 0)) },
     { key: "currency", value: (data.currency ?? "").toUpperCase() },
     { key: "audienceLevel", value: data.audienceLevel ?? "all" },
+    { key: "themeId", value: themeId },
+    { key: "fontPreset", value: fontPreset },
     { key: "coverImageUrl", value: coverImageUrl },
     { key: "posterImageUrl", value: posterImageUrl },
     { key: "thumbnailImageUrl", value: thumbnailImageUrl },

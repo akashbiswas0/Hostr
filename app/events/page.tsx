@@ -18,8 +18,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-import { EventCard, EventCardSkeleton } from "@/components/EventCard";
-import { Footer } from "@/components/Footer";
+import { EventCardSkeleton } from "@/components/EventCard";
 import { Navbar } from "@/components/Navbar";
 import {
   DEFAULT_FILTERS,
@@ -30,6 +29,7 @@ import { useEvents } from "@/hooks/useEvent";
 import { useEventImage } from "@/hooks/useEventImage";
 import { EVENT_CATEGORIES, type Category } from "@/lib/arkiv/categories";
 import type { Event } from "@/lib/arkiv/types";
+import { resolveEventAppearance } from "@/lib/eventAppearance";
 
 const CATEGORY_META: Record<Category, { icon: LucideIcon; iconClass: string }> = {
   Tech: { icon: Cpu, iconClass: "text-amber-300" },
@@ -79,6 +79,7 @@ function formatDateTime(value: unknown): string {
 
 function PopularThumb({ event }: { event: Event }) {
   const imgUrl = useEventImage(event.imageUrl);
+  const appearance = resolveEventAppearance(event);
   return (
     <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-xl border border-white/10 bg-zinc-900">
       {imgUrl ? (
@@ -86,7 +87,7 @@ function PopularThumb({ event }: { event: Event }) {
       ) : (
         <div
           className="h-full w-full"
-          style={{ backgroundImage: "linear-gradient(140deg, rgba(59,130,246,0.35), rgba(124,58,237,0.35))" }}
+          style={{ background: appearance.theme.cardGradient }}
         />
       )}
     </div>
@@ -95,6 +96,7 @@ function PopularThumb({ event }: { event: Event }) {
 
 export default function EventsPage() {
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
+  const defaultAppearance = resolveEventAppearance(null);
 
   const queryFilters = useMemo(() => {
     const isOnline: 0 | 1 | undefined =
@@ -122,6 +124,7 @@ export default function EventsPage() {
   }, [filters]);
 
   const { events, isLoading, error } = useEvents(queryFilters);
+  const { events: allEvents } = useEvents();
   const popularEvents = useMemo(() => events.slice(0, 6), [events]);
 
   const categoryCounts = useMemo(() => {
@@ -135,23 +138,41 @@ export default function EventsPage() {
     return EVENT_CATEGORIES.map((category) => [category, counts.get(category) ?? 0] as const);
   }, [events]);
 
+  const locationCounts = useMemo(() => {
+    const counts = new Map<string, { location: string; count: number }>();
+    for (const entity of allEvents) {
+      const event = entity.toJson() as Event;
+      const location = (event.location || "Online").trim();
+      if (!location) continue;
+      const key = location.toLowerCase();
+      const existing = counts.get(key);
+      if (existing) {
+        existing.count += 1;
+      } else {
+        counts.set(key, { location, count: 1 });
+      }
+    }
+    return Array.from(counts.values())
+      .sort((a, b) => b.count - a.count || a.location.localeCompare(b.location))
+      .slice(0, 16);
+  }, [allEvents]);
+
   function clearFilters() {
     setFilters(DEFAULT_FILTERS);
   }
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[#060912] text-white">
-      <div
-        className="pointer-events-none absolute inset-0"
-        style={{
-          background:
-            "radial-gradient(circle at 18% 0%, rgba(37,99,235,0.25), transparent 38%), radial-gradient(circle at 85% 2%, rgba(99,102,241,0.2), transparent 31%), linear-gradient(180deg, #0a1120 0%, #060912 55%)",
-        }}
-      />
+    <div
+      className="relative min-h-screen overflow-hidden text-white"
+      style={{ background: defaultAppearance.theme.pageBackground }}
+    >
 
       <Navbar active="events" />
 
-      <main className="relative mx-auto max-w-6xl px-4 pb-16 pt-10 sm:px-6">
+      <main
+        className="relative mx-auto max-w-6xl px-4 pb-16 pt-10 sm:px-6"
+        style={{ fontFamily: defaultAppearance.fontFamily }}
+      >
         <header className="max-w-4xl">
           <h1 className="text-4xl font-bold tracking-tight">Discover Events</h1>
           <p className="mt-2 text-zinc-300">
@@ -191,7 +212,7 @@ export default function EventsPage() {
                   <p className="text-sm text-zinc-400">Ranked by current result set</p>
                 </div>
                 <Link
-                  href="#all-events"
+                  href="/events/all"
                   className="inline-flex items-center gap-1 rounded-xl border border-white/10 px-3 py-2 text-sm font-semibold text-zinc-300 hover:border-white/20 hover:text-white transition-colors"
                 >
                   View all <ArrowRight size={14} />
@@ -206,11 +227,16 @@ export default function EventsPage() {
                 <div className="grid gap-4 sm:grid-cols-2">
                   {popularEvents.map((entity) => {
                     const event = entity.toJson() as Event;
+                    const appearance = resolveEventAppearance(event);
                     return (
                       <Link
                         key={entity.key}
                         href={`/events/${entity.key}`}
-                        className="group flex items-center gap-4 rounded-2xl border border-white/10 bg-white/[0.03] p-3 transition-all hover:border-white/20 hover:bg-white/[0.05]"
+                        className="group flex items-center gap-4 rounded-2xl border border-white/10 p-3 transition-all hover:border-white/20"
+                        style={{
+                          background: "rgba(255, 255, 255, 0.04)",
+                          fontFamily: appearance.fontFamily,
+                        }}
                       >
                         <PopularThumb event={event} />
 
@@ -218,7 +244,7 @@ export default function EventsPage() {
                           <p className="flex items-center gap-1 text-xs text-zinc-400">
                             <Clock3 size={12} /> {formatDateTime(event.date)}
                           </p>
-                          <h3 className="truncate text-xl font-semibold text-white group-hover:text-violet-200 transition-colors">
+                          <h3 className="truncate text-xl font-semibold text-white transition-colors group-hover:text-fuchsia-200">
                             {event.title}
                           </h3>
                           <p className="flex items-center gap-1 text-sm text-zinc-400">
@@ -262,34 +288,40 @@ export default function EventsPage() {
               </div>
             </section>
 
-            <section id="all-events" className="mt-10 border-t border-white/10 pt-8">
-              <div className="mb-5 flex items-end justify-between gap-4">
-                <div>
-                  <h2 className="text-3xl font-semibold">All Events</h2>
-                  <p className="text-sm text-zinc-400">
-                    {events.length} event{events.length !== 1 ? "s" : ""}
-                  </p>
-                </div>
-              </div>
+            <section className="mt-10 border-t border-white/10 pt-8">
+              <h2 className="text-3xl font-semibold">Explore Local Events</h2>
+              <p className="mt-2 text-sm text-zinc-400">Locations with at least one published event.</p>
 
-              {events.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-white/15 bg-white/[0.03] px-6 py-12 text-center">
-                  <p className="text-sm text-zinc-300">No events matched your filters.</p>
+              {locationCounts.length === 0 ? (
+                <div className="mt-5 rounded-2xl border border-dashed border-white/15 bg-white/[0.03] px-6 py-10 text-center">
+                  <p className="text-sm text-zinc-300">No event locations available yet.</p>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-                  {events.map((entity) => {
-                    const event = entity.toJson() as Event;
-                    return <EventCard key={entity.key} entity={entity} event={event} />;
-                  })}
+                <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                  {locationCounts.map((item) => (
+                    <button
+                      key={item.location}
+                      type="button"
+                      onClick={() => setFilters((prev) => ({ ...prev, location: item.location }))}
+                      className="rounded-2xl border border-white/10 bg-white/[0.03] p-3 text-left transition-colors hover:border-white/20 hover:bg-white/[0.05]"
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-fuchsia-500/25 text-fuchsia-200">
+                          <MapPin size={16} />
+                        </span>
+                        <div>
+                          <p className="font-semibold text-white">{item.location}</p>
+                          <p className="text-sm text-zinc-400">{item.count} event{item.count > 1 ? "s" : ""}</p>
+                        </div>
+                      </div>
+                    </button>
+                  ))}
                 </div>
               )}
             </section>
           </>
         )}
       </main>
-
-      <Footer />
     </div>
   );
 }

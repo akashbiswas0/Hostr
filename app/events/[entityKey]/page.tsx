@@ -25,7 +25,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { RsvpModal } from "@/components/RsvpModal";
 import { Navbar } from "@/components/Navbar";
 import { ChainLink } from "@/components/ChainLink";
-import { CATEGORY_STYLE, DEFAULT_CATEGORY_STYLE } from "@/lib/arkiv/categories";
+import { resolveEventAppearance } from "@/lib/eventAppearance";
 import type { OrganizerProfile, Ticket } from "@/lib/arkiv/types";
 import type { Entity } from "@arkiv-network/sdk";
 
@@ -155,10 +155,7 @@ export default function EventDetailPage() {
   const capacityPct = capacity ? Math.min(100, (rsvpCount / capacity) * 100) : 0;
   const isFull = rsvpCount >= capacity && capacity > 0;
   const isEnded = event?.status === "ended";
-  const gradient = event?.category
-    ? (CATEGORY_STYLE[event.category as keyof typeof CATEGORY_STYLE]?.heroGradient ??
-      DEFAULT_CATEGORY_STYLE.heroGradient)
-    : DEFAULT_CATEGORY_STYLE.heroGradient;
+  const appearance = resolveEventAppearance(event);
   // Is the event offline-only (has physical location, no virtual link)?
   const isOffline = !!(event?.location && !event?.virtualLink);
 
@@ -215,19 +212,15 @@ export default function EventDetailPage() {
   }
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[#060912] text-white">
-      <div
-        className="pointer-events-none absolute inset-0"
-        style={{
-          background:
-            "radial-gradient(circle at 18% 0%, rgba(37,99,235,0.22), transparent 35%), radial-gradient(circle at 80% 2%, rgba(99,102,241,0.18), transparent 30%), linear-gradient(180deg, #0a1120 0%, #060912 55%)",
-        }}
-      />
+    <div
+      className="relative min-h-screen overflow-hidden text-white"
+      style={{ background: appearance.theme.pageBackground }}
+    >
       <Navbar />
 
       {/* Hero */}
       <div className="relative h-56 border-b border-white/5 flex items-end overflow-hidden">
-        <div className={`absolute inset-0 bg-gradient-to-br ${gradient}`} />
+        <div className="absolute inset-0" style={{ background: appearance.theme.heroGradient }} />
         {heroImgUrl && (
           <img
             src={heroImgUrl}
@@ -235,7 +228,7 @@ export default function EventDetailPage() {
             className="absolute inset-0 w-full h-full object-cover opacity-55"
           />
         )}
-        <div className="absolute inset-0 bg-gradient-to-t from-[#060912] via-[#060912]/30 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/25 to-transparent" />
         <div className="relative mx-auto w-full max-w-7xl px-4 pb-6 sm:px-6 flex items-end justify-between gap-4">
           <div className="flex items-center gap-3">
             <span className="rounded-full border border-white/20 bg-black/30 px-3 py-1 text-xs font-semibold text-white/80 backdrop-blur-sm">
@@ -248,7 +241,10 @@ export default function EventDetailPage() {
       </div>
 
       {/* Body */}
-      <div className="relative mx-auto max-w-7xl px-4 py-10 sm:px-6">
+      <div
+        className="relative mx-auto max-w-7xl px-4 py-10 sm:px-6"
+        style={{ fontFamily: appearance.fontFamily }}
+      >
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
           {}
           <div className="lg:col-span-2 space-y-8">
@@ -457,10 +453,10 @@ export default function EventDetailPage() {
                     {(rsvpEntity.key as string).slice(0, 14)}… <ExternalLink size={10} />
                   </a>
                   <Link
-                    href="/my-rsvps"
+                    href="/events"
                     className="block text-xs text-zinc-500 hover:text-white transition-colors flex items-center gap-1"
                   >
-                    All my RSVPs <ArrowRight size={10} />
+                    Browse events <ArrowRight size={10} />
                   </Link>
                 </div>
               )}
@@ -570,10 +566,10 @@ function RsvpCard({
           <p className="text-sm font-semibold text-violet-300">Request pending</p>
           <p className="mt-1 text-xs text-zinc-500">Waiting for organizer approval</p>
           <Link
-            href="/my-rsvps"
+            href="/events"
             className="mt-3 inline-block text-xs text-zinc-500 hover:text-white underline transition-colors"
           >
-            Manage RSVPs
+            Browse Events
           </Link>
         </div>
       ) : hasRsvp && myRsvpStatus === "rejected" ? (
@@ -584,10 +580,10 @@ function RsvpCard({
           <p className="text-sm font-semibold text-rose-300">Request rejected</p>
           <p className="mt-1 text-xs text-zinc-500">The organizer declined your request</p>
           <Link
-            href="/my-rsvps"
+            href="/events"
             className="mt-3 inline-block text-xs text-zinc-500 hover:text-white underline transition-colors"
           >
-            Manage RSVPs
+            Browse Events
           </Link>
         </div>
       ) : hasRsvp && myRsvpStatus === "not-going" ? (
@@ -616,10 +612,10 @@ function RsvpCard({
             <p className="mt-1 text-xs text-zinc-500">{myRsvp.attendeeName}</p>
           )}
           <Link
-            href="/my-rsvps"
+            href="/events"
             className="mt-3 inline-block text-xs text-zinc-500 hover:text-white underline transition-colors"
           >
-            Manage RSVPs
+            Browse Events
           </Link>
         </div>
       ) : isFull ? (

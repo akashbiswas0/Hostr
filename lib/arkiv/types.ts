@@ -50,6 +50,8 @@ export interface Event {
   status: EventStatus;
   requiresRsvp?: boolean;
   imageUrl?: string;
+  themeId?: string;
+  fontPreset?: string;
   coverImageUrl?: string;
   posterImageUrl?: string;
   thumbnailImageUrl?: string;

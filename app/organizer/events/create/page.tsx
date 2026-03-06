@@ -41,41 +41,19 @@ import { publicClient } from "@/lib/arkiv/client";
 import { createHostEventEntity } from "@/lib/arkiv/entities/event";
 import { EVENT_CATEGORIES, type Category } from "@/lib/arkiv/categories";
 import type { Event } from "@/lib/arkiv/types";
+import {
+  EVENT_FONT_PRESETS,
+  EVENT_THEME_OPTIONS,
+  getEventFontFamily,
+  type EventFontPreset,
+  type EventThemeId,
+} from "@/lib/eventAppearance";
 
 const displayFont = Space_Grotesk({
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
   display: "swap",
 });
-
-const THEME_OPTIONS = [
-  { id: "minimal", label: "Minimal", preview: "linear-gradient(145deg, #ece6f2 0%, #b7b1c5 100%)" },
-  { id: "quantum", label: "Quantum", preview: "linear-gradient(145deg, #7cdbff 0%, #d078ff 50%, #6f83ff 100%)" },
-  { id: "warp", label: "Warp", preview: "radial-gradient(circle at 50% 50%, #320337 0%, #0f0a1a 42%, #6de2ff 100%)" },
-  { id: "emoji", label: "Emoji", preview: "linear-gradient(145deg, #ffd4f6 0%, #c8a1ff 100%)" },
-  { id: "confetti", label: "Confetti", preview: "linear-gradient(145deg, #7f17f0 0%, #c64ffd 45%, #ff79d7 100%)" },
-  { id: "pattern", label: "Pattern", preview: "linear-gradient(145deg, #6f54ff 0%, #5f8fff 50%, #95a1ff 100%)" },
-  { id: "seasonal", label: "Seasonal", preview: "linear-gradient(145deg, #63c2ff 0%, #4d8fff 50%, #0f4f86 100%)" },
-] as const;
-
-const FONT_PRESETS = [
-  "Default",
-  "Museo",
-  "Factoria",
-  "Ivy Presto",
-  "Ivy Mode",
-  "Google",
-  "Roc",
-  "Nunito",
-  "Degular",
-  "Pearl",
-  "Geist Mono",
-  "New Spirit",
-  "Departure",
-  "Garamond",
-  "Futura",
-  "Alternate",
-] as const;
 
 type FormState = Omit<Event, "status" | "category"> & { category: Category | "" };
 
@@ -124,8 +102,8 @@ export default function CreateEventPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [selectedTheme, setSelectedTheme] = useState<(typeof THEME_OPTIONS)[number]["id"]>("minimal");
-  const [selectedFont, setSelectedFont] = useState<(typeof FONT_PRESETS)[number]>("Default");
+  const [selectedTheme, setSelectedTheme] = useState<EventThemeId>("minimal");
+  const [selectedFont, setSelectedFont] = useState<EventFontPreset>("Default");
   const [fontMenuOpen, setFontMenuOpen] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -138,8 +116,12 @@ export default function CreateEventPage() {
   const utcOffset = useMemo(() => getUtcOffsetLabel(), []);
   const valid = useMemo(() => isFormValid(form), [form]);
   const selectedThemeMeta = useMemo(
-    () => THEME_OPTIONS.find((theme) => theme.id === selectedTheme) ?? THEME_OPTIONS[0],
+    () => EVENT_THEME_OPTIONS.find((theme) => theme.id === selectedTheme) ?? EVENT_THEME_OPTIONS[0],
     [selectedTheme],
+  );
+  const selectedFontFamily = useMemo(
+    () => getEventFontFamily(selectedFont),
+    [selectedFont],
   );
 
   useEffect(() => {
@@ -195,6 +177,8 @@ export default function CreateEventPage() {
       category: form.category as Category,
       virtualLink: form.virtualLink?.trim() || undefined,
       status: visibility === "public" ? "upcoming" : "draft",
+      themeId: selectedTheme,
+      fontPreset: selectedFont,
     };
 
     const res = await createHostEventEntity(
@@ -259,7 +243,10 @@ export default function CreateEventPage() {
   }
 
   return (
-    <div className={`min-h-screen bg-[#47174d] text-[#f3e8f4] ${displayFont.className}`}>
+    <div
+      className={`min-h-screen bg-[#47174d] text-[#f3e8f4] ${displayFont.className}`}
+      style={{ fontFamily: selectedFontFamily }}
+    >
       <OrganizerNav crumb="Create Event" />
 
       <main className="mx-auto max-w-[1120px] px-4 pb-52 pt-8 sm:px-6 lg:px-8">
@@ -611,19 +598,19 @@ function ThemeDock({
   onFontChange,
   onFontToggle,
 }: {
-  selectedTheme: (typeof THEME_OPTIONS)[number]["id"];
-  selectedFont: (typeof FONT_PRESETS)[number];
+  selectedTheme: EventThemeId;
+  selectedFont: EventFontPreset;
   fontMenuOpen: boolean;
   fontMenuRef: React.RefObject<HTMLDivElement | null>;
-  onThemeChange: (themeId: (typeof THEME_OPTIONS)[number]["id"]) => void;
-  onFontChange: (font: (typeof FONT_PRESETS)[number]) => void;
+  onThemeChange: (themeId: EventThemeId) => void;
+  onFontChange: (font: EventFontPreset) => void;
   onFontToggle: () => void;
 }) {
   return (
     <aside className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-[#2b1231]/95 backdrop-blur-md">
       <div className="mx-auto max-w-[1120px] px-4 pb-4 pt-3 sm:px-6 lg:px-8">
         <div className="mb-3 flex items-start gap-3 overflow-x-auto pb-1">
-          {THEME_OPTIONS.map((theme) => (
+          {EVENT_THEME_OPTIONS.map((theme) => (
             <button
               key={theme.id}
               type="button"
@@ -658,7 +645,7 @@ function ThemeDock({
             {fontMenuOpen && (
               <div className="absolute bottom-[calc(100%+0.55rem)] left-1/2 z-50 w-[min(92vw,420px)] -translate-x-1/2 rounded-2xl border border-white/15 bg-[#261729]/95 p-3 shadow-2xl backdrop-blur md:left-0 md:translate-x-0">
                 <div className="grid grid-cols-4 gap-2">
-                  {FONT_PRESETS.map((font) => (
+                  {EVENT_FONT_PRESETS.map((font) => (
                     <button
                       key={font}
                       type="button"
@@ -669,7 +656,9 @@ function ThemeDock({
                           : "border-white/15 bg-white/5 text-[#cab2cd] hover:bg-white/10"
                       }`}
                     >
-                      <span className="block text-xl leading-none">Ag</span>
+                      <span className="block text-xl leading-none" style={{ fontFamily: getEventFontFamily(font) }}>
+                        Ag
+                      </span>
                       <span className="mt-1 block truncate text-xs font-semibold">{font}</span>
                     </button>
                   ))}

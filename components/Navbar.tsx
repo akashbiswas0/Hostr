@@ -9,7 +9,7 @@ import { useOrganizer } from "@/hooks/useOrganizer";
 import { useWallet } from "@/hooks/useWallet";
 
 interface NavbarProps {
-  active?: "home" | "events" | "my-rsvps" | "dashboard";
+  active?: "home" | "events" | "dashboard";
 }
 
 export function Navbar({ active }: NavbarProps) {
@@ -23,15 +23,15 @@ export function Navbar({ active }: NavbarProps) {
       : "/organizer/onboard";
 
   const linkCls = (name: NavbarProps["active"]) =>
-    `text-sm font-medium transition-colors ${
+    `text-sm font-semibold transition-colors ${
       active === name
         ? "text-white"
-        : "text-zinc-400 hover:text-white"
+        : "text-zinc-300/80 hover:text-white"
     }`;
 
   return (
-    <nav className="sticky top-0 z-50 border-b border-white/10 bg-transparent backdrop-blur-xl supports-[backdrop-filter]:bg-zinc-950/20">
-      <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6">
+    <nav className="sticky top-0 z-50 border-b border-white/15 bg-[linear-gradient(90deg,rgba(86,77,106,0.7),rgba(37,14,58,0.75),rgba(86,77,106,0.7))] backdrop-blur-xl">
+      <div className="mx-auto grid h-16 max-w-7xl grid-cols-[auto_1fr_auto] items-center gap-4 px-4 sm:px-6">
         {}
         <Link
           href="/"
@@ -44,30 +44,23 @@ export function Navbar({ active }: NavbarProps) {
         </Link>
 
         {}
-        <div className="hidden sm:flex items-center gap-6">
+        <div className="hidden items-center justify-center gap-8 sm:flex">
           <Link href="/" className={linkCls("home")}>
             Home
           </Link>
           <Link href="/events" className={linkCls("events")}>
             Events
           </Link>
-          {isConnected && (
-            <Link href="/my-rsvps" className={linkCls("my-rsvps")}>
-              My RSVPs
-            </Link>
-          )}
-          {isConnected && !isOrganizer && (
-            <Link
-              href="/organizer/onboard"
-              className="text-sm font-medium text-violet-400 hover:text-violet-300 transition-colors"
-            >
-              Host an Event
-            </Link>
-          )}
+          <Link
+            href="/organizer/events/create"
+            className="text-sm font-semibold text-violet-300 transition-colors hover:text-violet-200"
+          >
+            Create Event
+          </Link>
         </div>
 
         {}
-        <div className="hidden sm:flex items-center gap-3">
+        <div className="hidden items-center gap-3 sm:flex">
           <NavAccountMenu />
         </div>
 
@@ -83,7 +76,7 @@ export function Navbar({ active }: NavbarProps) {
 
       {}
       {mobileOpen && (
-        <div className="sm:hidden border-t border-white/10 bg-zinc-950/70 px-4 pb-4 pt-2 backdrop-blur-xl space-y-2">
+        <div className="space-y-2 border-t border-white/10 bg-zinc-950/75 px-4 pb-4 pt-2 backdrop-blur-xl sm:hidden">
           <Link
             href="/"
             className="block py-2 text-sm font-medium text-zinc-400 hover:text-white"
@@ -98,24 +91,13 @@ export function Navbar({ active }: NavbarProps) {
           >
             Events
           </Link>
-          {isConnected && (
-            <Link
-              href="/my-rsvps"
-              className="block py-2 text-sm font-medium text-zinc-400 hover:text-white"
-              onClick={() => setMobileOpen(false)}
-            >
-              My RSVPs
-            </Link>
-          )}
-          {isConnected && !isOrganizer && (
-            <Link
-              href="/organizer/onboard"
-              className="block py-2 text-sm font-medium text-violet-400 hover:text-violet-300"
-              onClick={() => setMobileOpen(false)}
-            >
-              Host an Event
-            </Link>
-          )}
+          <Link
+            href="/organizer/events/create"
+            className="block py-2 text-sm font-medium text-violet-400 hover:text-violet-300"
+            onClick={() => setMobileOpen(false)}
+          >
+            Create Event
+          </Link>
 
           {isConnected && isCorrectChain && address && (
             <>
