@@ -71,7 +71,7 @@ erDiagram
     HOSTEVENT ||--o{ EVENT_CAPACITY_FLAG : "eventKey FK"
     HOSTEVENT ||--o{ EVENT_TRENDING_FLAG : "eventKey FK"
 
-    TICKET ||--o| TICKET_DECISION [RSVP] : "ticketKey FK [RSVP]"
+    TICKET ||--o| TICKET_DECISION[RSVP] : "ticketKey FK [RSVP]"
     TICKET ||--o| CHECKIN : "ticketKey FK"
     CHECKIN ||--o| POA : "checkinKey FK"
 ```
