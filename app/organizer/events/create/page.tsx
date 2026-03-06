@@ -604,17 +604,28 @@ export default function CreateEventPage() {
           // Upload via existing imagedb flow
           const uploadToast = toast.loading("Uploading AI image...");
           try {
-            const blob = await fetch(dataUrl).then((r) => r.blob());
-            const file = new File([blob], "ai-generated.png", { type: "image/png" });
+            // Decode data URL to File without using fetch() — more reliable
+            const [header, b64] = dataUrl.split(",");
+            const mimeType = header.match(/:(.*?);/)?.[1] ?? "image/jpeg";
+            const binary = atob(b64);
+            const bytes = new Uint8Array(binary.length);
+            for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+            const ext = mimeType.split("/")[1] ?? "jpg";
+            const file = new File([bytes], `ai-generated.${ext}`, { type: mimeType });
+
             const mediaId = await uploadEventImage(file);
             setField("imageUrl", mediaId);
             toast.success("AI image uploaded ✓", { id: uploadToast });
           } catch (err) {
-            toast.error("Upload failed", { id: uploadToast });
+            console.error("[AI upload]", err);
+            toast.error(
+              `Upload failed: ${err instanceof Error ? err.message : String(err)}`,
+              { id: uploadToast },
+            );
             setImagePreview(null);
             setField("imageUrl", "");
+            throw err; // re-throw so the modal knows upload failed
           }
-          setAiModalOpen(false);
         }}
       />
     </div>
