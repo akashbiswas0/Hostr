@@ -18,6 +18,7 @@ import { Footer } from "@/components/Footer";
 import { Navbar } from "@/components/Navbar";
 import { useMyRsvps } from "@/hooks/useRsvp";
 import { useWallet } from "@/hooks/useWallet";
+import { useEventImage } from "@/hooks/useEventImage";
 import { publicClient } from "@/lib/arkiv/client";
 import { getEventByKey } from "@/lib/arkiv/queries/events";
 import type { Event } from "@/lib/arkiv/types";
@@ -408,27 +409,25 @@ export default function HomePage() {
 }
 
 function EventImage({ event }: { event: Event }) {
+  const imgUrl = useEventImage(event.imageUrl);
+
   return (
-    <div
-      className="h-24 w-full overflow-hidden rounded-xl border border-white/10 bg-zinc-900 sm:w-36"
-      style={
-        event.imageUrl
-          ? {
-              backgroundImage: `linear-gradient(180deg, rgba(10, 17, 32, 0.05), rgba(10, 17, 32, 0.35)), url(${event.imageUrl})`,
-              backgroundSize: "cover",
-              backgroundPosition: "center",
-            }
-          : {
-              backgroundImage:
-                "linear-gradient(140deg, rgba(59, 130, 246, 0.35), rgba(124, 58, 237, 0.35))",
-            }
-      }
-    >
-      <div className="flex h-full items-end justify-between p-2.5">
-        <span className="rounded-md bg-black/40 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-zinc-100">
-          {event.category || "Event"}
-        </span>
-      </div>
+    <div className="relative h-24 w-full shrink-0 overflow-hidden rounded-xl border border-white/10 sm:w-36">
+      {imgUrl ? (
+        <img
+          src={imgUrl}
+          alt={event.title}
+          className="h-full w-full object-cover"
+        />
+      ) : (
+        <div
+          className="h-full w-full"
+          style={{ backgroundImage: "linear-gradient(140deg, rgba(59,130,246,0.35), rgba(124,58,237,0.35))" }}
+        />
+      )}
+      <span className="absolute bottom-2 left-2 rounded-md bg-black/50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-zinc-100 backdrop-blur-sm">
+        {event.category || "Event"}
+      </span>
     </div>
   );
 }

@@ -27,6 +27,7 @@ import {
   type FilterState,
 } from "@/components/FilterBar";
 import { useEvents } from "@/hooks/useEvent";
+import { useEventImage } from "@/hooks/useEventImage";
 import { EVENT_CATEGORIES, type Category } from "@/lib/arkiv/categories";
 import type { Event } from "@/lib/arkiv/types";
 
@@ -74,6 +75,22 @@ function formatDateTime(value: unknown): string {
     hour: "numeric",
     minute: "2-digit",
   }).format(new Date(ms));
+}
+
+function PopularThumb({ event }: { event: Event }) {
+  const imgUrl = useEventImage(event.imageUrl);
+  return (
+    <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-xl border border-white/10 bg-zinc-900">
+      {imgUrl ? (
+        <img src={imgUrl} alt={event.title} className="h-full w-full object-cover" />
+      ) : (
+        <div
+          className="h-full w-full"
+          style={{ backgroundImage: "linear-gradient(140deg, rgba(59,130,246,0.35), rgba(124,58,237,0.35))" }}
+        />
+      )}
+    </div>
+  );
 }
 
 export default function EventsPage() {
@@ -195,21 +212,7 @@ export default function EventsPage() {
                         href={`/events/${entity.key}`}
                         className="group flex items-center gap-4 rounded-2xl border border-white/10 bg-white/[0.03] p-3 transition-all hover:border-white/20 hover:bg-white/[0.05]"
                       >
-                        <div
-                          className="h-20 w-20 shrink-0 rounded-xl border border-white/10 bg-zinc-900"
-                          style={
-                            event.imageUrl || event.coverImageUrl
-                              ? {
-                                  backgroundImage: `linear-gradient(180deg, rgba(10,17,32,0.15), rgba(10,17,32,0.35)), url(${event.coverImageUrl ?? event.imageUrl})`,
-                                  backgroundSize: "cover",
-                                  backgroundPosition: "center",
-                                }
-                              : {
-                                  backgroundImage:
-                                    "linear-gradient(140deg, rgba(59, 130, 246, 0.35), rgba(124, 58, 237, 0.35))",
-                                }
-                          }
-                        />
+                        <PopularThumb event={event} />
 
                         <div className="min-w-0 flex-1 space-y-1">
                           <p className="flex items-center gap-1 text-xs text-zinc-400">

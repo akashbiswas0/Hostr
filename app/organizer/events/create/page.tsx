@@ -31,6 +31,8 @@ import {
   X,
 } from "lucide-react";
 
+import { uploadEventImage } from "@/lib/imagedb";
+
 import { ConnectButton } from "@/components/ConnectButton";
 import { OrganizerNav } from "@/components/OrganizerNav";
 import { useOrganizer } from "@/hooks/useOrganizer";
@@ -154,20 +156,28 @@ export default function CreateEventPage() {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
-  function handleImageUpload(event: ChangeEvent<HTMLInputElement>) {
+  async function handleImageUpload(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) return;
-    if (file.size > 2 * 1024 * 1024) {
-      toast.error("Image must be under 2 MB");
+    if (file.size > 25 * 1024 * 1024) {
+      toast.error("Image must be under 25 MB");
       return;
     }
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const dataUrl = e.target?.result as string;
-      setImagePreview(dataUrl);
-      setField("imageUrl", dataUrl);
-    };
-    reader.readAsDataURL(file);
+    const localPreview = URL.createObjectURL(file);
+    setImagePreview(localPreview);
+    console.log("[imageUpload] starting upload", { name: file.name, size: file.size, type: file.type });
+    const uploadToast = toast.loading("Uploading image...");
+    try {
+      const mediaId = await uploadEventImage(file);
+      console.log("[imageUpload] success, media_id:", mediaId);
+      setField("imageUrl", mediaId);
+      toast.success("Image uploaded ✓", { id: uploadToast });
+    } catch (err) {
+      console.error("[imageUpload] failed:", err);
+      toast.error(`Image upload failed: ${err instanceof Error ? err.message : String(err)}`, { id: uploadToast });
+      setImagePreview(null);
+      setField("imageUrl", "");
+    }
   }
 
   async function handleSubmit() {
@@ -309,16 +319,24 @@ export default function CreateEventPage() {
             </div>
 
             {imagePreview && (
-              <button
-                type="button"
-                onClick={() => {
-                  setImagePreview(null);
-                  setField("imageUrl", "");
-                }}
-                className="inline-flex items-center gap-1.5 text-xs text-[#d8bedb] hover:text-white"
-              >
-                <X size={12} /> Remove cover image
-              </button>
+              <div className="space-y-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setImagePreview(null);
+                    setField("imageUrl", "");
+                  }}
+                  className="inline-flex items-center gap-1.5 text-xs text-[#d8bedb] hover:text-white"
+                >
+                  <X size={12} /> Remove cover image
+                </button>
+                {form.imageUrl && (
+                  <div className="rounded-lg border border-white/10 bg-black/20 px-3 py-2">
+                    <p className="mb-1 text-[10px] font-semibold uppercase tracking-widest text-[#b898bd]">Media ID</p>
+                    <p className="break-all font-mono text-[11px] text-[#e2d0e4] select-all">{form.imageUrl}</p>
+                  </div>
+                )}
+              </div>
             )}
           </aside>
 

@@ -1,9 +1,12 @@
+"use client";
+
 import Link from "next/link";
 import { Calendar, MapPin, Users } from "lucide-react";
 import type { Entity } from "@arkiv-network/sdk";
 import { CATEGORY_STYLE, DEFAULT_CATEGORY_STYLE } from "@/lib/arkiv/categories";
 import type { Event } from "@/lib/arkiv/types";
 import { StatusBadge } from "./StatusBadge";
+import { useEventImage } from "@/hooks/useEventImage";
 
 function getCategoryStyle(category: string) {
   return CATEGORY_STYLE[category as keyof typeof CATEGORY_STYLE] ?? DEFAULT_CATEGORY_STYLE;
@@ -71,6 +74,7 @@ export function EventCardSkeleton() {
 
 export function EventCard({ entity, event }: EventCardProps) {
   const { cardGradient, badge } = getCategoryStyle(event.category);
+  const imgUrl = useEventImage(event.imageUrl);
 
   const rsvpCount = Number(
     entity.attributes.find((a) => a.key === "rsvpCount")?.value ?? 0,
@@ -91,7 +95,14 @@ export function EventCard({ entity, event }: EventCardProps) {
       className="group flex flex-col rounded-2xl bg-zinc-900 border border-white/5 overflow-hidden hover:border-white/10 hover:bg-zinc-800/80 transition-all duration-200 cursor-pointer"
     >
       {}
-      <div className={`relative h-28 bg-gradient-to-br ${cardGradient}`}>
+      <div className={`relative h-28 bg-gradient-to-br ${cardGradient} overflow-hidden`}>
+        {imgUrl && (
+          <img
+            src={imgUrl}
+            alt={event.title}
+            className="absolute inset-0 h-full w-full object-cover opacity-80"
+          />
+        )}
         {}
         <span
           className={`absolute top-3 left-3 text-xs font-semibold rounded-full px-2.5 py-0.5 ${badge}`}

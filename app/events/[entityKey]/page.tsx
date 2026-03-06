@@ -10,6 +10,7 @@ import { SearchX, Flag, Clock, CheckCircle2, XCircle, ArrowRight, Calendar, MapP
 import { useEvent } from "@/hooks/useEvent";
 import { useRsvp } from "@/hooks/useRsvp";
 import { useWallet } from "@/hooks/useWallet";
+import { useEventImage } from "@/hooks/useEventImage";
 import { publicClient } from "@/lib/arkiv/client";
 import { getRsvpsByEvent, getApprovalForRsvp, getRejectionForRsvp, getApprovalsByEvent } from "@/lib/arkiv/queries/rsvps";
 import { getCheckinsByEvent } from "@/lib/arkiv/queries/checkins";
@@ -137,6 +138,7 @@ export default function EventDetailPage() {
     : null;
 
   const [rsvpModalOpen, setRsvpModalOpen] = useState(false);
+  const heroImgUrl = useEventImage(event?.imageUrl);
 
   const onChainRsvpCount = Number(
     entity?.attributes.find((a) => a.key === "rsvpCount")?.value ?? 0,
@@ -208,22 +210,27 @@ export default function EventDetailPage() {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-white">
+    <div className="relative min-h-screen overflow-hidden bg-[#060912] text-white">
+      <div
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background:
+            "radial-gradient(circle at 18% 0%, rgba(37,99,235,0.22), transparent 35%), radial-gradient(circle at 80% 2%, rgba(99,102,241,0.18), transparent 30%), linear-gradient(180deg, #0a1120 0%, #060912 55%)",
+        }}
+      />
       <Navbar />
 
-      {}
-      <div
-        className={`relative h-48 border-b border-white/5 flex items-end overflow-hidden ${event.imageUrl ? "" : `bg-gradient-to-br ${gradient}`}`}
-      >
-        {event.imageUrl && (
-
+      {/* Hero */}
+      <div className="relative h-56 border-b border-white/5 flex items-end overflow-hidden">
+        <div className={`absolute inset-0 bg-gradient-to-br ${gradient}`} />
+        {heroImgUrl && (
           <img
-            src={event.imageUrl}
+            src={heroImgUrl}
             alt={event.title}
-            className="absolute inset-0 w-full h-full object-cover opacity-60"
+            className="absolute inset-0 w-full h-full object-cover opacity-55"
           />
         )}
-        {!event.imageUrl && <div className={`absolute inset-0 bg-gradient-to-br ${gradient}`} />}
+        <div className="absolute inset-0 bg-gradient-to-t from-[#060912] via-[#060912]/30 to-transparent" />
         <div className="relative mx-auto w-full max-w-7xl px-4 pb-6 sm:px-6 flex items-end justify-between gap-4">
           <div className="flex items-center gap-3">
             <span className="rounded-full border border-white/20 bg-black/30 px-3 py-1 text-xs font-semibold text-white/80 backdrop-blur-sm">
@@ -231,13 +238,12 @@ export default function EventDetailPage() {
             </span>
             <StatusBadge status={event.status} />
           </div>
-          {}
           <ChainLink entityKey={entity.key} label="Verified ✓" />
         </div>
       </div>
 
-      {}
-      <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6">
+      {/* Body */}
+      <div className="relative mx-auto max-w-7xl px-4 py-10 sm:px-6">
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
           {}
           <div className="lg:col-span-2 space-y-8">
@@ -296,26 +302,26 @@ export default function EventDetailPage() {
               </div>
             </div>
 
-            {}
+            {/* About */}
             <section>
               <h2 className="mb-3 text-base font-semibold text-white">
                 About this event
               </h2>
-              <div className="rounded-2xl border border-white/5 bg-zinc-900 p-5">
+              <div className="rounded-2xl border border-white/10 bg-white/[0.04] backdrop-blur-sm p-5">
                 <p className="whitespace-pre-wrap text-sm leading-relaxed text-zinc-300">
                   {event.description}
                 </p>
               </div>
             </section>
 
-            {}
+            {/* Organizer */}
             <section>
               <h2 className="mb-3 text-base font-semibold text-white">
                 Organizer
               </h2>
               <Link
                 href={entity.owner ? `/organizers/${entity.owner}` : "#"}
-                className="group flex items-center gap-4 rounded-2xl border border-white/5 bg-zinc-900 p-5 transition-colors hover:border-violet-700/40 hover:bg-zinc-900/80"
+                className="group flex items-center gap-4 rounded-2xl border border-white/10 bg-white/[0.04] backdrop-blur-sm p-5 transition-colors hover:border-violet-700/40 hover:bg-white/[0.07]"
               >
                 {}
                 {organizerProfile?.avatarUrl ? (
@@ -369,7 +375,7 @@ export default function EventDetailPage() {
               </Link>
             </section>
 
-            {}
+            {/* Attendees */}
             <section>
               <h2 className="mb-3 text-base font-semibold text-white">
                 Attendees{" "}
@@ -388,7 +394,7 @@ export default function EventDetailPage() {
           {}
           <div className="lg:col-span-1">
             <div className="sticky top-24 space-y-4">
-              <RsvpCard
+                <RsvpCard
                 isEnded={isEnded}
                 isFull={isFull}
                 isConnected={isConnected}
@@ -454,8 +460,8 @@ export default function EventDetailPage() {
                 </div>
               )}
 
-              {}
-              <div className="rounded-2xl border border-white/5 bg-zinc-900 p-4 space-y-2">
+              {/* On-chain info */}
+              <div className="rounded-2xl border border-white/10 bg-white/[0.04] backdrop-blur-sm p-4 space-y-2">
                 <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wide">
                   On-chain info
                 </p>
@@ -528,7 +534,7 @@ function RsvpCard({
   onOpen,
 }: RsvpCardProps) {
   return (
-    <div className="rounded-2xl border border-white/5 bg-zinc-900 p-5 space-y-4">
+    <div className="rounded-2xl border border-white/10 bg-white/[0.04] backdrop-blur-sm p-5 space-y-4">
       <h2 className="text-base font-bold text-white">RSVP</h2>
 
       {}
@@ -650,7 +656,7 @@ function AttendeeList({
         {[1, 2, 3].map((i) => (
           <div
             key={i}
-            className="h-10 rounded-xl bg-zinc-900 animate-pulse"
+            className="h-10 rounded-xl bg-white/[0.04] animate-pulse"
           />
         ))}
       </div>
@@ -666,7 +672,7 @@ function AttendeeList({
   }
 
   return (
-    <div className="rounded-2xl border border-white/5 bg-zinc-900 divide-y divide-white/5 overflow-hidden">
+    <div className="rounded-2xl border border-white/10 bg-white/[0.04] backdrop-blur-sm divide-y divide-white/5 overflow-hidden">
       {entities.map((entity) => {
         const rsvp = entity.toJson() as RSVP;
         return (
@@ -708,17 +714,17 @@ function AttendeeList({
 
 function PageSkeleton() {
   return (
-    <div className="min-h-screen bg-zinc-950 animate-pulse">
-      <div className="h-16 border-b border-white/5 bg-zinc-900" />
-      <div className="h-48 bg-zinc-800" />
+    <div className="min-h-screen bg-[#060912] animate-pulse">
+      <div className="h-16 border-b border-white/5 bg-white/[0.04]" />
+      <div className="h-56 bg-white/[0.04]" />
       <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-6">
-          <div className="h-10 w-3/4 rounded-xl bg-zinc-800" />
-          <div className="h-4 w-1/2 rounded bg-zinc-900" />
-          <div className="h-4 w-2/3 rounded bg-zinc-900" />
-          <div className="h-32 rounded-2xl bg-zinc-900" />
+          <div className="h-10 w-3/4 rounded-xl bg-white/[0.06]" />
+          <div className="h-4 w-1/2 rounded bg-white/[0.04]" />
+          <div className="h-4 w-2/3 rounded bg-white/[0.04]" />
+          <div className="h-32 rounded-2xl bg-white/[0.04]" />
         </div>
-        <div className="h-48 rounded-2xl bg-zinc-900" />
+        <div className="h-48 rounded-2xl bg-white/[0.04]" />
       </div>
     </div>
   );
