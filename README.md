@@ -3,10 +3,7 @@
 A fully on-chain event management platform built on **Arkiv** (Kaolin testnet).
 Create events, collect RSVPs, manage attendees, and record check-ins — all stored verifiably on-chain with no backend or traditional database.
 
-<p align="center">
-  <img src="./assets/hostr-arkiv.gif" width="900"/>
-</p>
-
+![Demo](./assets/hostr-arkiv.gif)
 
 > **Try it live**: [http://localhost:3000](http://localhost:3000) after running `npm run dev`.
 
