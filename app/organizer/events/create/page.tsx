@@ -35,6 +35,10 @@ import dynamic from "next/dynamic";
 import { uploadEventImage } from "@/lib/imagedb";
 
 const LocationPicker = dynamic(() => import("@/components/LocationPicker"), { ssr: false });
+const AIImageGenerator = dynamic(
+  () => import("@/components/AIImageGenerator"),
+  { ssr: false },
+);
 
 import { ConnectButton } from "@/components/ConnectButton";
 import { OrganizerNav } from "@/components/OrganizerNav";
@@ -151,6 +155,8 @@ export default function CreateEventPage() {
   const [selectedTheme, setSelectedTheme] = useState<EventThemeId>("minimal");
   const [selectedFont, setSelectedFont] = useState<EventFontPreset>("Default");
   const [fontMenuOpen, setFontMenuOpen] = useState(false);
+  const [aiModalOpen, setAiModalOpen] = useState(false);
+  const [aiGenerating, setAiGenerating] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const fontMenuRef = useRef<HTMLDivElement>(null);
@@ -333,6 +339,24 @@ export default function CreateEventPage() {
               onChange={handleImageUpload}
             />
 
+            {/* Upload / AI Generate row */}
+            <div className="flex items-center gap-2 mt-2">
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="flex-1 flex items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-[#69406d]/50 px-3 py-2 text-xs font-semibold text-[#e3cae5] hover:bg-[#7a4a7f] transition-colors"
+              >
+                <ImageIcon size={13} /> Upload
+              </button>
+              <button
+                type="button"
+                onClick={() => setAiModalOpen(true)}
+                className="flex-1 flex items-center justify-center gap-1.5 rounded-lg border border-fuchsia-400/30 bg-fuchsia-500/20 px-3 py-2 text-xs font-semibold text-fuchsia-200 hover:bg-fuchsia-500/40 transition-colors"
+              >
+                <WandSparkles size={13} /> AI Generate
+              </button>
+            </div>
+
             <div className="grid grid-cols-[1fr_54px] gap-2">
               <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-[#69406d]/70 px-3 py-2">
                 <div
@@ -348,7 +372,9 @@ export default function CreateEventPage() {
 
               <button
                 type="button"
-                className="inline-flex h-full items-center justify-center rounded-xl border border-white/10 bg-[#69406d]/70 text-[#e3cae5] transition-colors hover:bg-[#7a4a7f]"
+                onClick={() => setAiModalOpen(true)}
+                title="Generate with AI"
+                className="inline-flex h-full items-center justify-center rounded-xl border border-white/10 bg-[#69406d]/70 text-[#e3cae5] transition-colors hover:bg-fuchsia-500/40 hover:text-white hover:border-fuchsia-400/50"
               >
                 <WandSparkles size={18} />
               </button>
@@ -564,6 +590,32 @@ export default function CreateEventPage() {
           setFontMenuOpen(false);
         }}
         onFontToggle={() => setFontMenuOpen((prev) => !prev)}
+      />
+
+      <AIImageGenerator
+        eventTitle={form.title}
+        eventCategory={form.category}
+        isOpen={aiModalOpen}
+        onClose={() => setAiModalOpen(false)}
+        onSelectImage={async (dataUrl) => {
+          // Show preview immediately
+          setImagePreview(dataUrl);
+
+          // Upload via existing imagedb flow
+          const uploadToast = toast.loading("Uploading AI image...");
+          try {
+            const blob = await fetch(dataUrl).then((r) => r.blob());
+            const file = new File([blob], "ai-generated.png", { type: "image/png" });
+            const mediaId = await uploadEventImage(file);
+            setField("imageUrl", mediaId);
+            toast.success("AI image uploaded ✓", { id: uploadToast });
+          } catch (err) {
+            toast.error("Upload failed", { id: uploadToast });
+            setImagePreview(null);
+            setField("imageUrl", "");
+          }
+          setAiModalOpen(false);
+        }}
       />
     </div>
   );
