@@ -31,7 +31,10 @@ import {
   X,
 } from "lucide-react";
 
+import dynamic from "next/dynamic";
 import { uploadEventImage } from "@/lib/imagedb";
+
+const LocationPicker = dynamic(() => import("@/components/LocationPicker"), { ssr: false });
 
 import { ConnectButton } from "@/components/ConnectButton";
 import { OrganizerNav } from "@/components/OrganizerNav";
@@ -77,7 +80,11 @@ const FONT_PRESETS = [
   "Alternate",
 ] as const;
 
-type FormState = Omit<Event, "status" | "category"> & { category: Category | "" };
+type FormState = Omit<Event, "status" | "category"> & {
+  category: Category | ""
+  lat?: number
+  lng?: number
+};
 
 const EMPTY_FORM: FormState = {
   title: "",
@@ -88,6 +95,8 @@ const EMPTY_FORM: FormState = {
   location: "",
   virtualLink: "",
   capacity: 100,
+  lat: undefined,
+  lng: undefined,
   requiresRsvp: false,
   imageUrl: "",
 };
@@ -192,6 +201,8 @@ export default function CreateEventPage() {
 
     const eventData: Event = {
       ...form,
+      lat: form.lat,
+      lng: form.lng,
       category: form.category as Category,
       virtualLink: form.virtualLink?.trim() || undefined,
       status: visibility === "public" ? "upcoming" : "draft",
@@ -416,12 +427,14 @@ export default function CreateEventPage() {
               subtitle="Offline location or virtual link"
               className="mt-3"
             >
-              <input
-                type="text"
+              <LocationPicker
                 value={form.location}
-                onChange={(event) => setField("location", event.target.value)}
-                placeholder="123 Main St, San Francisco"
-                className={fieldInputCls}
+                onChange={(address) => setField("location", address)}
+                onLocationChange={({ address, lat, lng }) => {
+                  setField("location", address)
+                  setField("lat", lat)
+                  setField("lng", lng)
+                }}
               />
               <input
                 type="url"
