@@ -9,7 +9,7 @@ import { AlertTriangle, Lock, ShieldOff, ArrowLeft, Check } from "lucide-react";
 import { useEvent } from "@/hooks/useEvent";
 import { useWallet } from "@/hooks/useWallet";
 import { publicClient } from "@/lib/arkiv/client";
-import { updateEventDetails } from "@/lib/arkiv/entities/event";
+import { updateHostEventDetails } from "@/lib/arkiv/entities/event";
 import { EVENT_CATEGORIES, type Category } from "@/lib/arkiv/categories";
 import { OrganizerNav } from "@/components/OrganizerNav";
 import { ConnectButton } from "@/components/ConnectButton";
@@ -136,7 +136,7 @@ export default function EditEventPage() {
       virtualLink: form.virtualLink?.trim() || undefined,
     };
 
-    const res = await updateEventDetails(walletClient, publicClient, entityKey, updated);
+    const res = await updateHostEventDetails(walletClient, publicClient, entityKey, updated);
     if (res.success) {
       toast.success("Event saved ✓");
       setSaved(true);

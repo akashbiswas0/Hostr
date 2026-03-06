@@ -5,8 +5,8 @@ import { publicClient } from "@/lib/arkiv/client";
 import {
   getEventByKey,
   getAllUpcomingEvents,
-  getEventsByOrganizer,
-  type EventFilters,
+  getHostEventsByOrganizer,
+  type HostEventFilters,
 } from "@/lib/arkiv/queries/events";
 import type { Event } from "@/lib/arkiv/types";
 import type { Entity } from "@arkiv-network/sdk";
@@ -60,7 +60,7 @@ export function useEvent(entityKey: Hex | undefined): UseEventReturn {
   };
 }
 
-export function useEvents(filters?: EventFilters): UseEventsReturn {
+export function useEvents(filters?: HostEventFilters): UseEventsReturn {
   const query = useQuery({
     queryKey: [
       "events",
@@ -99,7 +99,7 @@ export function useOrganizerEvents(): UseEventsReturn {
     queryKey: ["organizer-events", address],
     queryFn: async () => {
       if (!address) return [];
-      const result = await getEventsByOrganizer(publicClient, address as Hex);
+      const result = await getHostEventsByOrganizer(publicClient, address as Hex);
       if (!result.success) throw new Error(result.error);
       return result.data;
     },

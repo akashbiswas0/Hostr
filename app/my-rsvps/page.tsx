@@ -8,24 +8,21 @@ import type { Hex } from "viem";
 import type { Entity } from "@arkiv-network/sdk";
 import { QRCodeSVG } from "qrcode.react";
 import { Lock, AlertTriangle, Calendar, MapPin, Ticket, BanIcon } from "lucide-react";
-import { useMyRsvps } from "@/hooks/useRsvp";
+import { useMyTickets } from "@/hooks/useTicket";
 import { useEvent } from "@/hooks/useEvent";
 import { useWallet } from "@/hooks/useWallet";
 import { ConfirmModal } from "@/components/ConfirmModal";
 import { publicClient } from "@/lib/arkiv/client";
-import { updateRsvpStatus, promoteFirstWaitlisted } from "@/lib/arkiv/entities/rsvp";
-import { getRsvpsByEvent, getApprovalForRsvp, getRejectionForRsvp } from "@/lib/arkiv/queries/rsvps";
-import { updateRsvpCount } from "@/lib/arkiv/entities/event";
+import { updateTicketStatus, promoteFirstWaitlistedTicket } from "@/lib/arkiv/entities/ticket";
+import { getTicketsByEvent, getApprovalForTicket, getRejectionForTicket } from "@/lib/arkiv/queries/tickets";
 import { friendlyError } from "@/lib/arkiv/errors";
 import { ConnectButton } from "@/components/ConnectButton";
 import { Navbar } from "@/components/Navbar";
 import { AddressBadge } from "@/components/AddressBadge";
 import { ChainLink } from "@/components/ChainLink";
-import type { RSVP } from "@/lib/arkiv/types";
+import type { Ticket as TicketData } from "@/lib/arkiv/types";
 import type { WalletArkivClient } from "@arkiv-network/sdk";
 import type { Account, Chain, Transport } from "viem";
-
-const EXPLORER = "https://explorer.kaolin.hoodi.arkiv.network";
 
 function truncate(addr: string) {
   return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
@@ -63,7 +60,7 @@ const STATUS_STYLE: Record<string, { dot: string; label: string; text: string }>
 
 export default function MyRsvpsPage() {
   const { address, isConnected, isCorrectChain, walletClient } = useWallet();
-  const { rsvpEntities, isLoading, error, refetch } = useMyRsvps();
+  const { ticketEntities, isLoading, error, refetch } = useMyTickets();
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
@@ -121,14 +118,14 @@ export default function MyRsvpsPage() {
               Retry
             </button>
           </div>
-        ) : rsvpEntities.length === 0 ? (
+        ) : ticketEntities.length === 0 ? (
           <EmptyState />
         ) : (
           <div className="space-y-4">
             <p className="text-sm text-zinc-500">
-              {rsvpEntities.length} RSVP{rsvpEntities.length !== 1 ? "s" : ""}
+              {ticketEntities.length} ticket{ticketEntities.length !== 1 ? "s" : ""}
             </p>
-            {rsvpEntities.map((rsvpEntity) => (
+            {ticketEntities.map((rsvpEntity) => (
               <RsvpRow
                 key={rsvpEntity.key}
                 rsvpEntity={rsvpEntity}
@@ -154,7 +151,7 @@ function RsvpRow({
 }) {
   const [confirmOpen, setConfirmOpen] = useState(false);
 
-  const rsvp = rsvpEntity.toJson() as RSVP;
+  const rsvp = rsvpEntity.toJson() as TicketData;
   const eventKey = rsvpEntity.attributes.find((a) => a.key === "eventKey")
     ?.value as Hex | undefined;
   const rsvpStatus =
@@ -165,7 +162,7 @@ function RsvpRow({
   const { data: approvalEntity } = useQuery({
     queryKey: ["rsvp-approval", rsvpEntity.key],
     queryFn: async () => {
-      const res = await getApprovalForRsvp(publicClient, rsvpEntity.key as Hex);
+      const res = await getApprovalForTicket(publicClient, rsvpEntity.key as Hex);
       return res.success ? res.data : null;
     },
     enabled: rsvpStatus === "pending",
@@ -175,7 +172,7 @@ function RsvpRow({
   const { data: rejectionEntity } = useQuery({
     queryKey: ["rsvp-rejection", rsvpEntity.key],
     queryFn: async () => {
-      const res = await getRejectionForRsvp(publicClient, rsvpEntity.key as Hex);
+      const res = await getRejectionForTicket(publicClient, rsvpEntity.key as Hex);
       return res.success ? res.data : null;
     },
     enabled: rsvpStatus === "pending",
@@ -203,7 +200,7 @@ function RsvpRow({
       if (!walletClient) throw new Error("Wallet not connected");
       const wasConfirmed =
         effectiveStatus === "confirmed" || effectiveStatus === "checked-in";
-      const res = await updateRsvpStatus(
+      const res = await updateTicketStatus(
         walletClient,
         publicClient,
         rsvpEntity.key as Hex,
@@ -211,9 +208,7 @@ function RsvpRow({
       );
       if (!res.success) throw new Error(res.error);
       if (wasConfirmed && eventKey) {
-
-        await updateRsvpCount(walletClient, publicClient, eventKey, false).catch(() => {});
-        await promoteFirstWaitlisted(walletClient, publicClient, eventKey).catch(() => {});
+        await promoteFirstWaitlistedTicket(walletClient, publicClient, eventKey).catch(() => {});
       }
     },
     onSuccess: () => {
@@ -354,7 +349,7 @@ function WaitlistPosition({ eventKey, myRsvpKey }: { eventKey: Hex; myRsvpKey: H
   const { data: position } = useQuery({
     queryKey: ["waitlist-position", eventKey, myRsvpKey],
     queryFn: async () => {
-      const res = await getRsvpsByEvent(publicClient, eventKey);
+      const res = await getTicketsByEvent(publicClient, eventKey);
       if (!res.success) return null;
       const waitlisted = res.data.filter((e) =>
         e.attributes.find((a) => a.key === "status")?.value === "waitlisted",
@@ -413,4 +408,3 @@ function LoadingSkeleton() {
     </div>
   );
 }
-

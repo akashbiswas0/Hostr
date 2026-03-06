@@ -38,7 +38,7 @@ import { OrganizerNav } from "@/components/OrganizerNav";
 import { useOrganizer } from "@/hooks/useOrganizer";
 import { useWallet } from "@/hooks/useWallet";
 import { publicClient } from "@/lib/arkiv/client";
-import { createEventEntity } from "@/lib/arkiv/entities/event";
+import { createHostEventEntity } from "@/lib/arkiv/entities/event";
 import { EVENT_CATEGORIES, type Category } from "@/lib/arkiv/categories";
 import type { Event } from "@/lib/arkiv/types";
 
@@ -197,7 +197,7 @@ export default function CreateEventPage() {
       status: visibility === "public" ? "upcoming" : "draft",
     };
 
-    const res = await createEventEntity(
+    const res = await createHostEventEntity(
       walletClient,
       publicClient,
       eventData,

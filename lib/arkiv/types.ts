@@ -4,9 +4,14 @@ export type ArkivResult<T> =
   | { success: true; data: T }
   | { success: false; error: string };
 
-export type EventStatus = "draft" | "upcoming" | "live" | "ended";
-export type RSVPStatus = "pending" | "confirmed" | "waitlisted" | "checked-in" | "not-going";
-export type RsvpDecision = "approved" | "rejected";
+export type EventStatus = "draft" | "upcoming" | "live" | "ended" | "archived";
+export type TicketStatus =
+  | "pending"
+  | "confirmed"
+  | "waitlisted"
+  | "checked-in"
+  | "not-going";
+export type TicketDecision = "approved" | "rejected";
 
 export interface OrganizerProfile {
   name: string;
@@ -21,7 +26,7 @@ export interface OrganizerProfile {
   language?: string;
 }
 
-export interface UserProfileV2 {
+export interface UserProfile {
   displayName: string;
   bio?: string;
   avatarImageUrl?: string;
@@ -48,6 +53,9 @@ export interface Event {
   coverImageUrl?: string;
   posterImageUrl?: string;
   thumbnailImageUrl?: string;
+  poapImageUrl?: string;
+  poapAnimationUrl?: string;
+  poapTemplateId?: string;
   format?: "in_person" | "online" | "hybrid";
   priceTier?: "free" | "paid" | "donation";
   priceMin?: number;
@@ -58,9 +66,7 @@ export interface Event {
   visibility?: "public" | "unlisted";
 }
 
-export type EventV2 = Event;
-
-export interface RSVP {
+export interface Ticket {
   eventKey: string;
   attendeeName: string;
   attendeeEmail: string;
@@ -71,29 +77,27 @@ export interface RSVP {
   ticketType?: string;
 }
 
-export type RsvpV2 = RSVP;
-
-export interface RsvpDecisionV2 {
+export interface TicketDecisionEntity {
   eventKey: string;
-  rsvpKey: string;
+  ticketKey: string;
   attendeeWallet: string;
-  decision: RsvpDecision;
+  decision: TicketDecision;
   decidedAt: number;
   decisionReasonCode?: string;
 }
 
-export interface CheckinV2 {
+export interface Checkin {
   eventKey: string;
-  rsvpKey?: string;
+  ticketKey?: string;
   attendeeWallet: string;
   checkedInAt: number;
   checkinMethod: "qr" | "manual";
   checkinGate?: string;
 }
 
-export interface ProofOfAttendanceV2 {
+export interface ProofOfAttendance {
   eventKey: string;
-  rsvpKey: string;
+  ticketKey: string;
   checkinKey: string;
   attendeeWallet: string;
   eventTitle: string;
@@ -104,7 +108,7 @@ export interface ProofOfAttendanceV2 {
   poapTemplateId?: string;
 }
 
-export interface EventSearchTokenV2 {
+export interface EventSearchToken {
   eventKey: string;
   token: string;
   field: "title" | "description" | "venue" | "tags";
@@ -114,7 +118,7 @@ export interface EventSearchTokenV2 {
   startAt: number;
 }
 
-export interface EventDiscoveryFiltersV2 {
+export interface HostEventDiscoveryFilters {
   status?: EventStatus[];
   category?: string[];
   city?: string;
@@ -131,15 +135,15 @@ export interface EventDiscoveryFiltersV2 {
   hasImage?: 0 | 1;
 }
 
-export type EventSortV2 =
+export type HostEventSort =
   | "startAtAsc"
   | "startAtDesc"
   | "newest"
   | "mostPopular";
 
-export interface EventGraphV2 {
+export interface HostEventGraph {
   event: import("@arkiv-network/sdk").Entity;
-  rsvps: import("@arkiv-network/sdk").Entity[];
+  tickets: import("@arkiv-network/sdk").Entity[];
   decisions: import("@arkiv-network/sdk").Entity[];
   checkins: import("@arkiv-network/sdk").Entity[];
   poaps: import("@arkiv-network/sdk").Entity[];

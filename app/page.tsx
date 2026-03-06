@@ -16,7 +16,7 @@ import {
 import { ConnectButton } from "@/components/ConnectButton";
 import { Footer } from "@/components/Footer";
 import { Navbar } from "@/components/Navbar";
-import { useMyRsvps } from "@/hooks/useRsvp";
+import { useMyTickets } from "@/hooks/useTicket";
 import { useWallet } from "@/hooks/useWallet";
 import { useEventImage } from "@/hooks/useEventImage";
 import { publicClient } from "@/lib/arkiv/client";
@@ -159,14 +159,14 @@ export default function HomePage() {
   const [view, setView] = useState<TimelineView>("upcoming");
   const { address, isConnected, isCorrectChain } = useWallet();
   const {
-    rsvpEntities,
+    ticketEntities,
     isLoading: rsvpLoading,
     error: rsvpError,
-  } = useMyRsvps();
+  } = useMyTickets();
 
   const eventKeys = useMemo(
-    () => rsvpEntities.map(extractEventKey).filter((key): key is Hex => key !== null),
-    [rsvpEntities],
+    () => ticketEntities.map(extractEventKey).filter((key): key is Hex => key !== null),
+    [ticketEntities],
   );
 
   const registeredEventsQuery = useQuery({
@@ -192,7 +192,7 @@ export default function HomePage() {
       }
 
       const items: RegisteredEventItem[] = [];
-      for (const rsvpEntity of rsvpEntities) {
+      for (const rsvpEntity of ticketEntities) {
         const eventKey = extractEventKey(rsvpEntity);
         if (!eventKey) continue;
 

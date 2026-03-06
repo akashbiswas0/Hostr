@@ -4,7 +4,7 @@ import { ExpirationTime } from "@arkiv-network/sdk/utils";
 import type { Account, Chain, Hex, Transport } from "viem";
 import type { PublicArkivClient, WalletArkivClient } from "@arkiv-network/sdk";
 import { ENTITY_TYPES } from "../constants";
-import type { ArkivResult, UserProfileV2 } from "../types";
+import type { ArkivResult, UserProfile } from "../types";
 import {
   mediaHost,
   normalizeMediaUrl,
@@ -17,7 +17,7 @@ const CONTENT_TYPE = "application/json" as const;
 
 function profileAttributes(
   wallet: Hex,
-  data: UserProfileV2,
+  data: UserProfile,
   createdAt: number,
 ): Array<{ key: string; value: string | number }> {
   const avatarImageUrl = normalizeMediaUrl(data.avatarImageUrl);
@@ -43,7 +43,7 @@ function profileAttributes(
 
 export async function createUserProfileEntity(
   walletClient: WalletArkivClient<Transport, Chain, Account>,
-  data: UserProfileV2,
+  data: UserProfile,
 ): Promise<ArkivResult<{ entityKey: Hex; txHash: Hex }>> {
   try {
     const createdAt = unixNow();
@@ -66,7 +66,7 @@ export async function createUserProfileEntity(
 export async function upsertUserProfileEntity(
   walletClient: WalletArkivClient<Transport, Chain, Account>,
   publicClient: PublicArkivClient,
-  data: UserProfileV2,
+  data: UserProfile,
 ): Promise<ArkivResult<{ entityKey: Hex; txHash: Hex }>> {
   try {
     const existing = await publicClient

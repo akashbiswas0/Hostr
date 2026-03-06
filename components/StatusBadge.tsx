@@ -29,6 +29,11 @@ const CONFIG: Record<
     dot: "bg-zinc-600",
     badge: "bg-zinc-800/60 text-zinc-500 ring-1 ring-zinc-700/50",
   },
+  archived: {
+    label: "Archived",
+    dot: "bg-zinc-700",
+    badge: "bg-zinc-900/70 text-zinc-400 ring-1 ring-zinc-700/50",
+  },
 };
 
 export function StatusBadge({ status, className = "" }: StatusBadgeProps) {

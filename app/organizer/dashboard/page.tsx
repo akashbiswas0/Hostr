@@ -6,13 +6,15 @@ import Link from "next/link";
 import { useMutation } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import type { Hex } from "viem";
-import type { Entity } from "@arkiv-network/sdk";
 import { AlertTriangle, Lock, Calendar, MapPin, Users, Tag, FileText, Flag, Radio, ArrowRight, Plus } from "lucide-react";
 import { useOrganizer } from "@/hooks/useOrganizer";
 import { useOrganizerEvents } from "@/hooks/useEvent";
 import { useWallet } from "@/hooks/useWallet";
 import { publicClient } from "@/lib/arkiv/client";
-import { updateEventStatus, deleteEvent, autoTransitionEndedEvents } from "@/lib/arkiv/entities/event";
+import {
+  updateHostEventStatus,
+  archiveHostEvent,
+} from "@/lib/arkiv/entities/event";
 import { OrganizerNav } from "@/components/OrganizerNav";
 import { StatusBadge } from "@/components/StatusBadge";
 import { ConnectButton } from "@/components/ConnectButton";
@@ -56,13 +58,14 @@ function truncate(addr: string) {
   return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
 }
 
-const TABS: EventStatus[] = ["draft", "upcoming", "live", "ended"];
+const TABS: EventStatus[] = ["draft", "upcoming", "live", "ended", "archived"];
 
 const TAB_LABEL: Record<EventStatus, string> = {
   draft: "Draft",
   upcoming: "Upcoming",
   live: "Live",
   ended: "Ended",
+  archived: "Archived",
 };
 
 export default function DashboardPage() {
@@ -82,18 +85,6 @@ export default function DashboardPage() {
     }
   }, [organizer, profileLoading, isConnected, isCorrectChain, router]);
 
-  useEffect(() => {
-    if (!walletClient || !address || eventsLoading || !events.length) return;
-    autoTransitionEndedEvents(walletClient, publicClient, address as import("viem").Hex)
-      .then((res) => {
-        if (res.success && res.data.transitioned > 0) {
-          toast.success(`${res.data.transitioned} event(s) auto-marked as ended`);
-          refetch();
-        }
-      })
-      .catch(() => {});
-  }, [eventsLoading]);
-
   const statusMutation = useMutation({
     mutationFn: async ({
       entityKey,
@@ -105,7 +96,7 @@ export default function DashboardPage() {
       payload: Event;
     }) => {
       if (!walletClient) throw new Error("Wallet not connected");
-      const res = await updateEventStatus(walletClient, publicClient, entityKey, newStatus, payload);
+      const res = await updateHostEventStatus(walletClient, publicClient, entityKey, newStatus, payload);
       if (!res.success) throw new Error(res.error);
     },
     onSuccess: () => {
@@ -119,11 +110,11 @@ export default function DashboardPage() {
     mutationFn: async (eventKey: Hex) => {
       if (!walletClient) throw new Error("Wallet not connected");
       setDeletingKey(eventKey);
-      const res = await deleteEvent(walletClient, publicClient, eventKey);
+      const res = await archiveHostEvent(walletClient, publicClient, eventKey);
       if (!res.success) throw new Error(res.error);
     },
     onSuccess: () => {
-      toast.success("Event deleted");
+      toast.success("Hostevent archived");
       setDeletingKey(null);
       refetch();
     },
@@ -279,7 +270,7 @@ export default function DashboardPage() {
                         <span className="flex items-center gap-1"><Calendar size={11} />{formatDate(ev.date)}</span>
                         <span className="flex items-center gap-1"><MapPin size={11} />{ev.location}</span>
                         <span className="flex items-center gap-1">
-                          <Users size={11} />{rsvpCount} / {ev.capacity} RSVPs
+                          <Users size={11} />{rsvpCount} / {ev.capacity} tickets
                         </span>
                         <span className="flex items-center gap-1"><Tag size={11} />{ev.category}</span>
                       </div>
@@ -359,7 +350,7 @@ export default function DashboardPage() {
                         disabled={deleteMutation.isPending}
                         className="rounded-lg border border-rose-800/40 px-3 py-1.5 text-xs font-medium text-rose-500 hover:bg-rose-950/20 disabled:opacity-40 transition-colors"
                       >
-                        Delete
+                        Archive
                       </button>
                     </div>
                   </div>
@@ -372,9 +363,9 @@ export default function DashboardPage() {
 
       <ConfirmModal
         open={!!confirmDeleteKey}
-        title={`Delete "${confirmDeleteKey?.title ?? "this event"}"?`}
-        message="This will also delete all RSVPs and cannot be undone."
-        confirmLabel="Delete"
+        title={`Archive "${confirmDeleteKey?.title ?? "this event"}"?`}
+        message="This hostevent will be hidden from public discovery and moved to archived."
+        confirmLabel="Archive"
         destructive
         onConfirm={() => {
           if (confirmDeleteKey) deleteMutation.mutate(confirmDeleteKey.key);
@@ -443,6 +434,11 @@ function EmptyTab({ status }: { status: EventStatus }) {
       icon: <Flag size={24} className="text-zinc-500" />,
       title: "No ended events",
       msg: "Completed events will appear here after they end.",
+    },
+    archived: {
+      icon: <Flag size={24} className="text-zinc-500" />,
+      title: "No archived events",
+      msg: "Archived hostevents appear here and stay hidden from public discovery.",
     },
   };
 

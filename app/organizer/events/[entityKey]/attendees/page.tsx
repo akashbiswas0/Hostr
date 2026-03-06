@@ -11,9 +11,13 @@ import { AlertTriangle, Lock, ShieldOff, ArrowLeft, Download, Check, ScanLine, X
 import { useEvent } from "@/hooks/useEvent";
 import { useWallet } from "@/hooks/useWallet";
 import { publicClient } from "@/lib/arkiv/client";
-import { confirmRsvp, rejectRsvp } from "@/lib/arkiv/entities/rsvp";
-import { autoPromoteCapacityStatus } from "@/lib/arkiv/entities/event";
-import { getRsvpsByEvent, getApprovalsByEvent, getRejectionsByEvent, getApprovalForRsvp, getRejectionForRsvp } from "@/lib/arkiv/queries/rsvps";
+import { approveTicket, rejectTicket } from "@/lib/arkiv/entities/ticket";
+import {
+  getTicketsByEvent,
+  getDecisionsByEvent,
+  getApprovalForTicket,
+  getRejectionForTicket,
+} from "@/lib/arkiv/queries/tickets";
 import { createCheckinEntity } from "@/lib/arkiv/entities/checkin";
 import { getCheckinsByEvent, hasAttendeeCheckedIn } from "@/lib/arkiv/queries/checkins";
 import { createPoAEntity } from "@/lib/arkiv/entities/attendance";
@@ -21,15 +25,15 @@ import { OrganizerNav } from "@/components/OrganizerNav";
 import { ConnectButton } from "@/components/ConnectButton";
 import { ConfirmModal } from "@/components/ConfirmModal";
 import { friendlyError } from "@/lib/arkiv/errors";
-import type { RSVP, RSVPStatus } from "@/lib/arkiv/types";
+import type { Ticket, TicketStatus } from "@/lib/arkiv/types";
 
-type EffectiveStatus = RSVPStatus | "rejected" | "not-going";
+type EffectiveStatus = TicketStatus | "rejected" | "not-going";
 
 interface AttendeeRow {
   entity: Entity;
   rsvpKey: Hex;
   ownerAddress: Hex;
-  data: RSVP;
+  data: Ticket;
   status: EffectiveStatus;
 }
 
@@ -107,7 +111,7 @@ export default function AttendeesPage() {
   } = useQuery<Entity[]>({
     queryKey: ["attendees", entityKey],
     queryFn: async () => {
-      const res = await getRsvpsByEvent(publicClient, entityKey);
+      const res = await getTicketsByEvent(publicClient, entityKey);
       return res.success ? res.data : [];
     },
     enabled: !!entityKey,
@@ -133,7 +137,7 @@ export default function AttendeesPage() {
   } = useQuery<Entity[]>({
     queryKey: ["rsvp-approvals", entityKey],
     queryFn: async () => {
-      const res = await getApprovalsByEvent(publicClient, entityKey);
+      const res = await getDecisionsByEvent(publicClient, entityKey, "approved");
       return res.success ? res.data : [];
     },
     enabled: !!entityKey,
@@ -145,7 +149,7 @@ export default function AttendeesPage() {
   } = useQuery<Entity[]>({
     queryKey: ["rsvp-rejections", entityKey],
     queryFn: async () => {
-      const res = await getRejectionsByEvent(publicClient, entityKey);
+      const res = await getDecisionsByEvent(publicClient, entityKey, "rejected");
       return res.success ? res.data : [];
     },
     enabled: !!entityKey,
@@ -163,7 +167,7 @@ export default function AttendeesPage() {
   const approvedRsvpKeys = useMemo(() => {
     return new Set(
       (approvalEntities ?? []).map((e) => {
-        const attr = e.attributes.find((a) => a.key === "rsvpKey");
+        const attr = e.attributes.find((a) => a.key === "ticketKey");
         return ((attr?.value as string) ?? "").toLowerCase();
       }),
     );
@@ -172,7 +176,7 @@ export default function AttendeesPage() {
   const rejectedRsvpKeys = useMemo(() => {
     return new Set(
       (rejectionEntities ?? []).map((e) => {
-        const attr = e.attributes.find((a) => a.key === "rsvpKey");
+        const attr = e.attributes.find((a) => a.key === "ticketKey");
         return ((attr?.value as string) ?? "").toLowerCase();
       }),
     );
@@ -185,6 +189,9 @@ export default function AttendeesPage() {
     }) => {
       if (!walletClient || !event?.endDate) {
         throw new Error("Missing walletClient or event data");
+      }
+      if (!vars.ownerAddress) {
+        throw new Error("Missing attendee wallet on ticket.");
       }
 
       const alreadyRes = await hasAttendeeCheckedIn(publicClient, entityKey, vars.ownerAddress);
@@ -214,7 +221,6 @@ export default function AttendeesPage() {
           vars.rsvpKey,
           vars.ownerAddress,
           checkinRes.data.entityKey,
-          event?.title ?? "",
         );
       } catch {  }
     },
@@ -229,14 +235,15 @@ export default function AttendeesPage() {
   const approveMutation = useMutation({
     mutationFn: async (vars: { rsvpKey: Hex; ownerAddress: Hex }) => {
       if (!walletClient || !event?.endDate) throw new Error("Wallet or event data missing");
+      if (!vars.ownerAddress) throw new Error("Missing attendee wallet on ticket.");
 
-      const rejRes = await getRejectionForRsvp(publicClient, vars.rsvpKey);
+      const rejRes = await getRejectionForTicket(publicClient, vars.rsvpKey);
       if (rejRes.success && rejRes.data) throw new Error("Cannot approve — this RSVP was already rejected");
       const ms = toMs(event.endDate);
       const endDateSeconds = isNaN(ms)
         ? Math.floor(Date.now() / 1_000) + 86_400
         : Math.floor(ms / 1_000);
-      const res = await confirmRsvp(
+      const res = await approveTicket(
         walletClient,
         publicClient,
         vars.rsvpKey,
@@ -250,8 +257,6 @@ export default function AttendeesPage() {
       toast.success("Request approved ✓");
       refetchApprovals();
       refetchRsvps();
-
-      autoPromoteCapacityStatus(walletClient!, publicClient, entityKey).catch(() => {});
     },
     onError: (e) => toast.error(friendlyError(e instanceof Error ? e.message : "Approval failed")),
   });
@@ -259,14 +264,15 @@ export default function AttendeesPage() {
   const rejectMutation = useMutation({
     mutationFn: async (vars: { rsvpKey: Hex; ownerAddress: Hex }) => {
       if (!walletClient || !event?.endDate) throw new Error("Wallet or event data missing");
+      if (!vars.ownerAddress) throw new Error("Missing attendee wallet on ticket.");
 
-      const appRes = await getApprovalForRsvp(publicClient, vars.rsvpKey);
+      const appRes = await getApprovalForTicket(publicClient, vars.rsvpKey);
       if (appRes.success && appRes.data) throw new Error("Cannot reject — this RSVP was already approved");
       const ms = toMs(event.endDate);
       const endDateSeconds = isNaN(ms)
         ? Math.floor(Date.now() / 1_000) + 86_400
         : Math.floor(ms / 1_000);
-      const res = await rejectRsvp(
+      const res = await rejectTicket(
         walletClient,
         publicClient,
         vars.rsvpKey,
@@ -339,13 +345,15 @@ export default function AttendeesPage() {
   }
 
   const allRows: AttendeeRow[] = (rsvpEntities ?? []).map((ent) => {
-    const data = ent.toJson() as RSVP;
-    const ownerAddress = (ent.owner ?? "") as Hex;
+    const data = ent.toJson() as Ticket;
+    const ownerAddress = String(
+      ent.attributes.find((a) => a.key === "attendeeWallet")?.value ?? ent.owner ?? "",
+    ) as Hex;
     const isCheckedIn = checkedInWallets.has(ownerAddress.toLowerCase());
     const rsvpKeyLower = (ent.key as string).toLowerCase();
 
     const statusAttr = ent.attributes.find((a) => a.key === "status");
-    const rsvpAttrStatus = (statusAttr?.value as RSVPStatus) ?? "confirmed";
+    const rsvpAttrStatus = (statusAttr?.value as TicketStatus) ?? "confirmed";
 
     let status: EffectiveStatus;
     if (isCheckedIn) {

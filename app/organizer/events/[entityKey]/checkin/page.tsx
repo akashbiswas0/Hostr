@@ -23,14 +23,15 @@ import {
 import { useEvent } from "@/hooks/useEvent";
 import { useWallet } from "@/hooks/useWallet";
 import { publicClient } from "@/lib/arkiv/client";
+import { ENTITY_TYPES } from "@/lib/arkiv/constants";
 import { createCheckinEntity } from "@/lib/arkiv/entities/checkin";
 import { createPoAEntity } from "@/lib/arkiv/entities/attendance";
-import { getApprovalForRsvp } from "@/lib/arkiv/queries/rsvps";
+import { getApprovalForTicket } from "@/lib/arkiv/queries/tickets";
 import { hasAttendeeCheckedIn } from "@/lib/arkiv/queries/checkins";
 import { friendlyError } from "@/lib/arkiv/errors";
 import { OrganizerNav } from "@/components/OrganizerNav";
 import { ConnectButton } from "@/components/ConnectButton";
-import type { RSVP } from "@/lib/arkiv/types";
+import type { Ticket } from "@/lib/arkiv/types";
 
 const QrScanner = dynamic(
   () => import("@/components/QrScanner").then((m) => m.QrScanner),
@@ -98,14 +99,14 @@ export default function CheckinPage() {
         } catch {
           setState({
             kind: "error",
-            message: "RSVP entity not found. Make sure you scanned the correct QR code.",
+            message: "Ticket entity not found. Make sure you scanned the correct QR code.",
           });
           return;
         }
 
         const typeAttr = rsvpEntity.attributes.find((a) => a.key === "type");
-        if (typeAttr?.value !== "rsvp") {
-          setState({ kind: "error", message: "Invalid QR code — this is not an RSVP entity." });
+        if (typeAttr?.value !== ENTITY_TYPES.TICKET) {
+          setState({ kind: "error", message: "Invalid QR code — this is not a ticket entity." });
           return;
         }
 
@@ -125,7 +126,7 @@ export default function CheckinPage() {
 
         if (status !== "confirmed" && status !== "checked-in") {
 
-          const approvalRes = await getApprovalForRsvp(publicClient, rsvpKey);
+          const approvalRes = await getApprovalForTicket(publicClient, rsvpKey);
           const isApproved = approvalRes.success && approvalRes.data !== null;
           if (!isApproved) {
             setState({
@@ -139,7 +140,7 @@ export default function CheckinPage() {
 
         const walletAttr = rsvpEntity.attributes.find((a) => a.key === "attendeeWallet");
         const attendeeWallet = ((walletAttr?.value as string) || rsvpEntity.owner || "") as Hex;
-        const rsvpData = rsvpEntity.toJson() as RSVP;
+        const rsvpData = rsvpEntity.toJson() as Ticket;
         const attendeeName = rsvpData.attendeeName || truncate(attendeeWallet);
 
         const alreadyRes = await hasAttendeeCheckedIn(publicClient, entityKey, attendeeWallet);
@@ -172,7 +173,6 @@ export default function CheckinPage() {
             rsvpKey,
             attendeeWallet,
             res.data.entityKey,
-            event.title ?? "",
           );
         } catch {  }
 

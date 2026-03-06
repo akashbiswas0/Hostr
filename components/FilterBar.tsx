@@ -10,7 +10,6 @@ export interface FilterState {
   category: string;
   location: string;
   dateFrom: string;
-  dateFrom: string;
   dateTo: string;
   status: "upcoming" | "live" | "";
   format: "" | "in_person" | "online" | "hybrid";

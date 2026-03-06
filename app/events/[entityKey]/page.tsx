@@ -8,11 +8,16 @@ import type { Hex } from "viem";
 import { QRCodeSVG } from "qrcode.react";
 import { SearchX, Flag, Clock, CheckCircle2, XCircle, ArrowRight, Calendar, MapPin, Users, ExternalLink, Check } from "lucide-react";
 import { useEvent } from "@/hooks/useEvent";
-import { useRsvp } from "@/hooks/useRsvp";
+import { useTicket } from "@/hooks/useTicket";
 import { useWallet } from "@/hooks/useWallet";
 import { useEventImage } from "@/hooks/useEventImage";
 import { publicClient } from "@/lib/arkiv/client";
-import { getRsvpsByEvent, getApprovalForRsvp, getRejectionForRsvp, getApprovalsByEvent } from "@/lib/arkiv/queries/rsvps";
+import {
+  getTicketsByEvent,
+  getApprovalForTicket,
+  getRejectionForTicket,
+  getDecisionsByEvent,
+} from "@/lib/arkiv/queries/tickets";
 import { getCheckinsByEvent } from "@/lib/arkiv/queries/checkins";
 import { getOrganizerByWallet } from "@/lib/arkiv/queries/profiles";
 import { ConnectButton } from "@/components/ConnectButton";
@@ -21,7 +26,7 @@ import { RsvpModal } from "@/components/RsvpModal";
 import { Navbar } from "@/components/Navbar";
 import { ChainLink } from "@/components/ChainLink";
 import { CATEGORY_STYLE, DEFAULT_CATEGORY_STYLE } from "@/lib/arkiv/categories";
-import type { RSVP, OrganizerProfile } from "@/lib/arkiv/types";
+import type { OrganizerProfile, Ticket } from "@/lib/arkiv/types";
 import type { Entity } from "@arkiv-network/sdk";
 
 const EXPLORER = "https://explorer.kaolin.hoodi.arkiv.network";
@@ -59,15 +64,15 @@ export default function EventDetailPage() {
   const entityKey = params.entityKey as Hex;
 
   const { event, entity, isLoading, error, refetch: refetchEvent } = useEvent(entityKey);
-  const { hasRsvp, rsvp: myRsvp, entity: rsvpEntity, isLoading: rsvpLoading, refetch: refetchRsvp } =
-    useRsvp(entityKey);
+  const { hasTicket: hasRsvp, ticket: myRsvp, entity: rsvpEntity, isLoading: rsvpLoading, refetch: refetchRsvp } =
+    useTicket(entityKey);
   const { isConnected, isCorrectChain } = useWallet();
 
   
   const attendeeQuery = useQuery({
     queryKey: ["attendees", entityKey],
     queryFn: async () => {
-      const res = await getRsvpsByEvent(publicClient, entityKey);
+      const res = await getTicketsByEvent(publicClient, entityKey);
       if (!res.success) throw new Error(res.error);
       return res.data;
     },
@@ -88,7 +93,7 @@ export default function EventDetailPage() {
   const approvalsQuery = useQuery({
     queryKey: ["rsvp-approvals-public", entityKey],
     queryFn: async () => {
-      const res = await getApprovalsByEvent(publicClient, entityKey);
+      const res = await getDecisionsByEvent(publicClient, entityKey, "approved");
       return res.success ? res.data : [];
     },
     enabled: !!entityKey,
@@ -107,7 +112,7 @@ export default function EventDetailPage() {
   const approvedRsvpKeys = useMemo(() => {
     return new Set(
       (approvalsQuery.data ?? []).map((e) => {
-        const attr = e.attributes.find((a) => a.key === "rsvpKey");
+        const attr = e.attributes.find((a) => a.key === "ticketKey");
         return ((attr?.value as string) ?? "").toLowerCase();
       }),
     );
@@ -163,7 +168,7 @@ export default function EventDetailPage() {
   const { data: myApprovalEntity } = useQuery({
     queryKey: ["rsvp-approval", rsvpEntity?.key],
     queryFn: async () => {
-      const res = await getApprovalForRsvp(publicClient, rsvpEntity!.key as Hex);
+      const res = await getApprovalForTicket(publicClient, rsvpEntity!.key as Hex);
       return res.success ? res.data : null;
     },
     enabled: myRsvpStatus === "pending" && !!rsvpEntity,
@@ -173,7 +178,7 @@ export default function EventDetailPage() {
   const { data: myRejectionEntity } = useQuery({
     queryKey: ["rsvp-rejection", rsvpEntity?.key],
     queryFn: async () => {
-      const res = await getRejectionForRsvp(publicClient, rsvpEntity!.key as Hex);
+      const res = await getRejectionForTicket(publicClient, rsvpEntity!.key as Hex);
       return res.success ? res.data : null;
     },
     enabled: myRsvpStatus === "pending" && !!rsvpEntity,
@@ -516,7 +521,7 @@ interface RsvpCardProps {
   isCorrectChain: boolean;
   hasRsvp: boolean;
   rsvpLoading: boolean;
-  myRsvp: RSVP | null;
+  myRsvp: Ticket | null;
   myRsvpStatus: string | null;
   rsvpEntity: Entity | null;
   onOpen: () => void;
@@ -674,7 +679,7 @@ function AttendeeList({
   return (
     <div className="rounded-2xl border border-white/10 bg-white/[0.04] backdrop-blur-sm divide-y divide-white/5 overflow-hidden">
       {entities.map((entity) => {
-        const rsvp = entity.toJson() as RSVP;
+        const rsvp = entity.toJson() as Ticket;
         return (
           <div
             key={entity.key}

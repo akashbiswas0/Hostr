@@ -9,13 +9,13 @@ import { X, Lock, AlertTriangle, Clock, CheckCircle2, XCircle, ExternalLink, Lin
 
 import { useWallet } from "@/hooks/useWallet";
 import { publicClient } from "@/lib/arkiv/client";
-import { createRsvpEntity } from "@/lib/arkiv/entities/rsvp"
+import { createTicketEntity } from "@/lib/arkiv/entities/ticket"
 import { upsertUserProfileEntity } from "@/lib/arkiv/entities/user";
-import { getRsvpByAttendee, getRsvpsByEvent } from "@/lib/arkiv/queries/rsvps"
+import { getTicketByAttendee, getTicketsByEvent } from "@/lib/arkiv/queries/tickets"
 import { getUserProfileByWallet } from "@/lib/arkiv/queries/profiles";
 import { ConnectButton } from "@/components/ConnectButton";
 import { friendlyError } from "@/lib/arkiv/errors";
-import type { Event, RSVP, UserProfileV2 } from "@/lib/arkiv/types";
+import type { Event, Ticket, UserProfile } from "@/lib/arkiv/types";
 
 export interface RsvpModalProps {
 
@@ -106,7 +106,7 @@ export function RsvpModal({
 
     try {
 
-      const existingRsvp = await getRsvpByAttendee(
+      const existingRsvp = await getTicketByAttendee(
         publicClient,
         entity.key as Hex,
         address as Hex,
@@ -128,7 +128,7 @@ export function RsvpModal({
         ? Math.floor(Date.now() / 1_000) + 86_400
         : Math.floor(endMs / 1_000);
 
-      const rsvpData: RSVP = {
+      const rsvpData: Ticket = {
         eventKey: entity.key as Hex,
         attendeeName: name.trim(),
         attendeeEmail: email.trim(),
@@ -140,7 +140,7 @@ export function RsvpModal({
       // Ensure attendee profile exists and snapshot display/avatar into RSVP.
       const userProfileRes = await getUserProfileByWallet(publicClient, address as Hex);
       const existingUserProfile = userProfileRes.success && userProfileRes.data
-        ? (userProfileRes.data.toJson() as UserProfileV2)
+        ? (userProfileRes.data.toJson() as UserProfile)
         : null;
 
       if (existingUserProfile?.displayName || existingUserProfile?.avatarImageUrl) {
@@ -165,7 +165,7 @@ export function RsvpModal({
 
       // Re-derive capacity state from a fresh live count instead of the stale
       // `isFull` prop (which could be wrong if another user RSVPed concurrently).
-      const freshRsvpRes = await getRsvpsByEvent(publicClient, entity.key as Hex);
+      const freshRsvpRes = await getTicketsByEvent(publicClient, entity.key as Hex);
       const activeRsvpCount = freshRsvpRes.success
         ? freshRsvpRes.data.filter((e) => {
             const s = e.attributes.find((a) => a.key === "status")?.value;
@@ -176,7 +176,7 @@ export function RsvpModal({
 
       const status = isActuallyFull ? "waitlisted" : "pending";
 
-      const createRes = await createRsvpEntity(
+      const createRes = await createTicketEntity(
         walletClient,
         publicClient,
         rsvpData,

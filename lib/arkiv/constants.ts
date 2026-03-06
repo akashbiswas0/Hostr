@@ -1,14 +1,16 @@
 export const SCHEMA_VERSION = 2 as const;
 
 export const ENTITY_TYPES = {
-  ORGANIZER_PROFILE: "organizer_profile_v2",
-  USER_PROFILE: "user_profile_v2",
-  EVENT: "event_v2",
-  RSVP: "rsvp_v2",
-  RSVP_DECISION: "rsvp_decision_v2",
-  CHECKIN: "checkin_v2",
-  PROOF_OF_ATTENDANCE: "poa_v2",
-  EVENT_SEARCH_TOKEN: "event_search_token_v2",
+  ORGANIZER_PROFILE: "organizer_profile",
+  USER_PROFILE: "user_profile",
+  HOSTEVENT: "hostevent",
+  TICKET: "ticket",
+  TICKET_DECISION: "ticket_decision",
+  CHECKIN: "checkin",
+  PROOF_OF_ATTENDANCE: "poa",
+  EVENT_SEARCH_TOKEN: "event_search_token",
+  EVENT_CAPACITY_FLAG: "event_capacity_flag",
+  EVENT_TRENDING_FLAG: "event_trending_flag",
 } as const;
 
 export type EntityType = (typeof ENTITY_TYPES)[keyof typeof ENTITY_TYPES];

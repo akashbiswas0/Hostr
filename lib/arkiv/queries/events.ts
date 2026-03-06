@@ -6,14 +6,14 @@ import { ENTITY_TYPES } from "../constants";
 import type {
   ArkivResult,
   Event,
-  EventDiscoveryFiltersV2,
-  EventGraphV2,
-  EventSortV2,
   EventStatus,
+  HostEventDiscoveryFilters,
+  HostEventGraph,
+  HostEventSort,
 } from "../types";
 import { normalizeText, tokenizeSearch, unixNow } from "../v2";
 
-export interface EventFilters {
+export interface HostEventFilters {
   category?: string;
   location?: string;
   dateFrom?: number;
@@ -27,7 +27,7 @@ export interface EventFilters {
   format?: "in_person" | "online" | "hybrid";
 }
 
-function mergeFilters(filters?: EventFilters): EventDiscoveryFiltersV2 {
+function mergeFilters(filters?: HostEventFilters): HostEventDiscoveryFilters {
   return {
     category: filters?.category ? [filters.category] : undefined,
     city: filters?.location,
@@ -47,20 +47,25 @@ function mergeFilters(filters?: EventFilters): EventDiscoveryFiltersV2 {
   };
 }
 
-function predicatesForFilters(filters?: EventDiscoveryFiltersV2) {
-  const predicates: Predicate[] = [eq("type", ENTITY_TYPES.EVENT)];
+function predicatesForFilters(filters?: HostEventDiscoveryFilters): Predicate[] {
+  const predicates: Predicate[] = [eq("type", ENTITY_TYPES.HOSTEVENT)];
 
   if (filters?.status?.length) {
-    if (filters.status.length === 1) predicates.push(eq("status", filters.status[0]));
-    else predicates.push(or(filters.status.map((status) => eq("status", status))));
+    predicates.push(
+      filters.status.length === 1
+        ? eq("status", filters.status[0])
+        : or(filters.status.map((status) => eq("status", status))),
+    );
+  } else {
+    predicates.push(or([eq("status", "upcoming"), eq("status", "live"), eq("status", "ended")]));
   }
 
   if (filters?.category?.length) {
-    if (filters.category.length === 1) {
-      predicates.push(eq("category", filters.category[0]));
-    } else {
-      predicates.push(or(filters.category.map((category) => eq("category", category))));
-    }
+    predicates.push(
+      filters.category.length === 1
+        ? eq("category", filters.category[0])
+        : or(filters.category.map((category) => eq("category", category))),
+    );
   }
 
   if (filters?.city) predicates.push(eq("cityNorm", normalizeText(filters.city)));
@@ -73,13 +78,14 @@ function predicatesForFilters(filters?: EventDiscoveryFiltersV2) {
   if (filters?.hasImage !== undefined) predicates.push(eq("hasImage", filters.hasImage));
   if (filters?.startFrom) predicates.push(gte("startAt", filters.startFrom));
   if (filters?.startTo) predicates.push(lte("startAt", filters.startTo));
+  if (filters?.hasSeatsOnly) predicates.push(gte("seatsRemaining", 1));
 
   return predicates;
 }
 
 function sortQuery(
   query: ReturnType<PublicArkivClient["buildQuery"]>,
-  sort: EventSortV2,
+  sort: HostEventSort,
 ) {
   if (sort === "startAtDesc") return query.orderBy("startAt", "number", "desc");
   if (sort === "newest") return query.orderBy("createdAt", "number", "desc");
@@ -102,10 +108,10 @@ export async function getEventByKey(
   }
 }
 
-export async function discoverEventsV2(
+export async function discoverHostEvents(
   publicClient: PublicArkivClient,
-  filters?: EventDiscoveryFiltersV2,
-  sort: EventSortV2 = "startAtAsc",
+  filters?: HostEventDiscoveryFilters,
+  sort: HostEventSort = "startAtAsc",
   cursor?: string,
   limit = 50,
 ): Promise<ArkivResult<{ entities: Entity[]; cursor?: string }>> {
@@ -119,21 +125,14 @@ export async function discoverEventsV2(
 
     query = sortQuery(query, sort);
     if (cursor) query = query.cursor(cursor);
-
     const result = await query.fetch();
-
-    const entities = filters?.hasSeatsOnly
-      ? result.entities.filter((entity) => {
-          const seats = Number(
-            entity.attributes.find((a) => a.key === "seatsRemaining")?.value ?? 0,
-          );
-          return seats > 0;
-        })
-      : result.entities;
 
     return {
       success: true,
-      data: { entities, cursor: result.cursor },
+      data: {
+        entities: result.entities,
+        cursor: result.cursor,
+      },
     };
   } catch (error) {
     return {
@@ -143,16 +142,23 @@ export async function discoverEventsV2(
   }
 }
 
-export async function searchEventsByKeywordV2(
+const TOKEN_WEIGHTS: Record<string, number> = {
+  title: 5,
+  venue: 3,
+  tags: 2,
+  description: 1,
+};
+
+export async function searchHostEventsByKeyword(
   publicClient: PublicArkivClient,
   tokens: string[],
-  filters?: EventDiscoveryFiltersV2,
-  sort: EventSortV2 = "startAtAsc",
+  filters?: HostEventDiscoveryFilters,
+  sort: HostEventSort = "startAtAsc",
 ): Promise<ArkivResult<Entity[]>> {
   try {
     const cleaned = Array.from(new Set(tokens.map(normalizeText).filter(Boolean)));
     if (cleaned.length === 0) {
-      const discover = await discoverEventsV2(publicClient, filters, sort);
+      const discover = await discoverHostEvents(publicClient, filters, sort);
       if (!discover.success) return { success: false, error: discover.error };
       return { success: true, data: discover.data.entities };
     }
@@ -161,46 +167,45 @@ export async function searchEventsByKeywordV2(
       cleaned.map((token) =>
         publicClient
           .buildQuery()
-          .where([
-            eq("type", ENTITY_TYPES.EVENT_SEARCH_TOKEN),
-            eq("token", token),
-          ])
+          .where([eq("type", ENTITY_TYPES.EVENT_SEARCH_TOKEN), eq("token", token)])
           .withAttributes()
           .fetch(),
       ),
     );
 
-    const score = new Map<string, number>();
+    const scored = new Map<string, number>();
     for (const query of tokenQueries) {
       for (const tokenEntity of query.entities) {
         const eventKey = String(
           tokenEntity.attributes.find((a) => a.key === "eventKey")?.value ?? "",
         );
         if (!eventKey) continue;
-        score.set(eventKey, (score.get(eventKey) ?? 0) + 1);
+        const field = String(
+          tokenEntity.attributes.find((a) => a.key === "field")?.value ?? "tags",
+        );
+        const weight = TOKEN_WEIGHTS[field] ?? 1;
+        scored.set(eventKey, (scored.get(eventKey) ?? 0) + weight);
       }
     }
 
-    const rankedKeys = Array.from(score.entries())
+    const rankedKeys = Array.from(scored.entries())
       .sort((a, b) => b[1] - a[1])
-      .map(([key]) => key as Hex);
+      .map(([key]) => key.toLowerCase());
 
     if (rankedKeys.length === 0) return { success: true, data: [] };
 
-    const discover = await discoverEventsV2(publicClient, filters, sort, undefined, 200);
+    const discover = await discoverHostEvents(publicClient, filters, sort, undefined, 300);
     if (!discover.success) return { success: false, error: discover.error };
 
     const discoverMap = new Map(
       discover.data.entities.map((entity) => [String(entity.key).toLowerCase(), entity]),
     );
-
-    const hydrated: Entity[] = [];
-    for (const key of rankedKeys) {
-      const match = discoverMap.get(String(key).toLowerCase());
-      if (match) hydrated.push(match);
-    }
-
-    return { success: true, data: hydrated };
+    return {
+      success: true,
+      data: rankedKeys
+        .map((key) => discoverMap.get(key))
+        .filter((entity): entity is Entity => Boolean(entity)),
+    };
   } catch (error) {
     return {
       success: false,
@@ -209,121 +214,28 @@ export async function searchEventsByKeywordV2(
   }
 }
 
-export async function getEventsMultiFilter(
-  publicClient: PublicArkivClient,
-  filters?: EventFilters,
-): Promise<ArkivResult<Entity[]>> {
-  if (filters?.keyword?.trim()) {
-    return searchEventsByKeywordV2(
-      publicClient,
-      tokenizeSearch(filters.keyword),
-      mergeFilters(filters),
-      "startAtAsc",
-    );
-  }
-
-  const result = await discoverEventsV2(
-    publicClient,
-    mergeFilters(filters),
-    "startAtAsc",
-  );
-
-  if (!result.success) return { success: false, error: result.error };
-  return { success: true, data: result.data.entities };
-}
-
-export async function getAllUpcomingEvents(
-  publicClient: PublicArkivClient,
-  filters?: EventFilters,
-): Promise<ArkivResult<Entity[]>> {
-  const nextFilters = mergeFilters(filters);
-
-  if (!filters?.status) {
-    nextFilters.status = ["upcoming", "live"];
-  }
-
-  if (filters?.keyword?.trim()) {
-    return searchEventsByKeywordV2(
-      publicClient,
-      tokenizeSearch(filters.keyword),
-      nextFilters,
-      "startAtAsc",
-    );
-  }
-
-  const result = await discoverEventsV2(publicClient, nextFilters, "startAtAsc");
-  if (!result.success) return { success: false, error: result.error };
-  return { success: true, data: result.data.entities };
-}
-
-export async function getEventsByCategoryAndStatus(
-  publicClient: PublicArkivClient,
-  category: string,
-  status: EventStatus,
-): Promise<ArkivResult<Entity[]>> {
-  return getEventsMultiFilter(publicClient, { category, status });
-}
-
-export async function getOnlineEvents(
-  publicClient: PublicArkivClient,
-): Promise<ArkivResult<Entity[]>> {
-  return getEventsMultiFilter(publicClient, { isOnline: 1 });
-}
-
-export async function getEventsByOrganizer(
-  publicClient: PublicArkivClient,
-  walletAddress: Hex,
-): Promise<ArkivResult<Entity[]>> {
-  try {
-    const result = await publicClient
-      .buildQuery()
-      .where([eq("type", ENTITY_TYPES.EVENT)])
-      .ownedBy(walletAddress)
-      .withPayload()
-      .withAttributes()
-      .orderBy("startAt", "number", "asc")
-      .fetch();
-
-    return { success: true, data: result.entities };
-  } catch (error) {
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : String(error),
-    };
-  }
-}
-
-export async function getEventGraphV2(
+export async function getHostEventGraph(
   publicClient: PublicArkivClient,
   eventKey: Hex,
-): Promise<ArkivResult<EventGraphV2>> {
+): Promise<ArkivResult<HostEventGraph>> {
   try {
-    const [event, rsvps, decisions, checkins, poaps] = await Promise.all([
+    const [event, tickets, decisions, checkins, poaps] = await Promise.all([
       publicClient.getEntity(eventKey),
       publicClient
         .buildQuery()
-        .where([
-          eq("type", ENTITY_TYPES.RSVP),
-          eq("eventKey", eventKey),
-        ])
+        .where([eq("type", ENTITY_TYPES.TICKET), eq("eventKey", eventKey)])
         .withPayload()
         .withAttributes()
         .fetch(),
       publicClient
         .buildQuery()
-        .where([
-          eq("type", ENTITY_TYPES.RSVP_DECISION),
-          eq("eventKey", eventKey),
-        ])
+        .where([eq("type", ENTITY_TYPES.TICKET_DECISION), eq("eventKey", eventKey)])
         .withPayload()
         .withAttributes()
         .fetch(),
       publicClient
         .buildQuery()
-        .where([
-          eq("type", ENTITY_TYPES.CHECKIN),
-          eq("eventKey", eventKey),
-        ])
+        .where([eq("type", ENTITY_TYPES.CHECKIN), eq("eventKey", eventKey)])
         .withPayload()
         .withAttributes()
         .fetch(),
@@ -342,7 +254,7 @@ export async function getEventGraphV2(
       success: true,
       data: {
         event,
-        rsvps: rsvps.entities,
+        tickets: tickets.entities,
         decisions: decisions.entities,
         checkins: checkins.entities,
         poaps: poaps.entities,
@@ -356,27 +268,19 @@ export async function getEventGraphV2(
   }
 }
 
-export async function getOrganizerPipelineV2(
+export async function getHostEventsByOrganizer(
   publicClient: PublicArkivClient,
-  organizerWallet: Hex,
-  filters?: { status?: EventStatus[]; startFrom?: number; startTo?: number },
+  walletAddress: Hex,
+  includeArchived = true,
 ): Promise<ArkivResult<Entity[]>> {
   try {
-    const basePredicates: Predicate[] = [eq("type", ENTITY_TYPES.EVENT)];
-    if (filters?.status?.length) {
-      basePredicates.push(
-        filters.status.length === 1
-          ? eq("status", filters.status[0])
-          : or(filters.status.map((status) => eq("status", status))),
-      );
-    }
-    if (filters?.startFrom) basePredicates.push(gte("startAt", filters.startFrom));
-    if (filters?.startTo) basePredicates.push(lte("startAt", filters.startTo));
+    const predicates: Predicate[] = [eq("type", ENTITY_TYPES.HOSTEVENT)];
+    if (!includeArchived) predicates.push(or([eq("status", "draft"), eq("status", "upcoming"), eq("status", "live"), eq("status", "ended")]));
 
     const result = await publicClient
       .buildQuery()
-      .where(and(basePredicates))
-      .ownedBy(organizerWallet)
+      .where(and(predicates))
+      .ownedBy(walletAddress)
       .withPayload()
       .withAttributes()
       .orderBy("startAt", "number", "asc")
@@ -391,20 +295,41 @@ export async function getOrganizerPipelineV2(
   }
 }
 
-export async function getMyUpcomingScheduleV2(
+export async function getAllUpcomingEvents(
+  publicClient: PublicArkivClient,
+  filters?: HostEventFilters,
+): Promise<ArkivResult<Entity[]>> {
+  const merged = mergeFilters(filters);
+  if (!filters?.status) merged.status = ["upcoming", "live"];
+
+  if (filters?.keyword?.trim()) {
+    return searchHostEventsByKeyword(
+      publicClient,
+      tokenizeSearch(filters.keyword),
+      merged,
+      "startAtAsc",
+    );
+  }
+
+  const result = await discoverHostEvents(publicClient, merged, "startAtAsc");
+  if (!result.success) return { success: false, error: result.error };
+  return { success: true, data: result.data.entities };
+}
+
+export async function getHostEventScheduleForAttendee(
   publicClient: PublicArkivClient,
   attendeeWallet: Hex,
   range?: { startFrom?: number; startTo?: number },
 ): Promise<ArkivResult<Entity[]>> {
   try {
-    const rsvps = await publicClient
+    const ticketResult = await publicClient
       .buildQuery()
-      .where([eq("type", ENTITY_TYPES.RSVP)])
+      .where([eq("type", ENTITY_TYPES.TICKET)])
       .ownedBy(attendeeWallet)
       .withAttributes()
       .fetch();
 
-    const active = rsvps.entities.filter((entity) => {
+    const active = ticketResult.entities.filter((entity) => {
       const status = String(
         entity.attributes.find((a) => a.key === "status")?.value ?? "pending",
       );
@@ -419,17 +344,13 @@ export async function getMyUpcomingScheduleV2(
       ),
     ) as Hex[];
 
-    const events = await Promise.all(
-      eventKeys.map((eventKey) => publicClient.getEntity(eventKey)),
-    );
-
+    const events = await Promise.all(eventKeys.map((eventKey) => publicClient.getEntity(eventKey)));
     const now = unixNow();
+
     const filtered = events.filter((entity) => {
-      const startAt = Number(
-        entity.attributes.find((a) => a.key === "startAt")?.value ??
-          entity.attributes.find((a) => a.key === "date")?.value ??
-          0,
-      );
+      const status = String(entity.attributes.find((a) => a.key === "status")?.value ?? "");
+      if (status === "archived") return false;
+      const startAt = Number(entity.attributes.find((a) => a.key === "startAt")?.value ?? 0);
       if (startAt < now) return false;
       if (range?.startFrom && startAt < range.startFrom) return false;
       if (range?.startTo && startAt > range.startTo) return false;
@@ -437,9 +358,9 @@ export async function getMyUpcomingScheduleV2(
     });
 
     filtered.sort((a, b) => {
-      const av = Number(a.attributes.find((attr) => attr.key === "startAt")?.value ?? 0);
-      const bv = Number(b.attributes.find((attr) => attr.key === "startAt")?.value ?? 0);
-      return av - bv;
+      const aValue = Number(a.attributes.find((attr) => attr.key === "startAt")?.value ?? 0);
+      const bValue = Number(b.attributes.find((attr) => attr.key === "startAt")?.value ?? 0);
+      return aValue - bValue;
     });
 
     return { success: true, data: filtered };
@@ -451,13 +372,13 @@ export async function getMyUpcomingScheduleV2(
   }
 }
 
-export async function countEventsByFacetV2(
+export async function countHostEventsByFacet(
   publicClient: PublicArkivClient,
-  baseFilters: EventDiscoveryFiltersV2,
+  filters: HostEventDiscoveryFilters,
   facet: "category" | "cityNorm" | "priceTier" | "format",
 ): Promise<ArkivResult<Array<{ value: string; count: number }>>> {
   try {
-    const result = await discoverEventsV2(publicClient, baseFilters, "startAtAsc", undefined, 500);
+    const result = await discoverHostEvents(publicClient, filters, "startAtAsc", undefined, 500);
     if (!result.success) return { success: false, error: result.error };
 
     const counts = new Map<string, number>();
@@ -466,7 +387,6 @@ export async function countEventsByFacetV2(
       if (!value) continue;
       counts.set(value, (counts.get(value) ?? 0) + 1);
     }
-
     return {
       success: true,
       data: Array.from(counts.entries()).map(([value, count]) => ({ value, count })),

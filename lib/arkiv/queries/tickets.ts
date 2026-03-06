@@ -2,19 +2,16 @@ import { eq } from "@arkiv-network/sdk/query";
 import type { Entity, PublicArkivClient } from "@arkiv-network/sdk";
 import type { Hex } from "viem";
 import { ENTITY_TYPES } from "../constants";
-import type { ArkivResult, RSVPStatus, RsvpDecision } from "../types";
+import type { ArkivResult, TicketDecision, TicketStatus } from "../types";
 
-export async function getRsvpsByEvent(
+export async function getTicketsByEvent(
   publicClient: PublicArkivClient,
   eventKey: Hex,
 ): Promise<ArkivResult<Entity[]>> {
   try {
     const result = await publicClient
       .buildQuery()
-      .where([
-        eq("type", ENTITY_TYPES.RSVP),
-        eq("eventKey", eventKey),
-      ])
+      .where([eq("type", ENTITY_TYPES.TICKET), eq("eventKey", eventKey)])
       .withPayload()
       .withAttributes()
       .orderBy("requestedAt", "number", "asc")
@@ -29,16 +26,16 @@ export async function getRsvpsByEvent(
   }
 }
 
-export async function getRsvpsByEventAndStatus(
+export async function getTicketsByEventAndStatus(
   publicClient: PublicArkivClient,
   eventKey: Hex,
-  status: RSVPStatus,
+  status: TicketStatus,
 ): Promise<ArkivResult<Entity[]>> {
   try {
     const result = await publicClient
       .buildQuery()
       .where([
-        eq("type", ENTITY_TYPES.RSVP),
+        eq("type", ENTITY_TYPES.TICKET),
         eq("eventKey", eventKey),
         eq("status", status),
       ])
@@ -46,7 +43,6 @@ export async function getRsvpsByEventAndStatus(
       .withAttributes()
       .orderBy("requestedAt", "number", "asc")
       .fetch();
-
     return { success: true, data: result.entities };
   } catch (error) {
     return {
@@ -56,21 +52,7 @@ export async function getRsvpsByEventAndStatus(
   }
 }
 
-export async function getConfirmedRsvpsByEvent(
-  publicClient: PublicArkivClient,
-  eventKey: Hex,
-): Promise<ArkivResult<Entity[]>> {
-  return getRsvpsByEventAndStatus(publicClient, eventKey, "confirmed");
-}
-
-export async function getPendingRsvpsByEvent(
-  publicClient: PublicArkivClient,
-  eventKey: Hex,
-): Promise<ArkivResult<Entity[]>> {
-  return getRsvpsByEventAndStatus(publicClient, eventKey, "pending");
-}
-
-export async function getRsvpByAttendee(
+export async function getTicketByAttendee(
   publicClient: PublicArkivClient,
   eventKey: Hex,
   attendeeWallet: Hex,
@@ -78,10 +60,7 @@ export async function getRsvpByAttendee(
   try {
     const result = await publicClient
       .buildQuery()
-      .where([
-        eq("type", ENTITY_TYPES.RSVP),
-        eq("eventKey", eventKey),
-      ])
+      .where([eq("type", ENTITY_TYPES.TICKET), eq("eventKey", eventKey)])
       .ownedBy(attendeeWallet)
       .withPayload()
       .withAttributes()
@@ -99,18 +78,16 @@ export async function getRsvpByAttendee(
 export async function getDecisionsByEvent(
   publicClient: PublicArkivClient,
   eventKey: Hex,
-  decision?: RsvpDecision,
+  decision?: TicketDecision,
 ): Promise<ArkivResult<Entity[]>> {
   try {
-    const predicates = [
-      eq("type", ENTITY_TYPES.RSVP_DECISION),
-      eq("eventKey", eventKey),
-      ...(decision ? [eq("decision", decision)] : []),
-    ];
-
     const result = await publicClient
       .buildQuery()
-      .where(predicates)
+      .where([
+        eq("type", ENTITY_TYPES.TICKET_DECISION),
+        eq("eventKey", eventKey),
+        ...(decision ? [eq("decision", decision)] : []),
+      ])
       .withAttributes()
       .orderBy("decidedAt", "number", "asc")
       .fetch();
@@ -124,21 +101,19 @@ export async function getDecisionsByEvent(
   }
 }
 
-export async function getDecisionForRsvp(
+export async function getDecisionForTicket(
   publicClient: PublicArkivClient,
-  rsvpKey: Hex,
-  decision?: RsvpDecision,
+  ticketKey: Hex,
+  decision?: TicketDecision,
 ): Promise<ArkivResult<Entity | null>> {
   try {
-    const predicates = [
-      eq("type", ENTITY_TYPES.RSVP_DECISION),
-      eq("rsvpKey", rsvpKey),
-      ...(decision ? [eq("decision", decision)] : []),
-    ];
-
     const result = await publicClient
       .buildQuery()
-      .where(predicates)
+      .where([
+        eq("type", ENTITY_TYPES.TICKET_DECISION),
+        eq("ticketKey", ticketKey),
+        ...(decision ? [eq("decision", decision)] : []),
+      ])
       .withAttributes()
       .orderBy("decidedAt", "number", "desc")
       .fetch();
@@ -152,31 +127,16 @@ export async function getDecisionForRsvp(
   }
 }
 
-// Compatibility wrappers used by current UI.
-export async function getApprovalsByEvent(
+export async function getApprovalForTicket(
   publicClient: PublicArkivClient,
-  eventKey: Hex,
-): Promise<ArkivResult<Entity[]>> {
-  return getDecisionsByEvent(publicClient, eventKey, "approved");
-}
-
-export async function getRejectionsByEvent(
-  publicClient: PublicArkivClient,
-  eventKey: Hex,
-): Promise<ArkivResult<Entity[]>> {
-  return getDecisionsByEvent(publicClient, eventKey, "rejected");
-}
-
-export async function getApprovalForRsvp(
-  publicClient: PublicArkivClient,
-  rsvpKey: Hex,
+  ticketKey: Hex,
 ): Promise<ArkivResult<Entity | null>> {
-  return getDecisionForRsvp(publicClient, rsvpKey, "approved");
+  return getDecisionForTicket(publicClient, ticketKey, "approved");
 }
 
-export async function getRejectionForRsvp(
+export async function getRejectionForTicket(
   publicClient: PublicArkivClient,
-  rsvpKey: Hex,
+  ticketKey: Hex,
 ): Promise<ArkivResult<Entity | null>> {
-  return getDecisionForRsvp(publicClient, rsvpKey, "rejected");
+  return getDecisionForTicket(publicClient, ticketKey, "rejected");
 }

@@ -10,7 +10,7 @@ import { getAddress } from "viem";
 import { SearchX, Globe, Pencil, ArrowLeft, ArrowRight, Check } from "lucide-react";
 import { publicClient } from "@/lib/arkiv/client";
 import { getOrganizerByWallet } from "@/lib/arkiv/queries/profiles";
-import { getEventsByOrganizer } from "@/lib/arkiv/queries/events";
+import { getHostEventsByOrganizer } from "@/lib/arkiv/queries/events";
 import { useWallet } from "@/hooks/useWallet";
 import { EventCard, EventCardSkeleton } from "@/components/EventCard";
 import type { OrganizerProfile, Event } from "@/lib/arkiv/types";
@@ -97,7 +97,7 @@ export default function OrganizerProfilePage() {
     isLoading: isEventsLoading,
   } = useQuery({
     queryKey: ["organizer-events-public", wallet],
-    queryFn: () => getEventsByOrganizer(publicClient, wallet),
+    queryFn: () => getHostEventsByOrganizer(publicClient, wallet),
     enabled: !!wallet,
   });
 

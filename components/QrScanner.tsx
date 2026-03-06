@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import type { Html5Qrcode } from "html5-qrcode";
 
 interface QrScannerProps {
   onScan: (result: string) => void;
@@ -19,7 +20,7 @@ export function QrScanner({ onScan, onError }: QrScannerProps) {
   useEffect(() => {
     let unmounted = false;
 
-    let scanner: any = null;
+    let scanner: Html5Qrcode | null = null;
 
     let isRunning = false;
 
@@ -56,7 +57,7 @@ export function QrScanner({ onScan, onError }: QrScannerProps) {
         .catch(() => {
 
           if (unmounted) return;
-          scanner
+          scanner!
             .start({ facingMode: "user" }, config, onSuccess, onFrameError)
             .then(() => {
               if (!unmounted) isRunning = true;
