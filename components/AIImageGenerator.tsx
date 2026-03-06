@@ -235,12 +235,12 @@ export default function AIImageGenerator({
               disabled={isUploading}
               onClick={async () => {
                 setIsUploading(true);
+                onClose();
                 try {
                   await onSelectImage(generatedDataUrl);
                 } finally {
                   setIsUploading(false);
                 }
-                onClose();
               }}
               className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-fuchsia-500 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-fuchsia-400 disabled:cursor-not-allowed disabled:opacity-70"
             >
