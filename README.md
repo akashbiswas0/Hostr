@@ -7,7 +7,7 @@ Hostr is a wallet-native event app built on Arkiv. Organizers create and run eve
 
 ### Hostr uses distinct entity types with stable `type` attributes and role-specific payloads/attributes:
 
-| Entity type | Purpose | Key queryable attributes (examples) | Field type usage |
+| Entity type | Purpose | Key queryable attributes | Field type usage |
 |---|---|---|---|
 | `organizer_profile` | Organizer identity | `wallet`, `displayNameNorm`, `countryCode`, `hasAvatar` | text + numeric flags |
 | `user_profile` | Attendee identity | `wallet`, `displayNameNorm`, `countryCode`, `hasAvatar` | text + numeric flags |
