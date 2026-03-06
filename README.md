@@ -59,20 +59,19 @@ Maintenance behavior:
 erDiagram
     ORGANIZER_WALLET ||--|| ORGANIZER_PROFILE : owns
     ORGANIZER_WALLET ||--o{ HOSTEVENT : owns
-    ATTENDEE_WALLET ||--|| USER_PROFILE : owns
     ATTENDEE_WALLET ||--o{ TICKET : owns
     ATTENDEE_WALLET ||--o{ POA : receives
 
     ORGANIZER_PROFILE ||--o{ HOSTEVENT : "organizerKey FK"
     HOSTEVENT ||--o{ TICKET : "eventKey FK"
-    HOSTEVENT ||--o{ TICKET_DECISION : "eventKey FK"
+    HOSTEVENT ||--o{ TICKET_DECISION : "eventKey FK [RSVP]"
     HOSTEVENT ||--o{ CHECKIN : "eventKey FK"
     HOSTEVENT ||--o{ POA : "eventKey FK"
     HOSTEVENT ||--o{ EVENT_SEARCH_TOKEN : "eventKey FK"
     HOSTEVENT ||--o{ EVENT_CAPACITY_FLAG : "eventKey FK"
     HOSTEVENT ||--o{ EVENT_TRENDING_FLAG : "eventKey FK"
 
-    TICKET ||--o| TICKET_DECISION : "ticketKey FK"
+    TICKET ||--o| TICKET_DECISION : "ticketKey FK [RSVP]"
     TICKET ||--o| CHECKIN : "ticketKey FK"
     CHECKIN ||--o| POA : "checkinKey FK"
 ```
