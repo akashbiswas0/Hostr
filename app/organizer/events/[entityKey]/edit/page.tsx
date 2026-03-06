@@ -11,7 +11,7 @@ import { useWallet } from "@/hooks/useWallet";
 import { publicClient } from "@/lib/arkiv/client";
 import { updateHostEventDetails } from "@/lib/arkiv/entities/event";
 import { EVENT_CATEGORIES, type Category } from "@/lib/arkiv/categories";
-import { OrganizerNav } from "@/components/OrganizerNav";
+import { Navbar } from "@/components/Navbar";
 import { ConnectButton } from "@/components/ConnectButton";
 import type { Event } from "@/lib/arkiv/types";
 
@@ -149,7 +149,7 @@ export default function EditEventPage() {
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
-      <OrganizerNav crumb="Edit Event" />
+      <Navbar active="dashboard" />
 
       <main className="mx-auto max-w-2xl px-4 py-10 sm:px-6">
         <div className="mb-8">

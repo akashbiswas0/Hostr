@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Menu, X, Hexagon } from "lucide-react";
+import { Menu, X } from "lucide-react";
 import { ConnectButton } from "./ConnectButton";
 import { NavAccountMenu } from "./NavAccountMenu";
 import { useOrganizer } from "@/hooks/useOrganizer";
@@ -25,48 +25,44 @@ export function Navbar({ active }: NavbarProps) {
   const linkCls = (name: NavbarProps["active"]) =>
     `text-sm font-semibold transition-colors ${
       active === name
-        ? "text-white"
-        : "text-zinc-300/80 hover:text-white"
+        ? "text-zinc-100/90"
+        : "text-zinc-200/55 hover:text-zinc-100/85"
     }`;
 
   return (
-    <nav className="sticky top-0 z-50 border-b border-white/15 bg-[linear-gradient(90deg,rgba(86,77,106,0.7),rgba(37,14,58,0.75),rgba(86,77,106,0.7))] backdrop-blur-xl">
-      <div className="mx-auto grid h-16 max-w-7xl grid-cols-[auto_1fr_auto] items-center gap-4 px-4 sm:px-6">
-        {}
+    <nav className="sticky top-0 z-50 border-b border-white/10 bg-[linear-gradient(90deg,rgba(86,77,106,0.44),rgba(37,14,58,0.5),rgba(86,77,106,0.44))] backdrop-blur-xl">
+      <div className="mx-auto flex h-16 max-w-7xl items-center gap-4 px-4 sm:px-6">
         <Link
           href="/"
-          className="flex items-center gap-2 text-base font-bold tracking-tight"
+          className="shrink-0 text-base font-bold tracking-tight text-white"
         >
-          <Hexagon size={18} className="text-cyan-300" strokeWidth={1.5} />
-          <span className="text-white">
-            Hostr
-          </span>
+          Hostr
         </Link>
 
-        {}
-        <div className="hidden items-center justify-center gap-8 sm:flex">
+        <div className="hidden items-center gap-8 pl-4 sm:flex md:pl-8">
           <Link href="/" className={linkCls("home")}>
             Home
           </Link>
           <Link href="/events" className={linkCls("events")}>
             Events
           </Link>
+          <Link href="/organizer/dashboard" className={linkCls("dashboard")}>
+            Dashboard
+          </Link>
           <Link
             href="/organizer/events/create"
-            className="text-sm font-semibold text-violet-300 transition-colors hover:text-violet-200"
+            className="text-sm font-semibold text-violet-200/65 transition-colors hover:text-violet-100/85"
           >
             Create Event
           </Link>
         </div>
 
-        {}
-        <div className="hidden items-center gap-3 sm:flex">
+        <div className="ml-auto hidden min-w-[216px] items-center justify-end gap-3 sm:flex">
           <NavAccountMenu />
         </div>
 
-        {}
         <button
-          className="sm:hidden rounded-lg p-2 text-zinc-300 hover:text-white transition-colors"
+          className="ml-auto rounded-lg p-2 text-zinc-300 transition-colors hover:text-white sm:hidden"
           onClick={() => setMobileOpen((v) => !v)}
           aria-label="Toggle menu"
         >
@@ -74,26 +70,32 @@ export function Navbar({ active }: NavbarProps) {
         </button>
       </div>
 
-      {}
       {mobileOpen && (
-        <div className="space-y-2 border-t border-white/10 bg-zinc-950/75 px-4 pb-4 pt-2 backdrop-blur-xl sm:hidden">
+        <div className="space-y-2 border-t border-white/10 bg-zinc-950/65 px-4 pb-4 pt-2 backdrop-blur-xl sm:hidden">
           <Link
             href="/"
-            className="block py-2 text-sm font-medium text-zinc-400 hover:text-white"
+            className="block py-2 text-sm font-medium text-zinc-400/85 hover:text-white"
             onClick={() => setMobileOpen(false)}
           >
             Home
           </Link>
           <Link
             href="/events"
-            className="block py-2 text-sm font-medium text-zinc-400 hover:text-white"
+            className="block py-2 text-sm font-medium text-zinc-400/85 hover:text-white"
             onClick={() => setMobileOpen(false)}
           >
             Events
           </Link>
           <Link
+            href="/organizer/dashboard"
+            className="block py-2 text-sm font-medium text-zinc-400/85 hover:text-white"
+            onClick={() => setMobileOpen(false)}
+          >
+            Dashboard
+          </Link>
+          <Link
             href="/organizer/events/create"
-            className="block py-2 text-sm font-medium text-violet-400 hover:text-violet-300"
+            className="block py-2 text-sm font-medium text-violet-200/85 hover:text-violet-100"
             onClick={() => setMobileOpen(false)}
           >
             Create Event
@@ -102,13 +104,6 @@ export function Navbar({ active }: NavbarProps) {
           {isConnected && isCorrectChain && address && (
             <>
               <div className="my-2 h-px bg-white/10" />
-              <Link
-                href="/organizer/dashboard"
-                className="block py-2 text-sm font-medium text-zinc-300 hover:text-white"
-                onClick={() => setMobileOpen(false)}
-              >
-                Dashboard
-              </Link>
               <Link
                 href={profileHref}
                 className="block py-2 text-sm font-medium text-zinc-300 hover:text-white"

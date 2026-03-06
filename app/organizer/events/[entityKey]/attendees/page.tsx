@@ -21,7 +21,7 @@ import {
 import { createCheckinEntity } from "@/lib/arkiv/entities/checkin";
 import { getCheckinsByEvent, hasAttendeeCheckedIn } from "@/lib/arkiv/queries/checkins";
 import { createPoAEntity } from "@/lib/arkiv/entities/attendance";
-import { OrganizerNav } from "@/components/OrganizerNav";
+import { Navbar } from "@/components/Navbar";
 import { ConnectButton } from "@/components/ConnectButton";
 import { ConfirmModal } from "@/components/ConfirmModal";
 import { friendlyError } from "@/lib/arkiv/errors";
@@ -393,7 +393,7 @@ export default function AttendeesPage() {
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
-      <OrganizerNav crumb="Manage Attendees" />
+      <Navbar active="dashboard" />
 
       <main className="mx-auto max-w-4xl px-4 py-10 sm:px-6 space-y-8">
         {}

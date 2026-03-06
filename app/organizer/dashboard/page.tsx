@@ -15,7 +15,7 @@ import {
   updateHostEventStatus,
   archiveHostEvent,
 } from "@/lib/arkiv/entities/event";
-import { OrganizerNav } from "@/components/OrganizerNav";
+import { Navbar } from "@/components/Navbar";
 import { StatusBadge } from "@/components/StatusBadge";
 import { ConnectButton } from "@/components/ConnectButton";
 import { ConfirmModal } from "@/components/ConfirmModal";
@@ -155,7 +155,7 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
-      <OrganizerNav />
+      <Navbar active="dashboard" />
 
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
         {}

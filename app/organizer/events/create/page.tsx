@@ -37,7 +37,7 @@ import { uploadEventImage } from "@/lib/imagedb";
 const LocationPicker = dynamic(() => import("@/components/LocationPicker"), { ssr: false });
 
 import { ConnectButton } from "@/components/ConnectButton";
-import { OrganizerNav } from "@/components/OrganizerNav";
+import { Navbar } from "@/components/Navbar";
 import { useOrganizer } from "@/hooks/useOrganizer";
 import { useWallet } from "@/hooks/useWallet";
 import { publicClient } from "@/lib/arkiv/client";
@@ -296,7 +296,7 @@ export default function CreateEventPage() {
       className={`min-h-screen bg-[#47174d] text-[#f3e8f4] ${displayFont.className}`}
       style={{ fontFamily: selectedFontFamily }}
     >
-      <OrganizerNav crumb="Create Event" />
+      <Navbar active="dashboard" />
 
       <main className="mx-auto max-w-[1120px] px-4 pb-52 pt-8 sm:px-6 lg:px-8">
         <div className="grid gap-7 xl:grid-cols-[320px_minmax(0,1fr)]">
@@ -308,7 +308,7 @@ export default function CreateEventPage() {
             >
               {imagePreview ? (
 
-                <img src={imagePreview} alt="Cover preview" className="h-full w-full object-cover" />
+                <img src={imagePreview} alt="Cover preview" className="h-full w-full aspect-square object-cover" />
               ) : (
                 <div className="relative flex h-full w-full items-center justify-center p-6">
                   <div

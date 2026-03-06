@@ -57,7 +57,7 @@ export interface EventCardSkeletonProps {
 export function EventCardSkeleton() {
   return (
     <div className="rounded-2xl bg-zinc-900 border border-white/5 overflow-hidden animate-pulse">
-      <div className="h-28 bg-zinc-800" />
+      <div className="aspect-square w-full bg-zinc-800" />
       <div className="p-4 space-y-3">
         <div className="h-4 w-3/4 rounded-lg bg-zinc-800" />
         <div className="h-3 w-1/2 rounded-lg bg-zinc-800" />
@@ -89,12 +89,12 @@ export function EventCard({ entity, event }: EventCardProps) {
       style={{ fontFamily: appearance.fontFamily }}
     >
       {}
-      <div className="relative h-28 overflow-hidden" style={{ background: appearance.theme.cardGradient }}>
+      <div className="relative aspect-square w-full overflow-hidden" style={{ background: appearance.theme.cardGradient }}>
         {imgUrl && !imgError && (
           <img
             src={imgUrl}
             alt={event.title}
-            className="absolute inset-0 h-full w-full object-cover opacity-80"
+            className="absolute inset-0 h-full w-full aspect-square object-cover opacity-80"
             onError={() => setImgError(true)}
           />
         )}

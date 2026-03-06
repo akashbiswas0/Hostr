@@ -1,11 +1,18 @@
 /**
  * Returns a URL that can be used directly in <img src> or CSS url().
- * The Next.js proxy at /api/imagedb/media/{id} forwards the request
- * server-side to ImageDB and returns the binary image with the correct
- * Content-Type header, so no client-side blob dance is needed.
+ * Accepts:
+ * - raw ImageDB media IDs
+ * - full http(s) URLs
+ * - ipfs:// URLs
+ * - already-proxied /api/imagedb/media/... paths
  */
-export function useEventImage(mediaId: string | undefined | null): string | null {
-  if (!mediaId || !mediaId.trim()) return null;
-  return `/api/imagedb/media/${mediaId}`;
-}
+export function useEventImage(source: string | undefined | null): string | null {
+  const raw = source?.trim();
+  if (!raw) return null;
 
+  if (raw.startsWith("/api/imagedb/media/")) return raw;
+  if (raw.startsWith("http://") || raw.startsWith("https://")) return raw;
+  if (raw.startsWith("ipfs://")) return `https://ipfs.io/ipfs/${raw.slice("ipfs://".length)}`;
+
+  return `/api/imagedb/media/${encodeURIComponent(raw)}`;
+}

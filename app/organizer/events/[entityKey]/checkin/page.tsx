@@ -29,7 +29,7 @@ import { createPoAEntity } from "@/lib/arkiv/entities/attendance";
 import { getApprovalForTicket } from "@/lib/arkiv/queries/tickets";
 import { hasAttendeeCheckedIn } from "@/lib/arkiv/queries/checkins";
 import { friendlyError } from "@/lib/arkiv/errors";
-import { OrganizerNav } from "@/components/OrganizerNav";
+import { Navbar } from "@/components/Navbar";
 import { ConnectButton } from "@/components/ConnectButton";
 import type { Ticket } from "@/lib/arkiv/types";
 
@@ -225,7 +225,7 @@ export default function CheckinPage() {
   if (isEventLoading) {
     return (
       <div className="min-h-screen bg-zinc-950">
-        <OrganizerNav crumb="Check-in" />
+        <Navbar active="dashboard" />
         <div className="flex items-center justify-center h-64">
           <Loader2 className="animate-spin text-violet-400" size={28} />
         </div>
@@ -259,7 +259,7 @@ export default function CheckinPage() {
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
-      <OrganizerNav crumb="Check-in" />
+      <Navbar active="dashboard" />
 
       <div className="mx-auto max-w-lg px-4 py-8 space-y-6">
         {}

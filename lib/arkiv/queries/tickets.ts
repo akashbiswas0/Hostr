@@ -66,7 +66,29 @@ export async function getTicketByAttendee(
       .withAttributes()
       .fetch();
 
-    return { success: true, data: result.entities[0] ?? null };
+    const toPriority = (entity: Entity): number => {
+      const status = String(entity.attributes.find((attr) => attr.key === "status")?.value ?? "pending");
+      return status === "not-going" ? 0 : 1;
+    };
+
+    const toRequestedAt = (entity: Entity): number => {
+      const raw = entity.attributes.find((attr) => attr.key === "requestedAt")?.value;
+      if (typeof raw === "number") return Number.isFinite(raw) ? raw : 0;
+      const parsed = Number(raw ?? 0);
+      return Number.isFinite(parsed) ? parsed : 0;
+    };
+
+    const sorted = [...result.entities].sort((a, b) => {
+      const byPriority = toPriority(b) - toPriority(a);
+      if (byPriority !== 0) return byPriority;
+
+      const byRequestedAt = toRequestedAt(b) - toRequestedAt(a);
+      if (byRequestedAt !== 0) return byRequestedAt;
+
+      return Number(b.createdAtBlock ?? 0) - Number(a.createdAtBlock ?? 0);
+    });
+
+    return { success: true, data: sorted[0] ?? null };
   } catch (error) {
     return {
       success: false,

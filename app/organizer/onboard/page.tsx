@@ -2,12 +2,12 @@
 
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import toast from "react-hot-toast";
-import { AlertTriangle, Lock, ArrowLeft, ArrowRight, Camera, X } from "lucide-react";
+import { AlertTriangle, Lock, ArrowRight, Camera, X } from "lucide-react";
 import { useOrganizer } from "@/hooks/useOrganizer";
 import { useWallet } from "@/hooks/useWallet";
 import { createOrganizerEntity } from "@/lib/arkiv/entities/organizer";
+import { Navbar } from "@/components/Navbar";
 import { ConnectButton } from "@/components/ConnectButton";
 import { uploadEventImage } from "@/lib/imagedb";
 import type { OrganizerProfile } from "@/lib/arkiv/types";
@@ -89,7 +89,6 @@ export default function OnboardPage() {
     return (
       <WalletGate
         isConnected={isConnected}
-        isCorrectChain={isCorrectChain}
       />
     );
   }
@@ -100,15 +99,7 @@ export default function OnboardPage() {
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
-      {}
-      <nav className="border-b border-white/10 bg-transparent backdrop-blur-xl supports-[backdrop-filter]:bg-zinc-950/20">
-        <div className="mx-auto flex max-w-2xl items-center justify-between px-4 py-3 sm:px-6">
-          <Link href="/" className="flex items-center gap-1.5 text-sm text-zinc-400 hover:text-white transition-colors">
-            <ArrowLeft size={14} /> Back
-          </Link>
-          <ConnectButton />
-        </div>
-      </nav>
+      <Navbar />
 
       <main className="mx-auto max-w-2xl px-4 py-12 sm:px-6">
         {}
@@ -161,7 +152,7 @@ export default function OnboardPage() {
                   className="relative h-20 w-20 shrink-0 overflow-hidden rounded-full border-2 border-dashed border-white/20 bg-zinc-800 transition-colors hover:border-violet-500 disabled:opacity-60"
                 >
                   {imagePreview ? (
-                    <img src={imagePreview} alt="avatar preview" className="h-full w-full object-cover" />
+                    <img src={imagePreview} alt="avatar preview" className="h-full w-full aspect-square object-cover" />
                   ) : (
                     <Camera size={22} className="absolute inset-0 m-auto text-zinc-500" />
                   )}
@@ -270,10 +261,8 @@ function Field({
 
 function WalletGate({
   isConnected,
-  isCorrectChain,
 }: {
   isConnected: boolean;
-  isCorrectChain: boolean;
 }) {
   return (
     <div className="flex min-h-screen items-center justify-center bg-zinc-950 p-6">

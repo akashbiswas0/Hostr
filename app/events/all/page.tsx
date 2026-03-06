@@ -125,7 +125,7 @@ export default function AllEventsTimelinePage() {
         ) : isLoading ? (
           <div className="space-y-4">
             {Array.from({ length: 4 }).map((_, index) => (
-              <div key={index} className="h-40 animate-pulse rounded-3xl border border-white/10 bg-white/[0.04]" />
+              <div key={index} className="h-28 animate-pulse rounded-2xl border border-white/10 bg-white/[0.04]" />
             ))}
           </div>
         ) : groups.length === 0 ? (
@@ -138,8 +138,8 @@ export default function AllEventsTimelinePage() {
               <section key={group.key} className="relative pl-7">
                 <span className="absolute left-[5px] top-3 h-2.5 w-2.5 rounded-full bg-zinc-400" />
                 <div className="mb-3 flex items-baseline gap-2">
-                  <h2 className="text-2xl font-bold text-white">{group.dayLabel}</h2>
-                  <p className="text-xl text-zinc-400">{group.weekday}</p>
+                  <h2 className="text-xl font-bold text-white">{group.dayLabel}</h2>
+                  <p className="text-lg text-zinc-400">{group.weekday}</p>
                 </div>
 
                 <div className="space-y-3 border-l border-dashed border-white/15 pl-6">
@@ -175,24 +175,24 @@ function TimelineCard({
   return (
     <Link
       href={`/events/${entity.key}`}
-      className="block rounded-2xl border border-white/10 p-3 transition-colors hover:border-white/20"
+      className="block rounded-xl border border-white/10 p-2.5 transition-colors hover:border-white/20"
       style={{
         background: "linear-gradient(120deg, rgba(33,33,33,0.86), rgba(38,38,38,0.86))",
         fontFamily: appearance.fontFamily,
       }}
     >
-      <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_116px]">
+      <div className="grid gap-2.5 sm:grid-cols-[minmax(0,1fr)_100px]">
         <div className="min-w-0">
-          <p className="text-2xl font-medium text-zinc-300">{formatTime(startMs)}</p>
-          <h3 className="mt-1 line-clamp-2 text-3xl font-semibold text-white">{event.title}</h3>
+          <p className="text-base font-medium text-zinc-300">{formatTime(startMs)}</p>
+          <h3 className="mt-1 line-clamp-2 text-xl font-semibold leading-tight text-white">{event.title}</h3>
 
-          <p className="mt-1.5 text-2xl text-zinc-300">By {organizer}</p>
-          <p className="mt-1 flex items-center gap-1 text-2xl text-zinc-400">
+          <p className="mt-1 text-sm text-zinc-300">By {organizer}</p>
+          <p className="mt-1 flex items-center gap-1 text-sm text-zinc-400">
             <MapPin size={14} className="shrink-0" />
             <span className="truncate">{event.location || "Online"}</span>
           </p>
 
-          <div className="mt-3 flex items-center gap-3">
+          <div className="mt-2 flex items-center gap-2">
             {isSoldOut && (
               <span className="rounded-md bg-rose-500/20 px-2 py-1 text-xs font-semibold text-rose-300">
                 Sold Out
@@ -205,11 +205,11 @@ function TimelineCard({
           </div>
         </div>
 
-        <div className="overflow-hidden rounded-2xl border border-white/15 bg-zinc-900">
+        <div className="aspect-square w-full overflow-hidden rounded-xl border border-white/15 bg-zinc-900">
           {imgUrl ? (
-            <img src={imgUrl} alt={event.title} className="h-full min-h-[96px] w-full object-cover" />
+            <img src={imgUrl} alt={event.title} className="h-full w-full aspect-square object-cover" />
           ) : (
-            <div className="h-full min-h-[96px] w-full" style={{ background: appearance.theme.cardGradient }} />
+            <div className="h-full w-full aspect-square" style={{ background: appearance.theme.cardGradient }} />
           )}
         </div>
       </div>

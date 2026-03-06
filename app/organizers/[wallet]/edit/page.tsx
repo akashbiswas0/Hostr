@@ -9,6 +9,7 @@ import { AlertTriangle, Lock, ShieldOff, ArrowLeft, ArrowRight, Check, Camera, X
 import { useOrganizer } from "@/hooks/useOrganizer";
 import { useWallet } from "@/hooks/useWallet";
 import { updateOrganizerEntity } from "@/lib/arkiv/entities/organizer";
+import { Navbar } from "@/components/Navbar";
 import { ConnectButton } from "@/components/ConnectButton";
 import { uploadEventImage } from "@/lib/imagedb";
 import type { OrganizerProfile } from "@/lib/arkiv/types";
@@ -158,21 +159,7 @@ export default function EditOrganizerPage() {
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
-      {}
-      <nav className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-white/10 bg-transparent px-4 backdrop-blur-xl supports-[backdrop-filter]:bg-zinc-950/20 sm:px-6">
-        <Link
-          href="/"
-          className="text-sm font-semibold text-violet-400 hover:text-violet-300 transition-colors"
-        >
-          Hostr
-        </Link>
-        <Link
-          href={`/organizers/${profileWallet}`}
-          className="flex items-center gap-1.5 text-xs text-zinc-500 hover:text-white transition-colors"
-        >
-          <ArrowLeft size={14} /> Profile
-        </Link>
-      </nav>
+      <Navbar />
 
       <main className="mx-auto max-w-lg px-4 py-10 sm:px-6">
         {}
@@ -226,7 +213,7 @@ export default function EditOrganizerPage() {
                     <img
                       src={resolveAvatarSrc(formValue.avatarUrl)}
                       alt="avatar"
-                      className="h-full w-full object-cover"
+                      className="h-full w-full aspect-square object-cover"
                       onError={(e) => { (e.currentTarget as HTMLImageElement).style.opacity = "0.3"; }}
                     />
                   ) : (

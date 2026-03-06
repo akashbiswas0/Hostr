@@ -37,9 +37,11 @@ export function useTicket(eventKey: Hex | undefined): UseTicketReturn {
 
   const entity = query.data ?? null;
   const ticket = entity ? (entity.toJson() as Ticket) : null;
+  const status = entity ? String(entity.attributes.find((attr) => attr.key === "status")?.value ?? "pending") : null;
+  const hasActiveTicket = entity !== null && status !== "not-going";
 
   return {
-    hasTicket: entity !== null,
+    hasTicket: hasActiveTicket,
     ticket,
     entity,
     isLoading: query.isLoading,

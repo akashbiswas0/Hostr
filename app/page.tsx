@@ -362,24 +362,24 @@ export default function HomePage() {
                       <Link
                         key={`${group.key}-${item.eventKey}`}
                         href={`/events/${item.eventEntity.key}`}
-                        className="group relative block overflow-hidden rounded-2xl border border-white/10 bg-white/[0.04] backdrop-blur-sm transition-all hover:border-white/20 hover:bg-white/[0.06]"
+                        className="group relative block overflow-hidden rounded-xl border border-white/10 bg-white/[0.04] backdrop-blur-sm transition-all hover:border-white/20 hover:bg-white/[0.06]"
                       >
-                        <div className="absolute -left-[28px] top-9 hidden h-3 w-3 rounded-full border border-white/25 bg-zinc-300 md:block" />
+                        <div className="absolute -left-[28px] top-7 hidden h-3 w-3 rounded-full border border-white/25 bg-zinc-300 md:block" />
 
-                        <div className="flex flex-col gap-4 p-4 sm:flex-row sm:items-start sm:justify-between sm:p-5">
-                          <div className="min-w-0 flex-1 space-y-2.5">
+                        <div className="flex flex-col gap-3 p-3 sm:flex-row sm:items-start sm:justify-between sm:p-3.5">
+                          <div className="min-w-0 flex-1 space-y-2">
                             <p className="flex items-center gap-1.5 text-sm text-zinc-400">
                               <Clock3 size={14} className="shrink-0" />
                               {formatTime(item.event.date)}
                             </p>
 
-                            <h2 className="text-xl font-semibold leading-tight text-white group-hover:text-violet-200 transition-colors">
+                            <h2 className="text-lg font-semibold leading-tight text-white group-hover:text-violet-200 transition-colors">
                               {item.event.title}
                             </h2>
 
-                            <p className="text-sm text-zinc-300">By {item.organizerName}</p>
+                            <p className="text-xs text-zinc-300">By {item.organizerName}</p>
 
-                            <p className="flex items-center gap-1.5 text-sm text-zinc-400">
+                            <p className="flex items-center gap-1.5 text-xs text-zinc-400">
                               <MapPin size={14} className="shrink-0" />
                               <span className="truncate">{item.event.location || "Online"}</span>
                             </p>
@@ -415,17 +415,17 @@ function EventImage({ event }: { event: Event }) {
   const showImage = imgUrl && !imgError;
 
   return (
-    <div className="relative h-24 w-full shrink-0 overflow-hidden rounded-xl border border-white/10 sm:w-36">
+    <div className="relative aspect-square w-20 shrink-0 overflow-hidden rounded-lg border border-white/10 sm:w-28">
       {showImage ? (
         <img
           src={imgUrl}
           alt={event.title}
-          className="h-full w-full object-cover"
+          className="h-full w-full aspect-square object-cover"
           onError={() => setImgError(true)}
         />
       ) : (
         <div
-          className="h-full w-full"
+          className="h-full w-full aspect-square"
           style={{ backgroundImage: "linear-gradient(140deg, rgba(59,130,246,0.35), rgba(124,58,237,0.35))" }}
         />
       )}
@@ -467,7 +467,7 @@ function TimelineSkeleton() {
             <div className="h-4 w-28 rounded bg-zinc-800" />
           </div>
           <div className="space-y-3">
-            <div className="h-32 rounded-2xl border border-white/10 bg-white/[0.04]" />
+            <div className="h-24 rounded-xl border border-white/10 bg-white/[0.04]" />
           </div>
         </div>
       ))}

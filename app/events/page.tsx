@@ -81,12 +81,12 @@ function PopularThumb({ event }: { event: Event }) {
   const imgUrl = useEventImage(event.imageUrl);
   const appearance = resolveEventAppearance(event);
   return (
-    <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-xl border border-white/10 bg-zinc-900">
+    <div className="relative aspect-square w-20 shrink-0 overflow-hidden rounded-xl border border-white/10 bg-zinc-900">
       {imgUrl ? (
-        <img src={imgUrl} alt={event.title} className="h-full w-full object-cover" />
+        <img src={imgUrl} alt={event.title} className="h-full w-full aspect-square object-cover" />
       ) : (
         <div
-          className="h-full w-full"
+          className="h-full w-full aspect-square"
           style={{ background: appearance.theme.cardGradient }}
         />
       )}
