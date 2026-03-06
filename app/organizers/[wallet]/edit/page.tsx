@@ -15,8 +15,10 @@ import { uploadEventImage } from "@/lib/imagedb";
 import type { OrganizerProfile } from "@/lib/arkiv/types";
 
 const inputCls =
-  "w-full rounded-lg border border-white/10 bg-zinc-800 px-3 py-2.5 text-sm text-white placeholder-zinc-500 focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500/50 transition-colors";
-const labelCls = "mb-1.5 block text-xs font-medium text-zinc-400";
+  "w-full rounded-lg border border-white/15 bg-white/[0.06] px-3 py-2.5 text-sm text-white placeholder-zinc-400 focus:border-violet-400 focus:outline-none focus:ring-1 focus:ring-violet-400/40 transition-colors";
+const labelCls = "mb-1.5 block text-xs font-medium text-zinc-300";
+const ORGANIZER_GLASS_BG =
+  "radial-gradient(circle at 18% 0%, rgba(37,99,235,0.28), transparent 36%), radial-gradient(circle at 80% 2%, rgba(99,102,241,0.22), transparent 30%), linear-gradient(180deg, #0a1120 0%, #060912 55%)";
 
 const EMPTY: OrganizerProfile = {
   name: "",
@@ -87,15 +89,16 @@ export default function EditOrganizerPage() {
 
   if (!isConnected || !isCorrectChain) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-zinc-950 p-6">
-        <div className="text-center space-y-4 max-w-sm">
-          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-zinc-900 border border-white/10 mx-auto">
+      <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#060912] p-6 text-white">
+        <div className="pointer-events-none absolute inset-0" style={{ background: ORGANIZER_GLASS_BG }} />
+        <div className="relative max-w-sm space-y-4 text-center">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full border border-white/15 bg-white/[0.05] backdrop-blur-sm">
             {isConnected ? <AlertTriangle size={24} className="text-amber-400" /> : <Lock size={24} className="text-violet-400" />}
           </div>
           <h2 className="text-lg font-bold text-white">
             {isConnected ? "Wrong network" : "Sign in required"}
           </h2>
-          <p className="text-sm text-zinc-500">
+          <p className="text-sm text-zinc-300">
             Connect to the Kaolin testnet to edit your profile.
           </p>
           <div className="flex justify-center">
@@ -111,18 +114,19 @@ export default function EditOrganizerPage() {
     address.toLowerCase() !== profileWallet
   ) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-zinc-950 p-6">
-        <div className="text-center space-y-4 max-w-sm">
-          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-zinc-900 border border-white/10 mx-auto">
+      <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#060912] p-6 text-white">
+        <div className="pointer-events-none absolute inset-0" style={{ background: ORGANIZER_GLASS_BG }} />
+        <div className="relative max-w-sm space-y-4 text-center">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full border border-white/15 bg-white/[0.05] backdrop-blur-sm">
             <ShieldOff size={24} className="text-rose-400" />
           </div>
           <h2 className="text-lg font-bold text-white">Not authorized</h2>
-          <p className="text-sm text-zinc-500">
+          <p className="text-sm text-zinc-300">
             You can only edit your own organizer profile.
           </p>
           <Link
             href={`/organizers/${profileWallet}`}
-            className="flex items-center gap-1.5 text-sm text-violet-400 hover:underline"
+            className="inline-flex items-center gap-1.5 text-sm text-violet-300 transition-colors hover:text-white"
           >
             <ArrowLeft size={14} /> View profile
           </Link>
@@ -158,46 +162,45 @@ export default function EditOrganizerPage() {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-white">
-      <Navbar />
+    <div className="relative min-h-screen overflow-hidden bg-[#060912] text-white">
+      <div className="pointer-events-none absolute inset-0" style={{ background: ORGANIZER_GLASS_BG }} />
+      <div className="relative z-10">
+        <Navbar active="dashboard" />
 
-      <main className="mx-auto max-w-lg px-4 py-10 sm:px-6">
-        {}
-        <div className="mb-8">
-          <h1 className="text-2xl font-bold text-white">Edit Profile</h1>
-          <p className="mt-1 text-xs text-zinc-500">
-            Updates are saved securely via Arkiv.
-          </p>
-        </div>
+        <main className="mx-auto max-w-lg px-4 py-10 sm:px-6">
+          <div className="mb-8">
+            <h1 className="text-2xl font-bold text-white">Edit Profile</h1>
+            <p className="mt-1 text-xs text-zinc-300">
+              Updates are saved securely via Arkiv.
+            </p>
+          </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="rounded-2xl border border-white/5 bg-zinc-900 p-6 space-y-5">
-            {}
-            <div>
-              <label className={labelCls}>
-                Display name <span className="text-rose-400">*</span>
-              </label>
-              <input
-                required
-                type="text"
-                placeholder="Satoshi Events"
-                value={formValue.name}
-                onChange={(e) => set("name", e.target.value)}
-                className={inputCls}
-              />
-            </div>
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="space-y-5 rounded-2xl border border-white/12 bg-white/[0.04] p-6 backdrop-blur-sm">
+              <div>
+                <label className={labelCls}>
+                  Display name <span className="text-rose-400">*</span>
+                </label>
+                <input
+                  required
+                  type="text"
+                  placeholder="Satoshi Events"
+                  value={formValue.name}
+                  onChange={(e) => set("name", e.target.value)}
+                  className={inputCls}
+                />
+              </div>
 
-            {}
-            <div>
-              <label className={labelCls}>Bio</label>
-              <textarea
-                rows={4}
-                placeholder="A short bio about yourself or your organization…"
-                value={formValue.bio}
-                onChange={(e) => set("bio", e.target.value)}
-                className={`${inputCls} resize-none`}
-              />
-            </div>
+              <div>
+                <label className={labelCls}>Bio</label>
+                <textarea
+                  rows={4}
+                  placeholder="A short bio about yourself or your organization…"
+                  value={formValue.bio}
+                  onChange={(e) => set("bio", e.target.value)}
+                  className={`${inputCls} resize-none`}
+                />
+              </div>
 
             {/* Profile Photo */}
             <div>
@@ -207,7 +210,7 @@ export default function EditOrganizerPage() {
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
                   disabled={imageUploading}
-                  className="relative h-20 w-20 shrink-0 overflow-hidden rounded-full border-2 border-dashed border-white/20 bg-zinc-800 transition-colors hover:border-violet-500 disabled:opacity-60"
+                  className="relative h-20 w-20 shrink-0 overflow-hidden rounded-full border-2 border-dashed border-white/20 bg-white/[0.06] transition-colors hover:border-violet-400 disabled:opacity-60"
                 >
                   {formValue.avatarUrl ? (
                     <img
@@ -229,10 +232,10 @@ export default function EditOrganizerPage() {
                   </span>
                 </button>
                 <div className="flex-1">
-                  <p className="text-xs text-zinc-400">
+                  <p className="text-xs text-zinc-300">
                     {formValue.avatarUrl ? "Click photo to change" : "Click to upload a profile photo"}
                   </p>
-                  <p className="mt-0.5 text-[11px] text-zinc-600">PNG, JPG, WebP or GIF · max 25 MB</p>
+                  <p className="mt-0.5 text-[11px] text-zinc-500">PNG, JPG, WebP or GIF · max 25 MB</p>
                   {formValue.avatarUrl && (
                     <button
                       type="button"
@@ -265,7 +268,6 @@ export default function EditOrganizerPage() {
               />
             </div>
 
-            {}
             <div>
               <label className={labelCls}>Twitter / X handle</label>
               <div className="relative">
@@ -281,70 +283,70 @@ export default function EditOrganizerPage() {
                 />
               </div>
             </div>
-          </div>
-
-          {}
-          {error && (
-            <div className="rounded-lg border border-red-800/40 bg-red-950/20 px-4 py-3">
-              <p className="text-xs text-red-400 font-mono">{error}</p>
             </div>
-          )}
 
-          {}
-          {saved && (
-            <div className="rounded-lg border border-emerald-700/30 bg-emerald-950/20 px-4 py-3">
-              <p className="text-xs text-emerald-400 flex items-center gap-1.5">
-                <Check size={12} /> Profile saved. Redirecting…
-              </p>
+            {error && (
+              <div className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-4 py-3 backdrop-blur-sm">
+                <p className="text-xs font-mono text-rose-200">{error}</p>
+              </div>
+            )}
+
+            {saved && (
+              <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 backdrop-blur-sm">
+                <p className="flex items-center gap-1.5 text-xs text-emerald-200">
+                  <Check size={12} /> Profile saved. Redirecting…
+                </p>
+              </div>
+            )}
+
+            <div className="flex gap-3">
+              <Link
+                href={`/organizers/${profileWallet}`}
+                className="flex-1 rounded-xl border border-white/15 bg-white/[0.03] py-3 text-center text-sm text-zinc-300 transition-colors hover:border-white/25 hover:text-white"
+              >
+                Cancel
+              </Link>
+              <button
+                type="submit"
+                disabled={submitting || saved || !formValue.name.trim()}
+                className="flex-1 rounded-xl bg-gradient-to-r from-violet-500 to-indigo-500 py-3 text-sm font-semibold text-white shadow-[0_10px_30px_rgba(99,102,241,0.35)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {submitting ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <SpinnerIcon />
+                    Saving…
+                  </span>
+                ) : (
+                  "Save Profile"
+                )}
+              </button>
             </div>
-          )}
 
-          {}
-          <div className="flex gap-3">
-            <Link
-              href={`/organizers/${profileWallet}`}
-              className="flex-1 rounded-xl border border-white/10 py-3 text-center text-sm text-zinc-400 hover:text-white transition-colors"
-            >
-              Cancel
-            </Link>
-            <button
-              type="submit"
-              disabled={submitting || saved || !formValue.name.trim()}
-              className="flex-1 rounded-xl bg-violet-600 py-3 text-sm font-semibold text-white hover:bg-violet-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-            >
-              {submitting ? (
-                <span className="flex items-center justify-center gap-2">
-                  <SpinnerIcon />
-                  Saving…
-                </span>
-              ) : (
-                "Save Profile"
-              )}
-            </button>
-          </div>
-
-          {}
-          <p className="text-center text-xs text-zinc-600">
-            <Link
-              href="/organizer/dashboard"
-              className="flex items-center justify-center gap-1 text-violet-500 hover:underline"
-            >
-              <ArrowRight size={12} /> Go to Organizer Dashboard
-            </Link>
-          </p>
-        </form>
-      </main>
+            <p className="text-center text-xs text-zinc-400">
+              <Link
+                href="/organizer/dashboard"
+                className="inline-flex items-center justify-center gap-1 text-violet-300 transition-colors hover:text-white"
+              >
+                <ArrowRight size={12} /> Go to Organizer Dashboard
+              </Link>
+            </p>
+          </form>
+        </main>
+      </div>
     </div>
   );
 }
 
 function PageSkeleton() {
   return (
-    <div className="min-h-screen bg-zinc-950 animate-pulse">
-      <div className="h-14 bg-zinc-900 border-b border-white/5" />
-      <div className="mx-auto max-w-lg px-4 py-10 sm:px-6 space-y-4">
-        <div className="h-6 w-36 rounded bg-zinc-800" />
-        <div className="h-80 rounded-2xl bg-zinc-900" />
+    <div className="relative min-h-screen animate-pulse overflow-hidden bg-[#060912] text-white">
+      <div className="pointer-events-none absolute inset-0" style={{ background: ORGANIZER_GLASS_BG }} />
+      <div className="relative">
+        <div className="h-16 border-b border-white/10 bg-white/[0.04]" />
+        <div className="mx-auto max-w-lg space-y-4 px-4 py-10 sm:px-6">
+          <div className="h-6 w-36 rounded bg-white/[0.08]" />
+          <div className="h-80 rounded-2xl border border-white/10 bg-white/[0.05]" />
+        </div>
       </div>
     </div>
   );

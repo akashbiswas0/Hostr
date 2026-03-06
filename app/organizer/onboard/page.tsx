@@ -21,7 +21,9 @@ const EMPTY: OrganizerProfile = {
 };
 
 const inputCls =
-  "w-full rounded-lg border border-white/10 bg-zinc-800 px-3 py-2.5 text-sm text-white placeholder-zinc-500 focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500/50 transition-colors";
+  "w-full rounded-lg border border-white/15 bg-white/[0.06] px-3 py-2.5 text-sm text-white placeholder-zinc-400 focus:border-violet-400 focus:outline-none focus:ring-1 focus:ring-violet-400/40 transition-colors";
+const ORGANIZER_GLASS_BG =
+  "radial-gradient(circle at 18% 0%, rgba(37,99,235,0.28), transparent 36%), radial-gradient(circle at 80% 2%, rgba(99,102,241,0.22), transparent 30%), linear-gradient(180deg, #0a1120 0%, #060912 55%)";
 
 export default function OnboardPage() {
   const router = useRouter();
@@ -98,30 +100,30 @@ export default function OnboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-white">
-      <Navbar />
+    <div className="relative min-h-screen overflow-hidden bg-[#060912] text-white">
+      <div className="pointer-events-none absolute inset-0" style={{ background: ORGANIZER_GLASS_BG }} />
+      <div className="relative z-10">
+        <Navbar active="dashboard" />
 
-      <main className="mx-auto max-w-2xl px-4 py-12 sm:px-6">
-        {}
-        <div className="mb-8">
-          <div className="inline-flex items-center gap-2 rounded-full border border-violet-700/30 bg-violet-950/20 px-3 py-1 text-xs font-medium text-violet-300 mb-4">
-            <span className="h-1.5 w-1.5 rounded-full bg-violet-400" />
-            One-time setup
+        <main className="mx-auto max-w-2xl px-4 py-12 sm:px-6">
+          <div className="mb-8">
+            <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/12 bg-white/[0.05] px-3 py-1 text-xs font-medium text-zinc-200 backdrop-blur-sm">
+              <span className="h-1.5 w-1.5 rounded-full bg-violet-300" />
+              One-time setup
+            </div>
+            <h1 className="text-2xl font-bold text-white sm:text-3xl">
+              Create your organizer profile
+            </h1>
+            <p className="mt-2 text-sm text-zinc-300">
+              Your profile is securely stored and owned by{" "}
+              <span className="font-mono text-zinc-200">
+                {address ? `${address.slice(0, 6)}…${address.slice(-4)}` : "—"}
+              </span>
+            </p>
           </div>
-          <h1 className="text-2xl font-bold text-white sm:text-3xl">
-            Create your organizer profile
-          </h1>
-          <p className="mt-2 text-sm text-zinc-400">
-            Your profile is securely stored and owned by{" "}
-            <span className="font-mono text-zinc-300">
-              {address ? `${address.slice(0, 6)}…${address.slice(-4)}` : "—"}
-            </span>
-          </p>
-        </div>
 
-        {}
-        <form onSubmit={handleSubmit} className="space-y-5">
-          <div className="rounded-2xl border border-white/5 bg-zinc-900 p-6 space-y-5">
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <div className="space-y-5 rounded-2xl border border-white/12 bg-white/[0.04] p-6 backdrop-blur-sm">
             <Field label="Display name" required>
               <input
                 required
@@ -149,7 +151,7 @@ export default function OnboardPage() {
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
                   disabled={imageUploading}
-                  className="relative h-20 w-20 shrink-0 overflow-hidden rounded-full border-2 border-dashed border-white/20 bg-zinc-800 transition-colors hover:border-violet-500 disabled:opacity-60"
+                  className="relative h-20 w-20 shrink-0 overflow-hidden rounded-full border-2 border-dashed border-white/20 bg-white/[0.06] transition-colors hover:border-violet-400 disabled:opacity-60"
                 >
                   {imagePreview ? (
                     <img src={imagePreview} alt="avatar preview" className="h-full w-full aspect-square object-cover" />
@@ -163,10 +165,10 @@ export default function OnboardPage() {
                   )}
                 </button>
                 <div className="flex-1">
-                  <p className="text-xs text-zinc-400">
+                  <p className="text-xs text-zinc-300">
                     {imagePreview ? "Click photo to change" : "Click to upload a profile photo"}
                   </p>
-                  <p className="mt-0.5 text-[11px] text-zinc-600">PNG, JPG, WebP or GIF · max 25 MB</p>
+                  <p className="mt-0.5 text-[11px] text-zinc-500">PNG, JPG, WebP or GIF · max 25 MB</p>
                   {imagePreview && (
                     <button
                       type="button"
@@ -187,7 +189,7 @@ export default function OnboardPage() {
               />
             </Field>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Website">
                 <input
                   type="url"
@@ -211,30 +213,31 @@ export default function OnboardPage() {
                 </div>
               </Field>
             </div>
-          </div>
-
-          {error && (
-            <div className="rounded-lg border border-red-800/40 bg-red-950/20 px-4 py-3">
-              <p className="text-xs text-red-400 font-mono">{error}</p>
             </div>
-          )}
 
-          <button
-            type="submit"
-            disabled={submitting || !form.name}
-            className="w-full rounded-xl bg-violet-600 py-3 text-sm font-semibold text-white hover:bg-violet-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-lg shadow-violet-900/30"
-          >
-            {submitting ? (
-              <span className="flex items-center justify-center gap-2">
-                <SpinnerIcon />
-                Saving…
-              </span>
-            ) : (
-              <span className="flex items-center justify-center gap-2">Create Profile &amp; Continue <ArrowRight size={14} /></span>
+            {error && (
+              <div className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-4 py-3 backdrop-blur-sm">
+                <p className="text-xs font-mono text-rose-200">{error}</p>
+              </div>
             )}
-          </button>
-        </form>
-      </main>
+
+            <button
+              type="submit"
+              disabled={submitting || !form.name}
+              className="w-full rounded-xl bg-gradient-to-r from-violet-500 to-indigo-500 py-3 text-sm font-semibold text-white shadow-[0_10px_30px_rgba(99,102,241,0.35)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {submitting ? (
+                <span className="flex items-center justify-center gap-2">
+                  <SpinnerIcon />
+                  Saving…
+                </span>
+              ) : (
+                <span className="flex items-center justify-center gap-2">Create Profile &amp; Continue <ArrowRight size={14} /></span>
+              )}
+            </button>
+          </form>
+        </main>
+      </div>
     </div>
   );
 }
@@ -265,15 +268,16 @@ function WalletGate({
   isConnected: boolean;
 }) {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-950 p-6">
-      <div className="text-center space-y-4 max-w-sm">
-        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-zinc-900 border border-white/10 mx-auto">
-            {isConnected ? <AlertTriangle size={24} className="text-amber-400" /> : <Lock size={24} className="text-violet-400" />}
-          </div>
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#060912] p-6 text-white">
+      <div className="pointer-events-none absolute inset-0" style={{ background: ORGANIZER_GLASS_BG }} />
+      <div className="relative max-w-sm space-y-4 text-center">
+        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full border border-white/15 bg-white/[0.05] backdrop-blur-sm">
+          {isConnected ? <AlertTriangle size={24} className="text-amber-400" /> : <Lock size={24} className="text-violet-400" />}
+        </div>
         <h2 className="text-lg font-bold text-white">
           {isConnected ? "Wrong network" : "Connect your wallet"}
         </h2>
-        <p className="text-sm text-zinc-400">
+        <p className="text-sm text-zinc-300">
           {isConnected
             ? "Switch to Kaolin to create your organizer profile."
             : "You need a connected wallet to create an organizer profile."}
@@ -288,11 +292,14 @@ function WalletGate({
 
 function PageSkeleton() {
   return (
-    <div className="min-h-screen bg-zinc-950 animate-pulse">
-      <div className="h-14 border-b border-white/5 bg-zinc-900" />
-      <div className="mx-auto max-w-2xl px-4 py-12 sm:px-6 space-y-6">
-        <div className="h-8 w-48 rounded bg-zinc-800" />
-        <div className="h-64 rounded-2xl bg-zinc-900" />
+    <div className="relative min-h-screen animate-pulse overflow-hidden bg-[#060912] text-white">
+      <div className="pointer-events-none absolute inset-0" style={{ background: ORGANIZER_GLASS_BG }} />
+      <div className="relative">
+        <div className="h-16 border-b border-white/10 bg-white/[0.04]" />
+        <div className="mx-auto max-w-2xl space-y-6 px-4 py-12 sm:px-6">
+          <div className="h-8 w-48 rounded bg-white/[0.08]" />
+          <div className="h-64 rounded-2xl border border-white/10 bg-white/[0.05]" />
+        </div>
       </div>
     </div>
   );
