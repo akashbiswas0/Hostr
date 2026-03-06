@@ -23,9 +23,10 @@ import {
 import { useEvent } from "@/hooks/useEvent";
 import { useWallet } from "@/hooks/useWallet";
 import { publicClient } from "@/lib/arkiv/client";
-import { hasAttendeeCheckedIn, createCheckinEntity } from "@/lib/arkiv/entities/checkin";
+import { createCheckinEntity } from "@/lib/arkiv/entities/checkin";
 import { createPoAEntity } from "@/lib/arkiv/entities/attendance";
 import { getApprovalForRsvp } from "@/lib/arkiv/queries/rsvps";
+import { hasAttendeeCheckedIn } from "@/lib/arkiv/queries/checkins";
 import { friendlyError } from "@/lib/arkiv/errors";
 import { OrganizerNav } from "@/components/OrganizerNav";
 import { ConnectButton } from "@/components/ConnectButton";
@@ -169,13 +170,22 @@ export default function CheckinPage() {
           ? Math.floor(Date.now() / 1_000) + 3_600
           : Math.floor(endMs / 1_000);
 
-        const res = await createCheckinEntity(walletClient, entityKey, attendeeWallet, endDateSeconds, rsvpKey);
+        const res = await createCheckinEntity(
+          walletClient,
+          publicClient,
+          entityKey,
+          attendeeWallet,
+          endDateSeconds,
+          rsvpKey,
+          "qr",
+        );
         if (!res.success) throw new Error(res.error);
 
         // Mint proof-of-attendance (non-fatal — checkin already succeeded)
         try {
           await createPoAEntity(
             walletClient,
+            publicClient,
             entityKey,
             rsvpKey,
             attendeeWallet,

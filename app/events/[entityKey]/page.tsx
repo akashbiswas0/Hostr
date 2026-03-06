@@ -11,14 +11,15 @@ import { useEvent } from "@/hooks/useEvent";
 import { useRsvp } from "@/hooks/useRsvp";
 import { useWallet } from "@/hooks/useWallet";
 import { publicClient } from "@/lib/arkiv/client";
-import { getRsvpsByEvent, getApprovalForRsvp, getRejectionForRsvp, getApprovalsByEvent } from "@/lib/arkiv/entities/rsvp";
-import { getCheckinsByEvent } from "@/lib/arkiv/entities/checkin";
-import { getOrganizerByWallet } from "@/lib/arkiv/entities/organizer";
+import { getRsvpsByEvent, getApprovalForRsvp, getRejectionForRsvp, getApprovalsByEvent } from "@/lib/arkiv/queries/rsvps";
+import { getCheckinsByEvent } from "@/lib/arkiv/queries/checkins";
+import { getOrganizerByWallet } from "@/lib/arkiv/queries/profiles";
 import { ConnectButton } from "@/components/ConnectButton";
 import { StatusBadge } from "@/components/StatusBadge";
 import { RsvpModal } from "@/components/RsvpModal";
 import { Navbar } from "@/components/Navbar";
 import { ChainLink } from "@/components/ChainLink";
+import { CATEGORY_STYLE, DEFAULT_CATEGORY_STYLE } from "@/lib/arkiv/categories";
 import type { RSVP, OrganizerProfile } from "@/lib/arkiv/types";
 import type { Entity } from "@arkiv-network/sdk";
 
@@ -50,14 +51,6 @@ function formatDateFull(value: unknown) {
 function truncate(addr: string) {
   return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
 }
-
-const CATEGORY_GRADIENT: Record<string, string> = {
-  DeFi: "from-violet-900 to-violet-950",
-  NFT: "from-pink-900 to-pink-950",
-  Gaming: "from-cyan-900 to-cyan-950",
-  IRL: "from-amber-900 to-amber-950",
-  Virtual: "from-emerald-900 to-emerald-950",
-};
 
 export default function EventDetailPage() {
   const params = useParams();
@@ -166,8 +159,10 @@ export default function EventDetailPage() {
   const capacityPct = capacity ? Math.min(100, (rsvpCount / capacity) * 100) : 0;
   const isFull = rsvpCount >= capacity && capacity > 0;
   const isEnded = event?.status === "ended";
-  const gradient =
-    CATEGORY_GRADIENT[event?.category ?? ""] ?? "from-zinc-800 to-zinc-900";
+  const gradient = event?.category
+    ? (CATEGORY_STYLE[event.category as keyof typeof CATEGORY_STYLE]?.heroGradient ??
+      DEFAULT_CATEGORY_STYLE.heroGradient)
+    : DEFAULT_CATEGORY_STYLE.heroGradient;
   // Is the event offline-only (has physical location, no virtual link)?
   const isOffline = !!(event?.location && !event?.virtualLink);
   // Current user's RSVP status (raw, from attendee-owned entity)
@@ -772,4 +767,3 @@ function InfoRow({
     </div>
   );
 }
-

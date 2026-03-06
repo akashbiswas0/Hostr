@@ -70,6 +70,12 @@ export function useEvents(filters?: EventFilters): UseEventsReturn {
       filters?.dateFrom,
       filters?.dateTo,
       filters?.status,
+      filters?.isOnline,
+      filters?.keyword,
+      filters?.approvalMode,
+      filters?.hasImage,
+      filters?.hasSeatsOnly,
+      filters?.format,
     ],
     queryFn: async () => {
       const result = await getAllUpcomingEvents(publicClient, filters);

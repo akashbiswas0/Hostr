@@ -14,7 +14,8 @@ import { publicClient } from "@/lib/arkiv/client";
 import { confirmRsvp, rejectRsvp } from "@/lib/arkiv/entities/rsvp";
 import { autoPromoteCapacityStatus } from "@/lib/arkiv/entities/event";
 import { getRsvpsByEvent, getApprovalsByEvent, getRejectionsByEvent, getApprovalForRsvp, getRejectionForRsvp } from "@/lib/arkiv/queries/rsvps";
-import { createCheckinEntity, getCheckinsByEvent, hasAttendeeCheckedIn } from "@/lib/arkiv/entities/checkin";
+import { createCheckinEntity } from "@/lib/arkiv/entities/checkin";
+import { getCheckinsByEvent, hasAttendeeCheckedIn } from "@/lib/arkiv/queries/checkins";
 import { createPoAEntity } from "@/lib/arkiv/entities/attendance";
 import { OrganizerNav } from "@/components/OrganizerNav";
 import { ConnectButton } from "@/components/ConnectButton";
@@ -207,10 +208,12 @@ export default function AttendeesPage() {
         : Math.floor(ms / 1_000);
       const checkinRes = await createCheckinEntity(
         walletClient,
+        publicClient,
         entityKey,
         vars.ownerAddress,
         endDateSeconds,
         vars.rsvpKey,
+        "manual",
       );
       if (!checkinRes.success) throw new Error(checkinRes.error);
 
@@ -218,6 +221,7 @@ export default function AttendeesPage() {
       try {
         await createPoAEntity(
           walletClient,
+          publicClient,
           entityKey,
           vars.rsvpKey,
           vars.ownerAddress,
@@ -278,6 +282,7 @@ export default function AttendeesPage() {
         : Math.floor(ms / 1_000);
       const res = await rejectRsvp(
         walletClient,
+        publicClient,
         vars.rsvpKey,
         entityKey,
         vars.ownerAddress,
@@ -553,7 +558,7 @@ export default function AttendeesPage() {
                     <p className="text-xs text-zinc-500 truncate">{row.data.attendeeEmail}</p>
                   )}
                   {row.data.message && (
-                    <p className="text-xs text-zinc-600 italic truncate">"{row.data.message}"</p>
+                    <p className="text-xs text-zinc-600 italic truncate">&quot;{row.data.message}&quot;</p>
                   )}
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
@@ -584,7 +589,7 @@ export default function AttendeesPage() {
                     <p className="text-xs text-zinc-500 truncate">{row.data.attendeeEmail}</p>
                   )}
                   {row.data.message && (
-                    <p className="text-xs text-zinc-600 italic truncate">"{row.data.message}"</p>
+                    <p className="text-xs text-zinc-600 italic truncate">&quot;{row.data.message}&quot;</p>
                   )}
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
@@ -690,7 +695,7 @@ function AttendeeRowItem({
           <p className="text-xs text-zinc-500 truncate">{row.data.attendeeEmail}</p>
         )}
         {row.data.message && (
-          <p className="text-xs text-zinc-600 italic truncate">"{row.data.message}"</p>
+          <p className="text-xs text-zinc-600 italic truncate">&quot;{row.data.message}&quot;</p>
         )}
       </div>
 
@@ -746,7 +751,7 @@ function PendingRowItem({
           <p className="text-xs text-zinc-500 truncate">{row.data.attendeeEmail}</p>
         )}
         {row.data.message && (
-          <p className="text-xs text-zinc-600 italic truncate">"{row.data.message}"</p>
+          <p className="text-xs text-zinc-600 italic truncate">&quot;{row.data.message}&quot;</p>
         )}
       </div>
       <div className="flex shrink-0 items-center gap-2">

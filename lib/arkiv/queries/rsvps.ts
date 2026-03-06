@@ -1,16 +1,9 @@
-/**
- * RSVP / approval / rejection query functions — read-only Arkiv queries.
- */
+import { eq } from "@arkiv-network/sdk/query";
+import type { Entity, PublicArkivClient } from "@arkiv-network/sdk";
+import type { Hex } from "viem";
+import { ENTITY_TYPES } from "../constants";
+import type { ArkivResult, RSVPStatus, RsvpDecision } from "../types";
 
-import { eq } from "@arkiv-network/sdk/query"
-import type { Entity, PublicArkivClient } from "@arkiv-network/sdk"
-import type { Hex } from "viem"
-import { ENTITY_TYPES } from "../constants"
-import type { ArkivResult, RSVPStatus } from "../types"
-
-// ─── RSVPs ───────────────────────────────────────────────────────────────────
-
-/** All RSVPs for a given event. */
 export async function getRsvpsByEvent(
   publicClient: PublicArkivClient,
   eventKey: Hex,
@@ -24,18 +17,18 @@ export async function getRsvpsByEvent(
       ])
       .withPayload()
       .withAttributes()
-      .fetch()
+      .orderBy("requestedAt", "number", "asc")
+      .fetch();
 
-    return { success: true, data: result.entities }
+    return { success: true, data: result.entities };
   } catch (error) {
     return {
       success: false,
       error: error instanceof Error ? error.message : String(error),
-    }
+    };
   }
 }
 
-/** RSVPs for a given event filtered by status (multi-filter query). */
 export async function getRsvpsByEventAndStatus(
   publicClient: PublicArkivClient,
   eventKey: Hex,
@@ -51,34 +44,32 @@ export async function getRsvpsByEventAndStatus(
       ])
       .withPayload()
       .withAttributes()
-      .fetch()
+      .orderBy("requestedAt", "number", "asc")
+      .fetch();
 
-    return { success: true, data: result.entities }
+    return { success: true, data: result.entities };
   } catch (error) {
     return {
       success: false,
       error: error instanceof Error ? error.message : String(error),
-    }
+    };
   }
 }
 
-/** Confirmed RSVPs for a given event. */
 export async function getConfirmedRsvpsByEvent(
   publicClient: PublicArkivClient,
   eventKey: Hex,
 ): Promise<ArkivResult<Entity[]>> {
-  return getRsvpsByEventAndStatus(publicClient, eventKey, "confirmed")
+  return getRsvpsByEventAndStatus(publicClient, eventKey, "confirmed");
 }
 
-/** Pending RSVPs for a given event. */
 export async function getPendingRsvpsByEvent(
   publicClient: PublicArkivClient,
   eventKey: Hex,
 ): Promise<ArkivResult<Entity[]>> {
-  return getRsvpsByEventAndStatus(publicClient, eventKey, "pending")
+  return getRsvpsByEventAndStatus(publicClient, eventKey, "pending");
 }
 
-/** A specific attendee's RSVP for an event (using ownedBy filter). */
 export async function getRsvpByAttendee(
   publicClient: PublicArkivClient,
   eventKey: Hex,
@@ -94,98 +85,98 @@ export async function getRsvpByAttendee(
       .ownedBy(attendeeWallet)
       .withPayload()
       .withAttributes()
-      .fetch()
+      .fetch();
 
-    const entity = result.entities[0] ?? null
-    return { success: true, data: entity }
+    return { success: true, data: result.entities[0] ?? null };
   } catch (error) {
     return {
       success: false,
       error: error instanceof Error ? error.message : String(error),
-    }
+    };
   }
 }
 
-// ─── Approvals ───────────────────────────────────────────────────────────────
+export async function getDecisionsByEvent(
+  publicClient: PublicArkivClient,
+  eventKey: Hex,
+  decision?: RsvpDecision,
+): Promise<ArkivResult<Entity[]>> {
+  try {
+    const predicates = [
+      eq("type", ENTITY_TYPES.RSVP_DECISION),
+      eq("eventKey", eventKey),
+      ...(decision ? [eq("decision", decision)] : []),
+    ];
 
-/** All organizer-created approval entities for a given event. */
+    const result = await publicClient
+      .buildQuery()
+      .where(predicates)
+      .withAttributes()
+      .orderBy("decidedAt", "number", "asc")
+      .fetch();
+
+    return { success: true, data: result.entities };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+export async function getDecisionForRsvp(
+  publicClient: PublicArkivClient,
+  rsvpKey: Hex,
+  decision?: RsvpDecision,
+): Promise<ArkivResult<Entity | null>> {
+  try {
+    const predicates = [
+      eq("type", ENTITY_TYPES.RSVP_DECISION),
+      eq("rsvpKey", rsvpKey),
+      ...(decision ? [eq("decision", decision)] : []),
+    ];
+
+    const result = await publicClient
+      .buildQuery()
+      .where(predicates)
+      .withAttributes()
+      .orderBy("decidedAt", "number", "desc")
+      .fetch();
+
+    return { success: true, data: result.entities[0] ?? null };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+// Compatibility wrappers used by current UI.
 export async function getApprovalsByEvent(
   publicClient: PublicArkivClient,
   eventKey: Hex,
 ): Promise<ArkivResult<Entity[]>> {
-  try {
-    const result = await publicClient
-      .buildQuery()
-      .where([
-        eq("type", ENTITY_TYPES.RSVP_APPROVAL),
-        eq("eventKey", eventKey),
-      ])
-      .withAttributes()
-      .fetch()
-    return { success: true, data: result.entities }
-  } catch (error) {
-    return { success: false, error: error instanceof Error ? error.message : String(error) }
-  }
+  return getDecisionsByEvent(publicClient, eventKey, "approved");
 }
 
-/** Approval entity for a specific RSVP key (if any). */
-export async function getApprovalForRsvp(
-  publicClient: PublicArkivClient,
-  rsvpKey: Hex,
-): Promise<ArkivResult<Entity | null>> {
-  try {
-    const result = await publicClient
-      .buildQuery()
-      .where([
-        eq("type", ENTITY_TYPES.RSVP_APPROVAL),
-        eq("rsvpKey", rsvpKey),
-      ])
-      .withAttributes()
-      .fetch()
-    return { success: true, data: result.entities[0] ?? null }
-  } catch (error) {
-    return { success: false, error: error instanceof Error ? error.message : String(error) }
-  }
-}
-
-// ─── Rejections ──────────────────────────────────────────────────────────────
-
-/** All organizer-created rejection entities for a given event. */
 export async function getRejectionsByEvent(
   publicClient: PublicArkivClient,
   eventKey: Hex,
 ): Promise<ArkivResult<Entity[]>> {
-  try {
-    const result = await publicClient
-      .buildQuery()
-      .where([
-        eq("type", ENTITY_TYPES.RSVP_REJECTION),
-        eq("eventKey", eventKey),
-      ])
-      .withAttributes()
-      .fetch()
-    return { success: true, data: result.entities }
-  } catch (error) {
-    return { success: false, error: error instanceof Error ? error.message : String(error) }
-  }
+  return getDecisionsByEvent(publicClient, eventKey, "rejected");
 }
 
-/** Rejection entity for a specific RSVP key (if any). */
+export async function getApprovalForRsvp(
+  publicClient: PublicArkivClient,
+  rsvpKey: Hex,
+): Promise<ArkivResult<Entity | null>> {
+  return getDecisionForRsvp(publicClient, rsvpKey, "approved");
+}
+
 export async function getRejectionForRsvp(
   publicClient: PublicArkivClient,
   rsvpKey: Hex,
 ): Promise<ArkivResult<Entity | null>> {
-  try {
-    const result = await publicClient
-      .buildQuery()
-      .where([
-        eq("type", ENTITY_TYPES.RSVP_REJECTION),
-        eq("rsvpKey", rsvpKey),
-      ])
-      .withAttributes()
-      .fetch()
-    return { success: true, data: result.entities[0] ?? null }
-  } catch (error) {
-    return { success: false, error: error instanceof Error ? error.message : String(error) }
-  }
+  return getDecisionForRsvp(publicClient, rsvpKey, "rejected");
 }

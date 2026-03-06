@@ -2,7 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { publicClient } from "@/lib/arkiv/client";
-import { getOrganizerByWallet } from "@/lib/arkiv/entities/organizer";
+import { getOrganizerByWallet } from "@/lib/arkiv/queries/profiles";
 import type { OrganizerProfile } from "@/lib/arkiv/types";
 import type { Entity } from "@arkiv-network/sdk";
 import type { Hex } from "viem";

@@ -10,10 +10,12 @@ import { X, Lock, AlertTriangle, Clock, CheckCircle2, XCircle, ExternalLink, Lin
 import { useWallet } from "@/hooks/useWallet";
 import { publicClient } from "@/lib/arkiv/client";
 import { createRsvpEntity } from "@/lib/arkiv/entities/rsvp"
+import { upsertUserProfileEntity } from "@/lib/arkiv/entities/user";
 import { getRsvpByAttendee, getRsvpsByEvent } from "@/lib/arkiv/queries/rsvps"
+import { getUserProfileByWallet } from "@/lib/arkiv/queries/profiles";
 import { ConnectButton } from "@/components/ConnectButton";
 import { friendlyError } from "@/lib/arkiv/errors";
-import type { Event, RSVP } from "@/lib/arkiv/types";
+import type { Event, RSVP, UserProfileV2 } from "@/lib/arkiv/types";
 
 export interface RsvpModalProps {
   
@@ -138,7 +140,35 @@ export function RsvpModal({
         attendeeName: name.trim(),
         attendeeEmail: email.trim(),
         message: message.trim() || undefined,
+        attendeeAvatarUrlSnapshot: "",
+        attendeeDisplayNameSnapshot: name.trim(),
       };
+
+      // Ensure attendee profile exists and snapshot display/avatar into RSVP.
+      const userProfileRes = await getUserProfileByWallet(publicClient, address as Hex);
+      const existingUserProfile = userProfileRes.success && userProfileRes.data
+        ? (userProfileRes.data.toJson() as UserProfileV2)
+        : null;
+
+      if (existingUserProfile?.displayName || existingUserProfile?.avatarImageUrl) {
+        rsvpData.attendeeDisplayNameSnapshot = existingUserProfile.displayName || rsvpData.attendeeName;
+        rsvpData.attendeeAvatarUrlSnapshot = existingUserProfile.avatarImageUrl ?? "";
+      } else {
+        const upsertRes = await upsertUserProfileEntity(walletClient, publicClient, {
+          displayName: rsvpData.attendeeName,
+          avatarImageUrl: "",
+          bannerImageUrl: "",
+          bio: "",
+          countryCode: "",
+          city: "",
+          language: "",
+          website: "",
+          twitter: "",
+        });
+        if (!upsertRes.success) {
+          throw new Error(upsertRes.error);
+        }
+      }
 
       // Re-derive capacity state from a fresh live count instead of the stale
       // `isFull` prop (which could be wrong if another user RSVPed concurrently).
@@ -155,6 +185,7 @@ export function RsvpModal({
 
       const createRes = await createRsvpEntity(
         walletClient,
+        publicClient,
         rsvpData,
         eventEndDate,
         status,
@@ -288,7 +319,7 @@ function FormStep({
           <div className="mt-2 flex items-center gap-2 rounded-lg bg-amber-950/40 border border-amber-700/30 px-3 py-2">
             <AlertTriangle size={13} className="text-amber-400 shrink-0" />
             <span className="text-amber-400 text-xs font-medium">
-              Event is at capacity. You'll be added to the waitlist.
+              Event is at capacity. You&apos;ll be added to the waitlist.
             </span>
           </div>
         )}

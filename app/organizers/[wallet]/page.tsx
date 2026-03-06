@@ -8,8 +8,8 @@ import type { Hex } from "viem";
 import type { Entity } from "@arkiv-network/sdk";
 import { SearchX, Globe, Pencil, ArrowLeft, ArrowRight, Check } from "lucide-react";
 import { publicClient } from "@/lib/arkiv/client";
-import { getOrganizerByWallet } from "@/lib/arkiv/entities/organizer";
-import { getEventsByOrganizer } from "@/lib/arkiv/entities/event";
+import { getOrganizerByWallet } from "@/lib/arkiv/queries/profiles";
+import { getEventsByOrganizer } from "@/lib/arkiv/queries/events";
 import { useWallet } from "@/hooks/useWallet";
 import { EventCard, EventCardSkeleton } from "@/components/EventCard";
 import type { OrganizerProfile, Event } from "@/lib/arkiv/types";
@@ -132,7 +132,7 @@ export default function OrganizerProfilePage() {
           </div>
           <h2 className="text-xl font-bold text-white">No organizer found</h2>
           <p className="text-sm text-zinc-500">
-            {truncateAddress(wallet)} hasn't created a profile yet.
+            {truncateAddress(wallet)} hasn&apos;t created a profile yet.
           </p>
           <Link
             href="/events"

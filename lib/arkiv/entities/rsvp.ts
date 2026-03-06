@@ -1,65 +1,170 @@
-import { jsonToPayload } from "@arkiv-network/sdk"
-import { eq } from "@arkiv-network/sdk/query"
-import { ExpirationTime } from "@arkiv-network/sdk/utils"
-import type { Account, Chain, Hex, Transport } from "viem"
+import { jsonToPayload } from "@arkiv-network/sdk";
+import { eq } from "@arkiv-network/sdk/query";
+import { ExpirationTime } from "@arkiv-network/sdk/utils";
+import type { Account, Chain, Hex, Transport } from "viem";
 import type {
   Entity,
   PublicArkivClient,
   WalletArkivClient,
-} from "@arkiv-network/sdk"
-import { ENTITY_TYPES } from "../constants"
-import type { ArkivResult, RSVP, RSVPStatus } from "../types"
+} from "@arkiv-network/sdk";
+import { ENTITY_TYPES } from "../constants";
+import type {
+  ArkivResult,
+  RSVP,
+  RsvpDecision,
+  RSVPStatus,
+} from "../types";
+import { ensureEvenSeconds, schemaAttributes, unixNow } from "../v2";
 
-const CONTENT_TYPE = "application/json" as const
+const CONTENT_TYPE = "application/json" as const;
 
-// Compute expiry for RSVP entities — differentiated by status:
-// - "pending" RSVPs auto-expire in 7 days if not approved
-// - "confirmed" / "waitlisted" RSVPs live until event end + 7 days
-// Result is rounded DOWN to a multiple of 2 (BLOCK_TIME) so that
-// `expiresIn / BLOCK_TIME` is always an integer when the SDK converts to blocks.
-function expiresInFromEventEnd(eventEndDate: number, status?: string): number {
+function expiresInFromEventEnd(eventEndDate: number, status?: RSVPStatus): number {
   if (status === "pending") {
-    // Pending RSVPs auto-expire in 7 days
-    const seconds = Math.floor(ExpirationTime.fromDays(7))
-    return Math.floor(seconds / 2) * 2
+    return ensureEvenSeconds(Math.floor(ExpirationTime.fromDays(7)));
   }
-  const secondsFromNow =
-    eventEndDate - Math.floor(Date.now() / 1_000)
-  // Add 7-day grace period after event end
-  const gracePeriod = ExpirationTime.fromDays(7)
-  const seconds = Math.floor(Math.max(secondsFromNow + gracePeriod, ExpirationTime.fromHours(1)))
-  return Math.floor(seconds / 2) * 2
+
+  const secondsFromNow = eventEndDate - unixNow();
+  const gracePeriod = ExpirationTime.fromDays(7);
+  const seconds = Math.floor(
+    Math.max(secondsFromNow + gracePeriod, ExpirationTime.fromHours(1)),
+  );
+  return ensureEvenSeconds(seconds);
+}
+
+async function ensureEventExists(
+  publicClient: PublicArkivClient,
+  eventKey: Hex,
+): Promise<Entity> {
+  const event = await publicClient.getEntity(eventKey);
+  const type = event.attributes.find((a) => a.key === "type")?.value;
+  if (type !== ENTITY_TYPES.EVENT) {
+    throw new Error("Invalid event reference for RSVP.");
+  }
+  return event;
+}
+
+async function upsertDecisionEntity(
+  walletClient: WalletArkivClient<Transport, Chain, Account>,
+  publicClient: PublicArkivClient,
+  params: {
+    eventKey: Hex;
+    rsvpKey: Hex;
+    attendeeWallet: Hex;
+    decision: RsvpDecision;
+    eventEndDate: number;
+  },
+): Promise<ArkivResult<{ entityKey: Hex; txHash: Hex }>> {
+  try {
+    const existing = await publicClient
+      .buildQuery()
+      .where([
+        eq("type", ENTITY_TYPES.RSVP_DECISION),
+        eq("eventKey", params.eventKey),
+        eq("rsvpKey", params.rsvpKey),
+      ])
+      .withAttributes()
+      .fetch();
+
+    if (existing.entities.length > 0) {
+      await walletClient.mutateEntities({
+        deletes: existing.entities.map((entity) => ({ entityKey: entity.key as Hex })),
+      });
+    }
+
+    const decidedAt = unixNow();
+    const result = await walletClient.createEntity({
+      payload: jsonToPayload({
+        eventKey: params.eventKey,
+        rsvpKey: params.rsvpKey,
+        attendeeWallet: params.attendeeWallet,
+        decision: params.decision,
+        decidedAt,
+      }),
+      contentType: CONTENT_TYPE,
+      attributes: [
+        { key: "type", value: ENTITY_TYPES.RSVP_DECISION },
+        ...schemaAttributes(),
+        { key: "eventKey", value: params.eventKey },
+        { key: "rsvpKey", value: params.rsvpKey },
+        { key: "attendeeWallet", value: params.attendeeWallet },
+        { key: "decision", value: params.decision },
+        { key: "decisionReasonCode", value: "" },
+        { key: "decidedAt", value: decidedAt },
+        { key: "deciderWallet", value: walletClient.account.address },
+      ],
+      expiresIn: ensureEvenSeconds(
+        Math.floor(
+          Math.max(
+            params.eventEndDate - unixNow() + ExpirationTime.fromDays(14),
+            ExpirationTime.fromHours(1),
+          ),
+        ),
+      ),
+    });
+
+    return { success: true, data: result as { entityKey: Hex; txHash: Hex } };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
 }
 
 export async function createRsvpEntity(
   walletClient: WalletArkivClient<Transport, Chain, Account>,
+  publicClient: PublicArkivClient,
   data: RSVP,
   eventEndDate: number,
   initialStatus: RSVPStatus = "confirmed",
 ): Promise<ArkivResult<{ entityKey: Hex; txHash: Hex }>> {
   try {
-    const rsvpData: RSVP = { ...data }
+    const event = await ensureEventExists(publicClient, data.eventKey as Hex);
+
+    const rsvpData: RSVP = { ...data };
 
     const result = await walletClient.createEntity({
       payload: jsonToPayload(rsvpData),
       contentType: CONTENT_TYPE,
       attributes: [
         { key: "type", value: ENTITY_TYPES.RSVP },
+        ...schemaAttributes(),
         { key: "eventKey", value: data.eventKey },
-        
-        
+        {
+          key: "organizerWallet",
+          value:
+            String(
+              event.attributes.find((a) => a.key === "organizerWallet")?.value ??
+                event.owner ??
+                "",
+            ) || "",
+        },
         { key: "attendeeWallet", value: walletClient.account.address },
         { key: "status", value: initialStatus },
+        { key: "requestedAt", value: unixNow() },
+        { key: "lastActionAt", value: unixNow() },
+        { key: "attendanceMode", value: data.attendanceMode ?? "in_person" },
+        { key: "ticketType", value: data.ticketType ?? "standard" },
+        { key: "source", value: "web" },
+        { key: "cancelReasonCode", value: "" },
+        {
+          key: "attendeeAvatarUrlSnapshot",
+          value: data.attendeeAvatarUrlSnapshot ?? "",
+        },
+        {
+          key: "attendeeDisplayNameSnapshot",
+          value: data.attendeeDisplayNameSnapshot ?? data.attendeeName,
+        },
       ],
       expiresIn: expiresInFromEventEnd(eventEndDate, initialStatus),
-    })
+    });
 
-    return { success: true, data: result as { entityKey: Hex; txHash: Hex } }
+    return { success: true, data: result as { entityKey: Hex; txHash: Hex } };
   } catch (error) {
     return {
       success: false,
       error: error instanceof Error ? error.message : String(error),
-    }
+    };
   }
 }
 
@@ -70,104 +175,85 @@ export async function updateRsvpStatus(
   status: RSVPStatus,
 ): Promise<ArkivResult<{ entityKey: Hex; txHash: Hex }>> {
   try {
-    // Validate one-way status transitions
-    const entity = await publicClient.getEntity(entityKey)
-    const currentStatusAttr = entity.attributes.find((a) => a.key === "status")
-    const currentStatus = currentStatusAttr?.value as string
+    const entity = await publicClient.getEntity(entityKey);
+    const currentStatusAttr = entity.attributes.find((a) => a.key === "status");
+    const currentStatus = currentStatusAttr?.value as string;
 
-    const VALID_TRANSITIONS: Record<string, string[]> = {
-      "pending":    ["confirmed", "waitlisted", "not-going"],
-      "waitlisted": ["confirmed", "not-going"],
-      "confirmed":  ["checked-in", "not-going"],
+    const VALID_TRANSITIONS: Record<string, RSVPStatus[]> = {
+      pending: ["confirmed", "waitlisted", "not-going"],
+      waitlisted: ["confirmed", "not-going"],
+      confirmed: ["checked-in", "not-going"],
       "checked-in": [],
-      "not-going":  [],
-    }
+      "not-going": [],
+    };
 
-    const allowed = VALID_TRANSITIONS[currentStatus] ?? []
+    const allowed = VALID_TRANSITIONS[currentStatus] ?? [];
     if (!allowed.includes(status)) {
       return {
         success: false,
-        error: `Invalid status transition: ${currentStatus} → ${status}`,
-      }
+        error: `Invalid status transition: ${currentStatus} -> ${status}`,
+      };
     }
 
-    // Use event-end-aware expiry (30 days for confirmed actions)
-    const expiresIn = Math.floor(ExpirationTime.fromDays(30))
+    const eventKey = entity.attributes.find((a) => a.key === "eventKey")?.value as Hex;
+    const event = await ensureEventExists(publicClient, eventKey);
+    const eventPayload = event.toJson() as { endDate?: string };
+    const eventEndDate = Math.max(
+      toUnixOrNow(eventPayload.endDate),
+      unixNow() + 3_600,
+    );
 
-    const updatedAttrs = entity.attributes.map((a) =>
-      a.key === "status" ? { key: "status", value: status } : a,
-    )
+    const updatedAttrs = entity.attributes.map((attr) => {
+      if (attr.key === "status") return { key: "status", value: status };
+      if (attr.key === "lastActionAt") return { key: "lastActionAt", value: unixNow() };
+      return attr;
+    });
 
-    const currentRsvp = entity.toJson() as RSVP
-    const updatedRsvp: RSVP = { ...currentRsvp }
+    const hasLastActionAt = updatedAttrs.some((attr) => attr.key === "lastActionAt");
+    if (!hasLastActionAt) {
+      updatedAttrs.push({ key: "lastActionAt", value: unixNow() });
+    }
 
     const result = await walletClient.updateEntity({
       entityKey,
-      payload: jsonToPayload(updatedRsvp),
+      payload: entity.payload ?? jsonToPayload(entity.toJson() as RSVP),
       contentType: CONTENT_TYPE,
       attributes: updatedAttrs,
-      expiresIn,
-    })
+      expiresIn: expiresInFromEventEnd(eventEndDate, status),
+    });
 
-    return { success: true, data: result as { entityKey: Hex; txHash: Hex } }
+    return { success: true, data: result as { entityKey: Hex; txHash: Hex } };
   } catch (error) {
     return {
       success: false,
       error: error instanceof Error ? error.message : String(error),
-    }
+    };
   }
 }
 
-/**
- * Deletes an attendee-owned RSVP entity.
- *
- * NOTE (Pattern C — hybrid ownership): Organizer-owned entities linked to this
- * RSVP (approvals, rejections, checkins) cannot be deleted by the attendee’s
- * wallet. They will expire naturally per their TTL settings.
- */
+function toUnixOrNow(value: string | undefined): number {
+  if (!value) return unixNow();
+  if (/^\d+$/.test(value)) return Number(value);
+  const ms = Date.parse(value);
+  if (Number.isNaN(ms)) return unixNow();
+  return Math.floor(ms / 1_000);
+}
+
 export async function deleteRsvp(
   walletClient: WalletArkivClient<Transport, Chain, Account>,
   entityKey: Hex,
 ): Promise<ArkivResult<{ entityKey: Hex; txHash: Hex }>> {
   try {
-    const result = await walletClient.deleteEntity({ entityKey })
-    return { success: true, data: result as { entityKey: Hex; txHash: Hex } }
+    const result = await walletClient.deleteEntity({ entityKey });
+    return { success: true, data: result as { entityKey: Hex; txHash: Hex } };
   } catch (error) {
     return {
       success: false,
       error: error instanceof Error ? error.message : String(error),
-    }
+    };
   }
 }
 
-export async function getRsvpsByEvent(
-  publicClient: PublicArkivClient,
-  eventKey: Hex,
-): Promise<ArkivResult<Entity[]>> {
-  try {
-    const result = await publicClient
-      .buildQuery()
-      .where([
-        eq("type", ENTITY_TYPES.RSVP),
-        eq("eventKey", eventKey),
-      ])
-      .withPayload()
-      .withAttributes()
-      .fetch()
-
-    return { success: true, data: result.entities }
-  } catch (error) {
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : String(error),
-    }
-  }
-}
-
-/**
- * Organizer creates an approval entity (owned by organizer) for a pending RSVP.
- * The RSVP entity itself is left untouched (owned by attendee — organizer cannot modify it).
- */
 export async function confirmRsvp(
   walletClient: WalletArkivClient<Transport, Chain, Account>,
   publicClient: PublicArkivClient,
@@ -176,181 +262,43 @@ export async function confirmRsvp(
   attendeeWallet: Hex,
   eventEndDate: number,
 ): Promise<ArkivResult<{ entityKey: Hex; txHash: Hex }>> {
+  const decision = await upsertDecisionEntity(walletClient, publicClient, {
+    eventKey: eventEntityKey,
+    rsvpKey: rsvpEntityKey,
+    attendeeWallet,
+    decision: "approved",
+    eventEndDate,
+  });
+
+  if (!decision.success) return decision;
+
   try {
-    // Create an approval entity owned by the organizer
-    const result = await walletClient.createEntity({
-      payload: jsonToPayload({ rsvpKey: rsvpEntityKey, attendeeWallet, eventKey: eventEntityKey, approvedAt: Math.floor(Date.now() / 1_000) }),
-      contentType: CONTENT_TYPE,
-      attributes: [
-        { key: "type", value: ENTITY_TYPES.RSVP_APPROVAL },
-        { key: "eventKey", value: eventEntityKey },
-        { key: "rsvpKey", value: rsvpEntityKey },
-        { key: "attendeeWallet", value: attendeeWallet },
-      ],
-      expiresIn: Math.floor(Math.max(
-        eventEndDate - Math.floor(Date.now() / 1_000) + ExpirationTime.fromDays(7),
-        ExpirationTime.fromHours(1),
-      ) / 2) * 2,
-    })
-
-    // Increment event rsvpCount — organizer owns the event so this works
-    try {
-      const { updateRsvpCount } = await import("./event")
-      await updateRsvpCount(walletClient, publicClient, eventEntityKey, true)
-    } catch (_) { /* non-fatal */ }
-
-    return { success: true, data: result as { entityKey: Hex; txHash: Hex } }
-  } catch (error) {
-    return { success: false, error: error instanceof Error ? error.message : String(error) }
+    const { updateRsvpCount } = await import("./event");
+    await updateRsvpCount(walletClient, publicClient, eventEntityKey, true);
+  } catch {
+    // Non-fatal: count can be recomputed later.
   }
+
+  return decision;
 }
 
-/**
- * Organizer creates a rejection entity (owned by organizer) for a pending RSVP.
- * The RSVP entity itself is left untouched (owned by attendee — organizer cannot delete it).
- */
 export async function rejectRsvp(
   walletClient: WalletArkivClient<Transport, Chain, Account>,
+  publicClient: PublicArkivClient,
   rsvpEntityKey: Hex,
   eventEntityKey: Hex,
   attendeeWallet: Hex,
   eventEndDate: number,
 ): Promise<ArkivResult<{ entityKey: Hex; txHash: Hex }>> {
-  try {
-    const result = await walletClient.createEntity({
-      payload: jsonToPayload({ rsvpKey: rsvpEntityKey, attendeeWallet, eventKey: eventEntityKey, rejectedAt: Math.floor(Date.now() / 1_000) }),
-      contentType: CONTENT_TYPE,
-      attributes: [
-        { key: "type", value: ENTITY_TYPES.RSVP_REJECTION },
-        { key: "eventKey", value: eventEntityKey },
-        { key: "rsvpKey", value: rsvpEntityKey },
-        { key: "attendeeWallet", value: attendeeWallet },
-      ],
-      expiresIn: Math.floor(Math.max(
-        eventEndDate - Math.floor(Date.now() / 1_000) + ExpirationTime.fromDays(7),
-        ExpirationTime.fromHours(1),
-      ) / 2) * 2,
-    })
-    return { success: true, data: result as { entityKey: Hex; txHash: Hex } }
-  } catch (error) {
-    return { success: false, error: error instanceof Error ? error.message : String(error) }
-  }
+  return upsertDecisionEntity(walletClient, publicClient, {
+    eventKey: eventEntityKey,
+    rsvpKey: rsvpEntityKey,
+    attendeeWallet,
+    decision: "rejected",
+    eventEndDate,
+  });
 }
 
-/** Returns all organizer-created approval entities for a given event. */
-export async function getApprovalsByEvent(
-  publicClient: PublicArkivClient,
-  eventKey: Hex,
-): Promise<ArkivResult<Entity[]>> {
-  try {
-    const result = await publicClient
-      .buildQuery()
-      .where([
-        eq("type", ENTITY_TYPES.RSVP_APPROVAL),
-        eq("eventKey", eventKey),
-      ])
-      .withAttributes()
-      .fetch()
-    return { success: true, data: result.entities }
-  } catch (error) {
-    return { success: false, error: error instanceof Error ? error.message : String(error) }
-  }
-}
-
-/** Returns all organizer-created rejection entities for a given event. */
-export async function getRejectionsByEvent(
-  publicClient: PublicArkivClient,
-  eventKey: Hex,
-): Promise<ArkivResult<Entity[]>> {
-  try {
-    const result = await publicClient
-      .buildQuery()
-      .where([
-        eq("type", ENTITY_TYPES.RSVP_REJECTION),
-        eq("eventKey", eventKey),
-      ])
-      .withAttributes()
-      .fetch()
-    return { success: true, data: result.entities }
-  } catch (error) {
-    return { success: false, error: error instanceof Error ? error.message : String(error) }
-  }
-}
-
-/** Returns the approval entity for a specific RSVP key (if any), used on attendee side. */
-export async function getApprovalForRsvp(
-  publicClient: PublicArkivClient,
-  rsvpKey: Hex,
-): Promise<ArkivResult<Entity | null>> {
-  try {
-    const result = await publicClient
-      .buildQuery()
-      .where([
-        eq("type", ENTITY_TYPES.RSVP_APPROVAL),
-        eq("rsvpKey", rsvpKey),
-      ])
-      .withAttributes()
-      .fetch()
-    return { success: true, data: result.entities[0] ?? null }
-  } catch (error) {
-    return { success: false, error: error instanceof Error ? error.message : String(error) }
-  }
-}
-
-/** Returns the rejection entity for a specific RSVP key (if any), used on attendee side. */
-export async function getRejectionForRsvp(
-  publicClient: PublicArkivClient,
-  rsvpKey: Hex,
-): Promise<ArkivResult<Entity | null>> {
-  try {
-    const result = await publicClient
-      .buildQuery()
-      .where([
-        eq("type", ENTITY_TYPES.RSVP_REJECTION),
-        eq("rsvpKey", rsvpKey),
-      ])
-      .withAttributes()
-      .fetch()
-    return { success: true, data: result.entities[0] ?? null }
-  } catch (error) {
-    return { success: false, error: error instanceof Error ? error.message : String(error) }
-  }
-}
-
-export async function getRsvpByAttendee(
-  publicClient: PublicArkivClient,
-  eventKey: Hex,
-  attendeeWallet: Hex,
-): Promise<ArkivResult<Entity | null>> {
-  try {
-    const result = await publicClient
-      .buildQuery()
-      .where([
-        eq("type", ENTITY_TYPES.RSVP),
-        eq("eventKey", eventKey),
-      ])
-      .ownedBy(attendeeWallet)
-      .withPayload()
-      .withAttributes()
-      .fetch()
-
-    const entity = result.entities[0] ?? null
-    return { success: true, data: entity }
-  } catch (error) {
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : String(error),
-    }
-  }
-}
-
-/**
- * Promotes the first waitlisted attendee by creating an approval entity.
- * 
- * NOTE (Pattern C): The organizer cannot directly update the attendee-owned RSVP
- * entity. Instead, we create an RSVP_APPROVAL entity (owned by organizer) which
- * the UI interprets as an upgrade from "waitlisted" → "confirmed".
- */
 export async function promoteFirstWaitlisted(
   walletClient: WalletArkivClient<Transport, Chain, Account>,
   publicClient: PublicArkivClient,
@@ -365,36 +313,40 @@ export async function promoteFirstWaitlisted(
         eq("eventKey", eventKey),
         eq("status", "waitlisted"),
       ])
-      .withPayload()
       .withAttributes()
-      .fetch()
+      .orderBy("requestedAt", "number", "asc")
+      .fetch();
 
     if (result.entities.length === 0) {
-      return { success: true, data: { promoted: false } }
+      return { success: true, data: { promoted: false } };
     }
 
-    const first = result.entities[0]
-    const attendeeWalletAttr = first.attributes.find((a) => a.key === "attendeeWallet")
-    const attendeeWallet = (attendeeWalletAttr?.value as Hex) ?? (first.owner as Hex)
+    const first = result.entities[0];
+    const attendeeWallet =
+      (first.attributes.find((a) => a.key === "attendeeWallet")?.value as Hex) ??
+      (first.owner as Hex);
 
-    // Create an approval entity — same pattern as confirmRsvp
-    const endDate = eventEndDate ?? Math.floor(Date.now() / 1_000) + 86_400
-    const approvalRes = await confirmRsvp(
+    const decisionRes = await confirmRsvp(
       walletClient,
       publicClient,
       first.key as Hex,
       eventKey,
       attendeeWallet,
-      endDate,
-    )
+      eventEndDate ?? unixNow() + 86_400,
+    );
 
-    if (!approvalRes.success) throw new Error(approvalRes.error)
+    if (!decisionRes.success) {
+      throw new Error(decisionRes.error);
+    }
 
-    return { success: true, data: { promoted: true, entityKey: first.key as Hex } }
+    return {
+      success: true,
+      data: { promoted: true, entityKey: first.key as Hex },
+    };
   } catch (error) {
     return {
       success: false,
       error: error instanceof Error ? error.message : String(error),
-    }
+    };
   }
 }

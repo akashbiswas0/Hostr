@@ -5,28 +5,55 @@ import { useMemo, useState } from "react";
 import {
   AlertTriangle,
   ArrowRight,
-  Calendar,
+  Bitcoin,
+  Bot,
   Clock3,
+  Cpu,
+  Dumbbell,
+  Flower2,
+  Leaf,
   MapPin,
-  Search,
+  Palette,
+  Soup,
+  type LucideIcon,
 } from "lucide-react";
 
 import { EventCard, EventCardSkeleton } from "@/components/EventCard";
 import { Footer } from "@/components/Footer";
 import { Navbar } from "@/components/Navbar";
+import {
+  DEFAULT_FILTERS,
+  FilterBar,
+  type FilterState,
+} from "@/components/FilterBar";
 import { useEvents } from "@/hooks/useEvent";
+import { EVENT_CATEGORIES, type Category } from "@/lib/arkiv/categories";
 import type { Event } from "@/lib/arkiv/types";
 
-const CATEGORY_COLORS = [
-  "text-amber-300",
-  "text-cyan-300",
-  "text-violet-300",
-  "text-emerald-300",
-  "text-rose-300",
-  "text-lime-300",
-  "text-orange-300",
-  "text-sky-300",
-];
+const CATEGORY_META: Record<Category, { icon: LucideIcon; iconClass: string }> = {
+  Tech: { icon: Cpu, iconClass: "text-amber-300" },
+  "Food & Drink": { icon: Soup, iconClass: "text-orange-300" },
+  AI: { icon: Bot, iconClass: "text-pink-300" },
+  "Arts & Culture": { icon: Palette, iconClass: "text-lime-300" },
+  Climate: { icon: Leaf, iconClass: "text-green-300" },
+  Fitness: { icon: Dumbbell, iconClass: "text-red-300" },
+  Wellness: { icon: Flower2, iconClass: "text-cyan-300" },
+  Crypto: { icon: Bitcoin, iconClass: "text-violet-300" },
+};
+
+function toUnixStartOfDay(date: string): number | undefined {
+  if (!date) return undefined;
+  const ms = Date.parse(`${date}T00:00:00.000Z`);
+  if (Number.isNaN(ms)) return undefined;
+  return Math.floor(ms / 1_000);
+}
+
+function toUnixEndOfDay(date: string): number | undefined {
+  if (!date) return undefined;
+  const ms = Date.parse(`${date}T23:59:59.000Z`);
+  if (Number.isNaN(ms)) return undefined;
+  return Math.floor(ms / 1_000);
+}
 
 function toMs(value: unknown): number {
   if (value == null || value === "") return NaN;
@@ -50,38 +77,50 @@ function formatDateTime(value: unknown): string {
 }
 
 export default function EventsPage() {
-  const [keyword, setKeyword] = useState("");
-  const { events: rawEvents, isLoading, error } = useEvents();
+  const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
 
-  const events = useMemo(() => {
-    const q = keyword.trim().toLowerCase();
-    if (!q) return rawEvents;
+  const queryFilters = useMemo(() => {
+    const isOnline: 0 | 1 | undefined =
+      filters.format === "online"
+        ? 1
+        : filters.format === "in_person"
+          ? 0
+          : undefined;
+    const hasImage: 0 | 1 | undefined =
+      filters.hasImage === "with-image" ? 1 : undefined;
 
-    return rawEvents.filter((entity) => {
-      const event = entity.toJson() as Event;
-      return (
-        (event.title ?? "").toLowerCase().includes(q) ||
-        (event.description ?? "").toLowerCase().includes(q) ||
-        (event.location ?? "").toLowerCase().includes(q) ||
-        (event.category ?? "").toLowerCase().includes(q)
-      );
-    });
-  }, [rawEvents, keyword]);
+    return {
+      category: filters.category || undefined,
+      location: filters.location || undefined,
+      dateFrom: toUnixStartOfDay(filters.dateFrom),
+      dateTo: toUnixEndOfDay(filters.dateTo),
+      status: filters.status || undefined,
+      isOnline,
+      keyword: filters.keyword || undefined,
+      approvalMode: filters.approvalMode || undefined,
+      hasImage,
+      hasSeatsOnly: filters.availability === "open",
+      format: filters.format || undefined,
+    };
+  }, [filters]);
 
+  const { events, isLoading, error } = useEvents(queryFilters);
   const popularEvents = useMemo(() => events.slice(0, 6), [events]);
 
   const categoryCounts = useMemo(() => {
     const counts = new Map<string, number>();
     for (const entity of events) {
       const event = entity.toJson() as Event;
-      const key = event.category?.trim() || "Other";
+      const key = event.category?.trim();
+      if (!key) continue;
       counts.set(key, (counts.get(key) ?? 0) + 1);
     }
-
-    return Array.from(counts.entries())
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 8);
+    return EVENT_CATEGORIES.map((category) => [category, counts.get(category) ?? 0] as const);
   }, [events]);
+
+  function clearFilters() {
+    setFilters(DEFAULT_FILTERS);
+  }
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-[#060912] text-white">
@@ -95,24 +134,22 @@ export default function EventsPage() {
 
       <Navbar active="events" />
 
-      <main className="relative mx-auto max-w-5xl px-4 pb-16 pt-10 sm:px-6">
-        <header className="max-w-3xl">
+      <main className="relative mx-auto max-w-6xl px-4 pb-16 pt-10 sm:px-6">
+        <header className="max-w-4xl">
           <h1 className="text-4xl font-bold tracking-tight">Discover Events</h1>
           <p className="mt-2 text-zinc-300">
-            Explore popular events near you, browse by category, and RSVP instantly.
+            Explore with Arkiv-native filters and keyword search.
           </p>
-
-          <div className="relative mt-6 max-w-xl">
-            <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" />
-            <input
-              type="text"
-              value={keyword}
-              onChange={(event) => setKeyword(event.target.value)}
-              placeholder="Search by title, location, or category"
-              className="w-full rounded-full border border-white/10 bg-white/[0.03] py-3 pl-10 pr-4 text-sm text-white placeholder-zinc-500 focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500/30"
-            />
-          </div>
         </header>
+
+        <div className="mt-6">
+          <FilterBar
+            filters={filters}
+            onChange={setFilters}
+            onClear={clearFilters}
+            showKeyword
+          />
+        </div>
 
         {error ? (
           <div className="mt-10 rounded-2xl border border-rose-500/25 bg-rose-500/10 p-6">
@@ -134,7 +171,7 @@ export default function EventsPage() {
               <div className="mb-4 flex items-end justify-between gap-4">
                 <div>
                   <h2 className="text-3xl font-semibold">Popular Events</h2>
-                  <p className="text-sm text-zinc-400">Trending right now</p>
+                  <p className="text-sm text-zinc-400">Ranked by current result set</p>
                 </div>
                 <Link
                   href="#all-events"
@@ -146,7 +183,7 @@ export default function EventsPage() {
 
               {popularEvents.length === 0 ? (
                 <div className="rounded-2xl border border-dashed border-white/15 bg-white/[0.03] px-6 py-12 text-center">
-                  <p className="text-sm text-zinc-300">No events matched your search.</p>
+                  <p className="text-sm text-zinc-300">No events matched your filters.</p>
                 </div>
               ) : (
                 <div className="grid gap-4 sm:grid-cols-2">
@@ -161,9 +198,9 @@ export default function EventsPage() {
                         <div
                           className="h-20 w-20 shrink-0 rounded-xl border border-white/10 bg-zinc-900"
                           style={
-                            event.imageUrl
+                            event.imageUrl || event.coverImageUrl
                               ? {
-                                  backgroundImage: `linear-gradient(180deg, rgba(10,17,32,0.15), rgba(10,17,32,0.35)), url(${event.imageUrl})`,
+                                  backgroundImage: `linear-gradient(180deg, rgba(10,17,32,0.15), rgba(10,17,32,0.35)), url(${event.coverImageUrl ?? event.imageUrl})`,
                                   backgroundSize: "cover",
                                   backgroundPosition: "center",
                                 }
@@ -195,38 +232,46 @@ export default function EventsPage() {
 
             <section className="mt-10 border-t border-white/10 pt-8">
               <h2 className="text-3xl font-semibold">Browse by Category</h2>
-              {categoryCounts.length === 0 ? (
-                <p className="mt-3 text-sm text-zinc-400">No categories available yet.</p>
-              ) : (
-                <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  {categoryCounts.map(([category, count], index) => (
+              <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {categoryCounts.map(([category, count]) => {
+                  const meta = CATEGORY_META[category];
+                  const Icon = meta.icon;
+                  return (
                     <button
                       key={category}
-                      onClick={() => setKeyword(category)}
+                      onClick={() => setFilters((prev) => ({ ...prev, category }))}
                       className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-4 text-left transition-all hover:border-white/20 hover:bg-white/[0.05]"
                     >
-                      <div className="flex items-center justify-between gap-3">
-                        <p className="text-lg font-semibold text-white">{category}</p>
-                        <Calendar size={16} className={CATEGORY_COLORS[index % CATEGORY_COLORS.length]} />
+                      <div className="flex items-center gap-3">
+                        <div className="rounded-xl border border-white/10 bg-white/[0.02] p-2">
+                          <Icon size={18} className={meta.iconClass} />
+                        </div>
+                        <div>
+                          <p className="text-lg font-semibold text-white">{category}</p>
+                          <p className="mt-0.5 text-sm text-zinc-400">
+                            {count} Event{count !== 1 ? "s" : ""}
+                          </p>
+                        </div>
                       </div>
-                      <p className="mt-1 text-sm text-zinc-400">{count} event{count !== 1 ? "s" : ""}</p>
                     </button>
-                  ))}
-                </div>
-              )}
+                  );
+                })}
+              </div>
             </section>
 
             <section id="all-events" className="mt-10 border-t border-white/10 pt-8">
               <div className="mb-5 flex items-end justify-between gap-4">
                 <div>
                   <h2 className="text-3xl font-semibold">All Events</h2>
-                  <p className="text-sm text-zinc-400">{events.length} event{events.length !== 1 ? "s" : ""}</p>
+                  <p className="text-sm text-zinc-400">
+                    {events.length} event{events.length !== 1 ? "s" : ""}
+                  </p>
                 </div>
               </div>
 
               {events.length === 0 ? (
                 <div className="rounded-2xl border border-dashed border-white/15 bg-white/[0.03] px-6 py-12 text-center">
-                  <p className="text-sm text-zinc-300">No events matched your search.</p>
+                  <p className="text-sm text-zinc-300">No events matched your filters.</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">

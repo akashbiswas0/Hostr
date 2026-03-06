@@ -1,111 +1,85 @@
-import { jsonToPayload } from "@arkiv-network/sdk"
-import { eq } from "@arkiv-network/sdk/query"
-import { ExpirationTime } from "@arkiv-network/sdk/utils"
-import type { Account, Chain, Hex, Transport } from "viem"
-import type {
-  Entity,
-  PublicArkivClient,
-  WalletArkivClient,
-} from "@arkiv-network/sdk"
-import { ENTITY_TYPES } from "../constants"
-import type { ArkivResult } from "../types"
+import { jsonToPayload } from "@arkiv-network/sdk";
+import { ExpirationTime } from "@arkiv-network/sdk/utils";
+import type { Account, Chain, Hex, Transport } from "viem";
+import type { PublicArkivClient, WalletArkivClient } from "@arkiv-network/sdk";
+import { ENTITY_TYPES } from "../constants";
+import type { ArkivResult } from "../types";
+import { ensureEvenSeconds, schemaAttributes, unixNow } from "../v2";
 
-const CONTENT_TYPE = "application/json" as const
+const CONTENT_TYPE = "application/json" as const;
 
-// Checkin entities get a 1-day grace period after event end.
-// Result is rounded DOWN to a multiple of 2 (BLOCK_TIME) so that
-// `expiresIn / BLOCK_TIME` is always an integer when the SDK converts to blocks.
 function expiresInFromEventEnd(eventEndDate: number): number {
-  const secondsFromNow =
-    eventEndDate - Math.floor(Date.now() / 1_000)
-  // Add 1-day grace period after event end
-  const gracePeriod = ExpirationTime.fromDays(1)
-  const seconds = Math.floor(Math.max(secondsFromNow + gracePeriod, ExpirationTime.fromHours(1)))
-  return Math.floor(seconds / 2) * 2
+  const secondsFromNow = eventEndDate - unixNow();
+  const gracePeriod = ExpirationTime.fromDays(2);
+  const seconds = Math.floor(
+    Math.max(secondsFromNow + gracePeriod, ExpirationTime.fromHours(1)),
+  );
+  return ensureEvenSeconds(seconds);
+}
+
+async function assertRefs(
+  publicClient: PublicArkivClient,
+  eventKey: Hex,
+  rsvpKey?: Hex,
+): Promise<void> {
+  const event = await publicClient.getEntity(eventKey);
+  const eventType = event.attributes.find((a) => a.key === "type")?.value;
+  if (eventType !== ENTITY_TYPES.EVENT) {
+    throw new Error("Invalid event reference for check-in.");
+  }
+
+  if (!rsvpKey) return;
+  const rsvp = await publicClient.getEntity(rsvpKey);
+  const rsvpType = rsvp.attributes.find((a) => a.key === "type")?.value;
+  if (rsvpType !== ENTITY_TYPES.RSVP) {
+    throw new Error("Invalid RSVP reference for check-in.");
+  }
 }
 
 export async function createCheckinEntity(
   walletClient: WalletArkivClient<Transport, Chain, Account>,
+  publicClient: PublicArkivClient,
   eventKey: Hex,
   attendeeWallet: Hex,
   eventEndDate: number,
   rsvpKey?: Hex,
+  method: "qr" | "manual" = "manual",
 ): Promise<ArkivResult<{ entityKey: Hex; txHash: Hex }>> {
   try {
+    await assertRefs(publicClient, eventKey, rsvpKey);
+
+    const checkedInAt = unixNow();
+
     const checkinData = {
       eventKey,
       attendeeWallet,
       rsvpKey: rsvpKey ?? "",
-      checkedInAt: Math.floor(Date.now() / 1_000),
-    }
+      checkedInAt,
+      checkinMethod: method,
+      checkinGate: "default",
+    };
 
     const result = await walletClient.createEntity({
       payload: jsonToPayload(checkinData),
       contentType: CONTENT_TYPE,
       attributes: [
         { key: "type", value: ENTITY_TYPES.CHECKIN },
+        ...schemaAttributes(),
         { key: "eventKey", value: eventKey },
         { key: "attendeeWallet", value: attendeeWallet },
-        // Entity relationship chain: eventKey → rsvpKey → checkin
         { key: "rsvpKey", value: rsvpKey ?? "" },
+        { key: "checkedInAt", value: checkedInAt },
+        { key: "checkinMethod", value: method },
+        { key: "checkinGate", value: "default" },
       ],
       expiresIn: expiresInFromEventEnd(eventEndDate),
-    })
+    });
 
-    return { success: true, data: result as { entityKey: Hex; txHash: Hex } }
+    return { success: true, data: result as { entityKey: Hex; txHash: Hex } };
   } catch (error) {
     return {
       success: false,
       error: error instanceof Error ? error.message : String(error),
-    }
-  }
-}
-
-export async function getCheckinsByEvent(
-  publicClient: PublicArkivClient,
-  eventKey: Hex,
-): Promise<ArkivResult<Entity[]>> {
-  try {
-    const result = await publicClient
-      .buildQuery()
-      .where([
-        eq("type", ENTITY_TYPES.CHECKIN),
-        eq("eventKey", eventKey),
-      ])
-      .withPayload()
-      .withAttributes()
-      .fetch()
-
-    return { success: true, data: result.entities }
-  } catch (error) {
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : String(error),
-    }
-  }
-}
-
-export async function hasAttendeeCheckedIn(
-  publicClient: PublicArkivClient,
-  eventKey: Hex,
-  attendeeWallet: Hex,
-): Promise<ArkivResult<boolean>> {
-  try {
-    const result = await publicClient
-      .buildQuery()
-      .where([
-        eq("type", ENTITY_TYPES.CHECKIN),
-        eq("eventKey", eventKey),
-        eq("attendeeWallet", attendeeWallet),
-      ])
-      .withAttributes()
-      .fetch()
-
-    return { success: true, data: result.entities.length > 0 }
-  } catch (error) {
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : String(error),
-    }
+    };
   }
 }

@@ -10,16 +10,12 @@ import { useEvent } from "@/hooks/useEvent";
 import { useWallet } from "@/hooks/useWallet";
 import { publicClient } from "@/lib/arkiv/client";
 import { updateEventDetails } from "@/lib/arkiv/entities/event";
+import { EVENT_CATEGORIES, type Category } from "@/lib/arkiv/categories";
 import { OrganizerNav } from "@/components/OrganizerNav";
 import { ConnectButton } from "@/components/ConnectButton";
 import type { Event } from "@/lib/arkiv/types";
 
 type FormState = Event;
-
-const CATEGORIES = [
-  "DeFi", "NFT", "Gaming", "IRL", "Virtual",
-  "Infrastructure", "DAO", "Education", "Other",
-];
 
 const inputCls =
   "w-full rounded-lg border border-white/10 bg-zinc-800 px-3 py-2.5 text-sm text-white placeholder-zinc-500 focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500/50 transition-colors";
@@ -61,6 +57,7 @@ export default function EditEventPage() {
   
   useEffect(() => {
     if (event) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setForm({
         ...event,
         date: toLocalInput(event.date),
@@ -208,10 +205,10 @@ export default function EditEventPage() {
               <label className={labelCls}>Category</label>
               <select
                 value={form.category}
-                onChange={(e) => setField("category", e.target.value)}
+                onChange={(e) => setField("category", e.target.value as Category)}
                 className={inputCls}
               >
-                {CATEGORIES.map((c) => (
+                {EVENT_CATEGORIES.map((c) => (
                   <option key={c} value={c}>
                     {c}
                   </option>

@@ -1,121 +1,117 @@
-/**
- * Proof-of-Attendance (PoA) entity — minted by organizer after attendee check-in.
- * Long-lived on-chain proof that an attendee was present at an event.
- */
+import { jsonToPayload } from "@arkiv-network/sdk";
+import { ExpirationTime } from "@arkiv-network/sdk/utils";
+import type { Account, Chain, Hex, Transport } from "viem";
+import type { PublicArkivClient, WalletArkivClient } from "@arkiv-network/sdk";
+import { ENTITY_TYPES } from "../constants";
+import type { ArkivResult } from "../types";
+import {
+  mediaHost,
+  normalizeMediaUrl,
+  schemaAttributes,
+  unixNow,
+} from "../v2";
 
-import { jsonToPayload } from "@arkiv-network/sdk"
-import { eq } from "@arkiv-network/sdk/query"
-import { ExpirationTime } from "@arkiv-network/sdk/utils"
-import type { Account, Chain, Hex, Transport } from "viem"
-import type {
-  Entity,
-  PublicArkivClient,
-  WalletArkivClient,
-} from "@arkiv-network/sdk"
-import { ENTITY_TYPES } from "../constants"
-import type { ArkivResult } from "../types"
-
-const CONTENT_TYPE = "application/json" as const
+const CONTENT_TYPE = "application/json" as const;
 
 export interface ProofOfAttendance {
-  eventKey: string
-  attendeeWallet: string
-  eventTitle: string
-  checkedInAt: number
-  mintedAt: number
+  eventKey: string;
+  attendeeWallet: string;
+  eventTitle: string;
+  checkedInAt: number;
+  issuedAt: number;
+  poapImageUrl?: string;
+  poapAnimationUrl?: string;
+  poapTemplateId?: string;
 }
 
-/**
- * Mints a proof-of-attendance entity after successful check-in.
- * Owned by the organizer on behalf of the attendee.
- * Expiration: 2 years (long-lived proof).
- */
+async function assertRefs(
+  publicClient: PublicArkivClient,
+  eventKey: Hex,
+  rsvpKey: Hex,
+  checkinKey: Hex,
+): Promise<void> {
+  const [event, rsvp, checkin] = await Promise.all([
+    publicClient.getEntity(eventKey),
+    publicClient.getEntity(rsvpKey),
+    publicClient.getEntity(checkinKey),
+  ]);
+
+  const eventType = event.attributes.find((a) => a.key === "type")?.value;
+  const rsvpType = rsvp.attributes.find((a) => a.key === "type")?.value;
+  const checkinType = checkin.attributes.find((a) => a.key === "type")?.value;
+
+  if (eventType !== ENTITY_TYPES.EVENT) throw new Error("Invalid event reference for PoAP.");
+  if (rsvpType !== ENTITY_TYPES.RSVP) throw new Error("Invalid RSVP reference for PoAP.");
+  if (checkinType !== ENTITY_TYPES.CHECKIN) throw new Error("Invalid checkin reference for PoAP.");
+}
+
 export async function createPoAEntity(
   walletClient: WalletArkivClient<Transport, Chain, Account>,
+  publicClient: PublicArkivClient,
   eventKey: Hex,
   rsvpKey: Hex,
   attendeeWallet: Hex,
   checkinKey: Hex,
   eventTitle: string,
+  media?: {
+    poapImageUrl?: string;
+    poapAnimationUrl?: string;
+    poapTemplateId?: string;
+  },
 ): Promise<ArkivResult<{ entityKey: Hex; txHash: Hex }>> {
   try {
+    await assertRefs(publicClient, eventKey, rsvpKey, checkinKey);
+
+    const issuedAt = unixNow();
+    const checkedInAt = issuedAt;
+    const poapImageUrl = normalizeMediaUrl(media?.poapImageUrl);
+    const poapAnimationUrl = normalizeMediaUrl(media?.poapAnimationUrl);
+
     const poaData: ProofOfAttendance = {
       eventKey,
       attendeeWallet,
       eventTitle,
-      checkedInAt: Math.floor(Date.now() / 1_000),
-      mintedAt: Math.floor(Date.now() / 1_000),
-    }
+      checkedInAt,
+      issuedAt,
+      poapImageUrl,
+      poapAnimationUrl,
+      poapTemplateId: media?.poapTemplateId,
+    };
 
     const result = await walletClient.createEntity({
       payload: jsonToPayload(poaData),
       contentType: CONTENT_TYPE,
       attributes: [
         { key: "type", value: ENTITY_TYPES.PROOF_OF_ATTENDANCE },
+        ...schemaAttributes(),
         { key: "eventKey", value: eventKey },
         { key: "rsvpKey", value: rsvpKey },
         { key: "attendeeWallet", value: attendeeWallet },
         { key: "checkinKey", value: checkinKey },
+        { key: "eventTitle", value: eventTitle },
+        { key: "issuedAt", value: issuedAt },
+        { key: "checkedInAt", value: checkedInAt },
+        { key: "proofVersion", value: "v2" },
+        { key: "eventCategory", value: "" },
+        { key: "poapImageUrl", value: poapImageUrl },
+        { key: "poapAnimationUrl", value: poapAnimationUrl },
+        { key: "poapTemplateId", value: media?.poapTemplateId ?? "" },
+        { key: "poapMediaHost", value: mediaHost(poapImageUrl || poapAnimationUrl) },
+        { key: "hasPoapImage", value: poapImageUrl ? 1 : 0 },
       ],
-      // PoA is a long-lived proof — 2 years
       expiresIn: Math.floor(ExpirationTime.fromDays(730)),
-    })
+    });
 
-    return { success: true, data: result as { entityKey: Hex; txHash: Hex } }
+    await walletClient.changeOwnership({
+      entityKey: result.entityKey as Hex,
+      newOwner: attendeeWallet,
+    });
+
+    return { success: true, data: result as { entityKey: Hex; txHash: Hex } };
   } catch (error) {
     return {
       success: false,
       error: error instanceof Error ? error.message : String(error),
-    }
-  }
-}
-
-/** Get all PoA entities for a specific attendee wallet. */
-export async function getPoAsByAttendee(
-  publicClient: PublicArkivClient,
-  attendeeWallet: Hex,
-): Promise<ArkivResult<Entity[]>> {
-  try {
-    const result = await publicClient
-      .buildQuery()
-      .where([
-        eq("type", ENTITY_TYPES.PROOF_OF_ATTENDANCE),
-        eq("attendeeWallet", attendeeWallet),
-      ])
-      .withPayload()
-      .withAttributes()
-      .fetch()
-
-    return { success: true, data: result.entities }
-  } catch (error) {
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : String(error),
-    }
-  }
-}
-
-/** Get all PoA entities for a specific event. */
-export async function getPoAsByEvent(
-  publicClient: PublicArkivClient,
-  eventKey: Hex,
-): Promise<ArkivResult<Entity[]>> {
-  try {
-    const result = await publicClient
-      .buildQuery()
-      .where([
-        eq("type", ENTITY_TYPES.PROOF_OF_ATTENDANCE),
-        eq("eventKey", eventKey),
-      ])
-      .withPayload()
-      .withAttributes()
-      .fetch()
-
-    return { success: true, data: result.entities }
-  } catch (error) {
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : String(error),
-    }
+    };
   }
 }

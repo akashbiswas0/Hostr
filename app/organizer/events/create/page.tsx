@@ -35,7 +35,9 @@ import { ConnectButton } from "@/components/ConnectButton";
 import { OrganizerNav } from "@/components/OrganizerNav";
 import { useOrganizer } from "@/hooks/useOrganizer";
 import { useWallet } from "@/hooks/useWallet";
+import { publicClient } from "@/lib/arkiv/client";
 import { createEventEntity } from "@/lib/arkiv/entities/event";
+import { EVENT_CATEGORIES, type Category } from "@/lib/arkiv/categories";
 import type { Event } from "@/lib/arkiv/types";
 
 const displayFont = Space_Grotesk({
@@ -43,18 +45,6 @@ const displayFont = Space_Grotesk({
   weight: ["400", "500", "600", "700"],
   display: "swap",
 });
-
-const CATEGORIES = [
-  "DeFi",
-  "NFT",
-  "Gaming",
-  "IRL",
-  "Virtual",
-  "Infrastructure",
-  "DAO",
-  "Education",
-  "Other",
-];
 
 const THEME_OPTIONS = [
   { id: "minimal", label: "Minimal", preview: "linear-gradient(145deg, #ece6f2 0%, #b7b1c5 100%)" },
@@ -85,7 +75,9 @@ const FONT_PRESETS = [
   "Alternate",
 ] as const;
 
-const EMPTY_FORM: Omit<Event, "status"> = {
+type FormState = Omit<Event, "status" | "category"> & { category: Category | "" };
+
+const EMPTY_FORM: FormState = {
   title: "",
   description: "",
   category: "",
@@ -97,8 +89,6 @@ const EMPTY_FORM: Omit<Event, "status"> = {
   requiresRsvp: false,
   imageUrl: "",
 };
-
-type FormState = typeof EMPTY_FORM;
 
 function isFormValid(form: FormState): boolean {
   if (!form.title.trim() || !form.description.trim() || !form.category) return false;
@@ -192,12 +182,14 @@ export default function CreateEventPage() {
 
     const eventData: Event = {
       ...form,
+      category: form.category as Category,
       virtualLink: form.virtualLink?.trim() || undefined,
       status: visibility === "public" ? "upcoming" : "draft",
     };
 
     const res = await createEventEntity(
       walletClient,
+      publicClient,
       eventData,
       organizerKey ?? undefined,
       organizer?.name ?? undefined,
@@ -336,11 +328,11 @@ export default function CreateEventPage() {
                 <Globe size={14} className="text-[#dbc3dd]" />
                 <select
                   value={form.category}
-                  onChange={(event) => setField("category", event.target.value)}
+                  onChange={(event) => setField("category", event.target.value as Category | "")}
                   className="min-w-[180px] appearance-none bg-transparent text-sm font-semibold text-white outline-none"
                 >
                   <option value="" className="bg-[#4f2953] text-white">Select category</option>
-                  {CATEGORIES.map((category) => (
+                  {EVENT_CATEGORIES.map((category) => (
                     <option key={category} value={category} className="bg-[#4f2953] text-white">
                       {category}
                     </option>

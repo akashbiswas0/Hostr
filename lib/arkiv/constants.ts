@@ -1,11 +1,14 @@
+export const SCHEMA_VERSION = 2 as const;
+
 export const ENTITY_TYPES = {
-  ORGANIZER_PROFILE: "organizer_profile",
-  EVENT: "event",
-  RSVP: "rsvp",
-  CHECKIN: "checkin",
-  RSVP_APPROVAL: "rsvp_approval",
-  RSVP_REJECTION: "rsvp_rejection",
-  PROOF_OF_ATTENDANCE: "proof_of_attendance",
+  ORGANIZER_PROFILE: "organizer_profile_v2",
+  USER_PROFILE: "user_profile_v2",
+  EVENT: "event_v2",
+  RSVP: "rsvp_v2",
+  RSVP_DECISION: "rsvp_decision_v2",
+  CHECKIN: "checkin_v2",
+  PROOF_OF_ATTENDANCE: "poa_v2",
+  EVENT_SEARCH_TOKEN: "event_search_token_v2",
 } as const;
 
 export type EntityType = (typeof ENTITY_TYPES)[keyof typeof ENTITY_TYPES];

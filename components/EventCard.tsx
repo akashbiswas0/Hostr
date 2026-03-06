@@ -1,43 +1,12 @@
 import Link from "next/link";
 import { Calendar, MapPin, Users } from "lucide-react";
 import type { Entity } from "@arkiv-network/sdk";
+import { CATEGORY_STYLE, DEFAULT_CATEGORY_STYLE } from "@/lib/arkiv/categories";
 import type { Event } from "@/lib/arkiv/types";
 import { StatusBadge } from "./StatusBadge";
 
-const CATEGORY_STYLE: Record<string, { gradient: string; badge: string }> = {
-  DeFi: {
-    gradient: "from-purple-400 to-violet-600",
-    badge: "bg-white/90 text-purple-700",
-  },
-  NFT: {
-    gradient: "from-pink-400 to-rose-500",
-    badge: "bg-white/90 text-pink-700",
-  },
-  Gaming: {
-    gradient: "from-cyan-400 to-blue-500",
-    badge: "bg-white/90 text-cyan-700",
-  },
-  IRL: {
-    gradient: "from-amber-400 to-orange-500",
-    badge: "bg-white/90 text-amber-700",
-  },
-  Virtual: {
-    gradient: "from-emerald-400 to-teal-500",
-    badge: "bg-white/90 text-emerald-700",
-  },
-  DAO: {
-    gradient: "from-indigo-400 to-purple-500",
-    badge: "bg-white/90 text-indigo-700",
-  },
-};
-
 function getCategoryStyle(category: string) {
-  return (
-    CATEGORY_STYLE[category] ?? {
-      gradient: "from-gray-400 to-gray-500",
-      badge: "bg-white/90 text-gray-700",
-    }
-  );
+  return CATEGORY_STYLE[category as keyof typeof CATEGORY_STYLE] ?? DEFAULT_CATEGORY_STYLE;
 }
 
 function toMs(value: unknown): number {
@@ -101,7 +70,7 @@ export function EventCardSkeleton() {
 }
 
 export function EventCard({ entity, event }: EventCardProps) {
-  const { gradient, badge } = getCategoryStyle(event.category);
+  const { cardGradient, badge } = getCategoryStyle(event.category);
 
   const rsvpCount = Number(
     entity.attributes.find((a) => a.key === "rsvpCount")?.value ?? 0,
@@ -123,7 +92,7 @@ export function EventCard({ entity, event }: EventCardProps) {
       className="group flex flex-col rounded-2xl bg-zinc-900 border border-white/5 overflow-hidden hover:border-white/10 hover:bg-zinc-800/80 transition-all duration-200 cursor-pointer"
     >
       {}
-      <div className={`relative h-28 bg-gradient-to-br ${gradient}`}>
+      <div className={`relative h-28 bg-gradient-to-br ${cardGradient}`}>
         {}
         <span
           className={`absolute top-3 left-3 text-xs font-semibold rounded-full px-2.5 py-0.5 ${badge}`}
