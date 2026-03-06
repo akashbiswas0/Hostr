@@ -17,7 +17,7 @@ interface LocationMapPreviewProps {
 
 export default function LocationMapPreview({ lat, lng, address }: LocationMapPreviewProps) {
   return (
-    <div className="relative rounded-xl overflow-hidden mt-2">
+    <div className="relative rounded-xl overflow-hidden mt-2" style={{ isolation: 'isolate' }}>
       <MapContainer
         center={[lat, lng]}
         zoom={15}

@@ -14,7 +14,7 @@ interface AIImageGeneratorProps {
   eventCategory: string;
   isOpen: boolean;
   onClose: () => void;
-  onSelectImage: (dataUrl: string) => void;
+  onSelectImage: (dataUrl: string) => Promise<void>;
 }
 
 const STYLE_PILLS = [
@@ -70,6 +70,7 @@ export default function AIImageGenerator({
   );
   const [userEditedPrompt, setUserEditedPrompt] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const [generatedDataUrl, setGeneratedDataUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -86,6 +87,7 @@ export default function AIImageGenerator({
     if (isOpen && !prevOpen.current) {
       setGeneratedDataUrl(null);
       setError(null);
+      setIsUploading(false);
       setUserEditedPrompt(false);
       setPrompt(buildDefaultPrompt(eventTitle, eventCategory));
     }
@@ -117,7 +119,7 @@ export default function AIImageGenerator({
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-[1100] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -220,7 +222,7 @@ export default function AIImageGenerator({
             <button
               type="button"
               onClick={handleGenerate}
-              disabled={isGenerating}
+              disabled={isGenerating || isUploading}
               className="absolute right-2 top-2 flex items-center gap-1 rounded-lg bg-black/60 px-2.5 py-1.5 text-xs text-white hover:bg-black/80 disabled:opacity-50"
             >
               <RefreshCw size={12} />
@@ -230,14 +232,23 @@ export default function AIImageGenerator({
             {/* Use this image button */}
             <button
               type="button"
-              onClick={() => {
-                onSelectImage(generatedDataUrl);
+              disabled={isUploading}
+              onClick={async () => {
+                setIsUploading(true);
                 onClose();
+                try {
+                  await onSelectImage(generatedDataUrl);
+                } finally {
+                  setIsUploading(false);
+                }
               }}
-              className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-fuchsia-500 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-fuchsia-400"
+              className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-fuchsia-500 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-fuchsia-400 disabled:cursor-not-allowed disabled:opacity-70"
             >
-              <Check size={15} />
-              Use This Image
+              {isUploading ? (
+                <><SpinnerIcon /> Uploading...</>
+              ) : (
+                <><Check size={15} /> Use This Image</>
+              )}
             </button>
           </div>
         )}
