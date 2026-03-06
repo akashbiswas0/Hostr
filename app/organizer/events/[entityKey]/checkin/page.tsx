@@ -32,7 +32,6 @@ import { OrganizerNav } from "@/components/OrganizerNav";
 import { ConnectButton } from "@/components/ConnectButton";
 import type { RSVP } from "@/lib/arkiv/types";
 
-// Dynamically import the QR scanner so it only loads on the client (requires browser camera API)
 const QrScanner = dynamic(
   () => import("@/components/QrScanner").then((m) => m.QrScanner),
   {
@@ -46,8 +45,6 @@ const QrScanner = dynamic(
   },
 );
 
-// ─── Types ───────────────────────────────────────────────────────────────────
-
 type PageState =
   | { kind: "idle" }
   | { kind: "scanning" }
@@ -56,8 +53,6 @@ type PageState =
   | { kind: "success"; attendeeName: string; attendeeWallet: string; txHash: string }
   | { kind: "already-checked-in"; attendeeName: string }
   | { kind: "error"; message: string };
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function truncate(addr: string) {
   if (!addr || addr.length < 10) return addr;
@@ -74,8 +69,6 @@ function toMs(value: unknown): number {
 
 const EXPLORER = "https://explorer.kaolin.hoodi.arkiv.network";
 
-// ─── Page ────────────────────────────────────────────────────────────────────
-
 export default function CheckinPage() {
   const params = useParams();
   const entityKey = params.entityKey as Hex;
@@ -86,10 +79,8 @@ export default function CheckinPage() {
   const [state, setState] = useState<PageState>({ kind: "idle" });
   const [manualInput, setManualInput] = useState("");
 
-  // Prevent double-processing if the QR scanner fires the callback twice
   const processingRef = useRef(false);
 
-  // ── Core verify + check-in logic ──────────────────────────────────────────
   const processRsvpKey = useCallback(
     async (rawKey: string) => {
       if (!walletClient || !event) return;
@@ -100,7 +91,7 @@ export default function CheckinPage() {
       setState({ kind: "verifying", rsvpKey });
 
       try {
-        // 1. Fetch the RSVP entity from on-chain
+
         let rsvpEntity;
         try {
           rsvpEntity = await publicClient.getEntity(rsvpKey);
@@ -112,23 +103,18 @@ export default function CheckinPage() {
           return;
         }
 
-        // 2. Verify it's typed as "rsvp"
         const typeAttr = rsvpEntity.attributes.find((a) => a.key === "type");
         if (typeAttr?.value !== "rsvp") {
           setState({ kind: "error", message: "Invalid QR code — this is not an RSVP entity." });
           return;
         }
 
-        // 3. Verify it belongs to THIS event
         const eventKeyAttr = rsvpEntity.attributes.find((a) => a.key === "eventKey");
         if ((eventKeyAttr?.value as string)?.toLowerCase() !== entityKey.toLowerCase()) {
           setState({ kind: "error", message: "This RSVP belongs to a different event." });
           return;
         }
 
-        // 4. Check RSVP status — "confirmed" passes immediately.
-        //    "pending" may still be valid if the organizer created an approval entity
-        //    (organizer cannot modify attendee-owned RSVP, so status stays "pending" on-chain).
         const statusAttr = rsvpEntity.attributes.find((a) => a.key === "status");
         const status = statusAttr?.value as string;
 
@@ -138,7 +124,7 @@ export default function CheckinPage() {
         }
 
         if (status !== "confirmed" && status !== "checked-in") {
-          // status is "pending" — check if organizer has approved via approval entity
+
           const approvalRes = await getApprovalForRsvp(publicClient, rsvpKey);
           const isApproved = approvalRes.success && approvalRes.data !== null;
           if (!isApproved) {
@@ -148,23 +134,20 @@ export default function CheckinPage() {
             });
             return;
           }
-          // Approved via approval entity — allow check-in to proceed
+
         }
 
-        // 5. Resolve attendee wallet (attribute > entity owner)
         const walletAttr = rsvpEntity.attributes.find((a) => a.key === "attendeeWallet");
         const attendeeWallet = ((walletAttr?.value as string) || rsvpEntity.owner || "") as Hex;
         const rsvpData = rsvpEntity.toJson() as RSVP;
         const attendeeName = rsvpData.attendeeName || truncate(attendeeWallet);
 
-        // 6. Prevent duplicate check-in
         const alreadyRes = await hasAttendeeCheckedIn(publicClient, entityKey, attendeeWallet);
         if (alreadyRes.success && alreadyRes.data) {
           setState({ kind: "already-checked-in", attendeeName });
           return;
         }
 
-        // 7. Write the check-in entity on-chain
         const endMs = toMs(event.endDate);
         const endDateSeconds = isNaN(endMs)
           ? Math.floor(Date.now() / 1_000) + 3_600
@@ -181,7 +164,6 @@ export default function CheckinPage() {
         );
         if (!res.success) throw new Error(res.error);
 
-        // Mint proof-of-attendance (non-fatal — checkin already succeeded)
         try {
           await createPoAEntity(
             walletClient,
@@ -192,7 +174,7 @@ export default function CheckinPage() {
             res.data.entityKey,
             event.title ?? "",
           );
-        } catch { /* PoA is best-effort */ }
+        } catch {  }
 
         toast.success(`${attendeeName} checked in ✓`);
         setState({
@@ -217,8 +199,6 @@ export default function CheckinPage() {
     setState({ kind: "idle" });
     setManualInput("");
   }
-
-  // ── Auth guards ───────────────────────────────────────────────────────────
 
   if (!isConnected || !isCorrectChain) {
     return (
@@ -277,14 +257,12 @@ export default function CheckinPage() {
     );
   }
 
-  // ── UI ────────────────────────────────────────────────────────────────────
-
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
       <OrganizerNav crumb="Check-in" />
 
       <div className="mx-auto max-w-lg px-4 py-8 space-y-6">
-        {/* Header */}
+        {}
         <div>
           <Link
             href={`/organizer/events/${entityKey}/attendees`}
@@ -296,7 +274,7 @@ export default function CheckinPage() {
           <p className="text-zinc-400 text-sm mt-1">{event.title}</p>
         </div>
 
-        {/* ── State: idle ── */}
+        {}
         {state.kind === "idle" && (
           <div className="space-y-3">
             <button
@@ -331,7 +309,7 @@ export default function CheckinPage() {
           </div>
         )}
 
-        {/* ── State: scanning ── */}
+        {}
         {state.kind === "scanning" && (
           <div className="space-y-4">
             <div className="rounded-xl overflow-hidden border border-white/10 bg-zinc-900">
@@ -359,7 +337,7 @@ export default function CheckinPage() {
           </div>
         )}
 
-        {/* ── State: manual input ── */}
+        {}
         {state.kind === "manual" && (
           <div className="space-y-4">
             <div className="rounded-xl border border-white/10 bg-zinc-900 p-5 space-y-4">
@@ -392,7 +370,7 @@ export default function CheckinPage() {
           </div>
         )}
 
-        {/* ── State: verifying ── */}
+        {}
         {state.kind === "verifying" && (
           <div className="rounded-xl border border-white/10 bg-zinc-900 p-8 text-center space-y-4">
             <Loader2 className="animate-spin text-violet-400 mx-auto" size={32} />
@@ -405,7 +383,7 @@ export default function CheckinPage() {
           </div>
         )}
 
-        {/* ── State: success ── */}
+        {}
         {state.kind === "success" && (
           <div className="space-y-4">
             <div className="rounded-xl border border-emerald-700/30 bg-emerald-950/30 p-6 text-center space-y-3">
@@ -440,7 +418,7 @@ export default function CheckinPage() {
           </div>
         )}
 
-        {/* ── State: already checked in ── */}
+        {}
         {state.kind === "already-checked-in" && (
           <div className="space-y-4">
             <div className="rounded-xl border border-amber-700/30 bg-amber-950/30 p-6 text-center space-y-3">
@@ -463,7 +441,7 @@ export default function CheckinPage() {
           </div>
         )}
 
-        {/* ── State: error ── */}
+        {}
         {state.kind === "error" && (
           <div className="space-y-4">
             <div className="rounded-xl border border-rose-700/30 bg-rose-950/30 p-6 text-center space-y-3">

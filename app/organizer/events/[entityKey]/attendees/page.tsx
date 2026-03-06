@@ -100,7 +100,6 @@ export default function AttendeesPage() {
   const { event, entity: eventEntity, isLoading: isEventLoading } = useEvent(entityKey);
   const { address, isConnected, isCorrectChain, walletClient } = useWallet();
 
-  
   const {
     data: rsvpEntities,
     isLoading: isRsvpLoading,
@@ -114,8 +113,6 @@ export default function AttendeesPage() {
     enabled: !!entityKey,
   });
 
-  
-  
   const {
     data: checkinEntities,
     refetch: refetchCheckins,
@@ -130,7 +127,6 @@ export default function AttendeesPage() {
 
   const [rejectTarget, setRejectTarget] = useState<AttendeeRow | null>(null);
 
-  // Approval entities (owned by organizer, one per approved pending RSVP)
   const {
     data: approvalEntities,
     refetch: refetchApprovals,
@@ -143,7 +139,6 @@ export default function AttendeesPage() {
     enabled: !!entityKey,
   });
 
-  // Rejection entities (owned by organizer, one per rejected pending RSVP)
   const {
     data: rejectionEntities,
     refetch: refetchRejections,
@@ -156,7 +151,6 @@ export default function AttendeesPage() {
     enabled: !!entityKey,
   });
 
-  
   const checkedInWallets = useMemo(() => {
     return new Set(
       (checkinEntities ?? []).map((e) => {
@@ -166,7 +160,6 @@ export default function AttendeesPage() {
     );
   }, [checkinEntities]);
 
-  // Set of rsvpKeys that have been approved by the organizer
   const approvedRsvpKeys = useMemo(() => {
     return new Set(
       (approvalEntities ?? []).map((e) => {
@@ -176,7 +169,6 @@ export default function AttendeesPage() {
     );
   }, [approvalEntities]);
 
-  // Set of rsvpKeys that have been rejected by the organizer
   const rejectedRsvpKeys = useMemo(() => {
     return new Set(
       (rejectionEntities ?? []).map((e) => {
@@ -186,9 +178,6 @@ export default function AttendeesPage() {
     );
   }, [rejectionEntities]);
 
-  
-  
-  
   const checkInMutation = useMutation({
     mutationFn: async (vars: {
       rsvpKey: Hex;
@@ -197,7 +186,7 @@ export default function AttendeesPage() {
       if (!walletClient || !event?.endDate) {
         throw new Error("Missing walletClient or event data");
       }
-      // Prevent duplicate check-in
+
       const alreadyRes = await hasAttendeeCheckedIn(publicClient, entityKey, vars.ownerAddress);
       if (alreadyRes.success && alreadyRes.data) {
         throw new Error("This attendee has already been checked in");
@@ -217,7 +206,6 @@ export default function AttendeesPage() {
       );
       if (!checkinRes.success) throw new Error(checkinRes.error);
 
-      // Mint proof-of-attendance (non-fatal)
       try {
         await createPoAEntity(
           walletClient,
@@ -228,7 +216,7 @@ export default function AttendeesPage() {
           checkinRes.data.entityKey,
           event?.title ?? "",
         );
-      } catch { /* PoA is best-effort */ }
+      } catch {  }
     },
     onSuccess: () => {
       toast.success("Attendee checked in ✓");
@@ -238,11 +226,10 @@ export default function AttendeesPage() {
     onError: (e) => toast.error(friendlyError(e instanceof Error ? e.message : "Check-in failed")),
   });
 
-  // Approve a pending RSVP request — creates an organizer-owned approval entity
   const approveMutation = useMutation({
     mutationFn: async (vars: { rsvpKey: Hex; ownerAddress: Hex }) => {
       if (!walletClient || !event?.endDate) throw new Error("Wallet or event data missing");
-      // Prevent approving a rejected RSVP
+
       const rejRes = await getRejectionForRsvp(publicClient, vars.rsvpKey);
       if (rejRes.success && rejRes.data) throw new Error("Cannot approve — this RSVP was already rejected");
       const ms = toMs(event.endDate);
@@ -263,17 +250,16 @@ export default function AttendeesPage() {
       toast.success("Request approved ✓");
       refetchApprovals();
       refetchRsvps();
-      // Capacity-status promotion is now handled here (not on RSVP submission)
+
       autoPromoteCapacityStatus(walletClient!, publicClient, entityKey).catch(() => {});
     },
     onError: (e) => toast.error(friendlyError(e instanceof Error ? e.message : "Approval failed")),
   });
 
-  // Reject a pending RSVP request — creates an organizer-owned rejection entity
   const rejectMutation = useMutation({
     mutationFn: async (vars: { rsvpKey: Hex; ownerAddress: Hex }) => {
       if (!walletClient || !event?.endDate) throw new Error("Wallet or event data missing");
-      // Prevent rejecting an approved RSVP
+
       const appRes = await getApprovalForRsvp(publicClient, vars.rsvpKey);
       if (appRes.success && appRes.data) throw new Error("Cannot reject — this RSVP was already approved");
       const ms = toMs(event.endDate);
@@ -298,7 +284,6 @@ export default function AttendeesPage() {
     onError: (e) => toast.error(friendlyError(e instanceof Error ? e.message : "Rejection failed")),
   });
 
-  
   if (!isConnected || !isCorrectChain) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-zinc-950 p-6">
@@ -353,10 +338,6 @@ export default function AttendeesPage() {
     );
   }
 
-  
-  
-  
-  
   const allRows: AttendeeRow[] = (rsvpEntities ?? []).map((ent) => {
     const data = ent.toJson() as RSVP;
     const ownerAddress = (ent.owner ?? "") as Hex;
@@ -366,14 +347,13 @@ export default function AttendeesPage() {
     const statusAttr = ent.attributes.find((a) => a.key === "status");
     const rsvpAttrStatus = (statusAttr?.value as RSVPStatus) ?? "confirmed";
 
-    // Derive effective status: checkin > rejection > approval > raw status
     let status: EffectiveStatus;
     if (isCheckedIn) {
       status = "checked-in";    } else if (rsvpAttrStatus === "not-going") {
       status = "not-going";    } else if (rsvpAttrStatus === "pending" && rejectedRsvpKeys.has(rsvpKeyLower)) {
       status = "rejected";
     } else if (rsvpAttrStatus === "pending" && approvedRsvpKeys.has(rsvpKeyLower)) {
-      // Organizer approved this pending request
+
       status = "confirmed";
     } else {
       status = rsvpAttrStatus;
@@ -388,7 +368,6 @@ export default function AttendeesPage() {
     };
   });
 
-  // Pending = status still "pending" AND not yet approved or rejected
   const pending = allRows.filter((r) => r.status === "pending");
   const confirmed = allRows.filter(
     (r) => r.status === "confirmed" || r.status === "checked-in",

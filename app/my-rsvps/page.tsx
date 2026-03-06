@@ -162,7 +162,6 @@ function RsvpRow({
     "confirmed";
   const isCheckedIn = rsvpStatus === "checked-in";
 
-  // For pending RSVPs, check if the organizer has approved or rejected via separate entities
   const { data: approvalEntity } = useQuery({
     queryKey: ["rsvp-approval", rsvpEntity.key],
     queryFn: async () => {
@@ -183,7 +182,6 @@ function RsvpRow({
     staleTime: 30_000,
   });
 
-  // Derive effective status: organizer approval/rejection overrides raw pending status
   const effectiveStatus = isCheckedIn
     ? "checked-in"
     : rsvpStatus === "not-going"
@@ -196,11 +194,10 @@ function RsvpRow({
 
   const { event, isLoading: eventLoading } = useEvent(eventKey);
   const isEventEnded = event?.status === "ended";
-  // Show QR only for offline, confirmed/checked-in RSVPs
+
   const isOffline = !!(event?.location && !event?.virtualLink);
   const showQr = isOffline && (effectiveStatus === "confirmed" || effectiveStatus === "checked-in");
 
-  // "Not Going" mutation — updates status on-chain, decrements count if was confirmed
   const notGoingMutation = useMutation({
     mutationFn: async () => {
       if (!walletClient) throw new Error("Wallet not connected");
@@ -214,7 +211,7 @@ function RsvpRow({
       );
       if (!res.success) throw new Error(res.error);
       if (wasConfirmed && eventKey) {
-        // Decrement confirmed count and promote next waitlisted attendee
+
         await updateRsvpCount(walletClient, publicClient, eventKey, false).catch(() => {});
         await promoteFirstWaitlisted(walletClient, publicClient, eventKey).catch(() => {});
       }
@@ -291,7 +288,7 @@ function RsvpRow({
           {}
           <ChainLink entityKey={rsvpEntity.key} label="Verified ✓" />
 
-          {/* Not Going button — shown for any active status that can be withdrawn */}
+          {}
           {!isCheckedIn &&
             !isEventEnded &&
             effectiveStatus !== "rejected" &&
@@ -319,7 +316,7 @@ function RsvpRow({
         </div>
       </div>
 
-      {/* Error feedback */}
+      {}
       {notGoingMutation.isError && (
         <div className="border-t border-red-800/30 bg-red-950/20 px-5 py-2">
           <p className="text-xs text-red-400 font-mono">

@@ -37,49 +37,38 @@ function isProviderNotFoundError(error: unknown): boolean {
 }
 
 export interface UseWalletReturn {
-  
+
   address: `0x${string}` | undefined;
-  
+
   isConnected: boolean;
-  
+
   isConnecting: boolean;
-  
 
   walletClient: WalletArkivClient<Transport, Chain, Account> | null;
-  
+
   connect: () => void;
-  
+
   disconnect: () => void;
-  
+
   isCorrectChain: boolean;
-  
+
   switchToKaolin: () => void;
 }
 
 export function useWallet(): UseWalletReturn {
-  
+
   const { address, isConnected, chainId } = useConnection();
 
-  
-  
   const { data: wagmiWalletClient } = useWalletClient();
 
   const connectors = useConnectors();
 
   const { mutate: connectMutate, isPending: isConnecting } = useConnect();
 
-  
   const { mutate: switchChain } = useSwitchChain();
 
-  
   const { mutate: disconnectMutate } = useDisconnect();
 
-  
-  
-  
-  
-  
-  
   const walletClient = useMemo<WalletArkivClient<
     Transport,
     Chain,
@@ -92,10 +81,8 @@ export function useWallet(): UseWalletReturn {
     ) as WalletArkivClient<Transport, Chain, Account>;
   }, [wagmiWalletClient]);
 
-  
   const isCorrectChain = isConnected && chainId === KAOLIN_CHAIN_ID;
 
-  
   const connect = () => {
     const connector = connectors.find((item) => item.id === "metaMask") ?? connectors[0];
     if (!connector) {

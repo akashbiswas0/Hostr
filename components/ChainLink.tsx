@@ -9,7 +9,7 @@ const EXPLORER = "https://explorer.kaolin.hoodi.arkiv.network";
 interface ChainLinkProps {
   entityKey?: Hex | string | null;
   txHash?: Hex | string | null;
-  
+
   label?: string;
 }
 

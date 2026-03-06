@@ -1,8 +1,3 @@
-/**
- * Maps raw blockchain / Arkiv SDK errors to user-friendly messages.
- * Keeps blockchain jargon out of the UI.
- */
-
 const ERROR_MAP: Array<{ pattern: RegExp; message: string }> = [
   { pattern: /user rejected|user denied/i, message: "Transaction was cancelled." },
   { pattern: /insufficient funds/i, message: "Insufficient funds to complete this action." },
@@ -19,10 +14,6 @@ const ERROR_MAP: Array<{ pattern: RegExp; message: string }> = [
   { pattern: /0x[a-f0-9]+/i, message: "Something went wrong. Please try again." },
 ]
 
-/**
- * Converts a raw error (string or Error) into a user-friendly message.
- * Falls back to a generic message for unrecognised patterns.
- */
 export function friendlyError(raw: unknown): string {
   const message =
     raw instanceof Error ? raw.message : typeof raw === "string" ? raw : String(raw ?? "")
@@ -31,7 +22,6 @@ export function friendlyError(raw: unknown): string {
     if (pattern.test(message)) return friendly
   }
 
-  // Generic fallback – strips hex addresses / technical noise
   if (message.length > 120) return "Something went wrong. Please try again."
   return message || "An unexpected error occurred."
 }

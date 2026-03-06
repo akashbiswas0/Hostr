@@ -5,9 +5,9 @@ import { AlertTriangle } from "lucide-react";
 
 interface Props {
   children: React.ReactNode;
-  
+
   label?: string;
-  
+
   fallback?: React.ReactNode;
 }
 
@@ -30,7 +30,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
   }
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
-    
+
     console.error("[ErrorBoundary]", error, info.componentStack);
   }
 
@@ -46,7 +46,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
     return (
       <div className="flex flex-col items-center gap-4 rounded-2xl border border-red-500/20 bg-red-950/10 px-6 py-12 text-center">
         <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-950/40 border border-red-700/30">
-          <AlertTriangle size={22} className="text-red-400" />    
+          <AlertTriangle size={22} className="text-red-400" />
         </div>
         <div>
           <p className="font-semibold text-white">

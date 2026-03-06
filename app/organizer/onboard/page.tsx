@@ -27,7 +27,6 @@ export default function OnboardPage() {
   const { address, isConnected, isCorrectChain, walletClient } = useWallet();
   const { organizer, isLoading: profileLoading, refetch } = useOrganizer();
 
-  
   useEffect(() => {
     if (!profileLoading && organizer) {
       router.push("/organizer/dashboard");
@@ -59,7 +58,6 @@ export default function OnboardPage() {
     }
   }
 
-  
   if (!isConnected || !isCorrectChain) {
     return (
       <WalletGate

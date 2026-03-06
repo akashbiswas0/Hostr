@@ -76,7 +76,6 @@ export default function DashboardPage() {
   const [deletingKey, setDeletingKey] = useState<string | null>(null);
   const [confirmDeleteKey, setConfirmDeleteKey] = useState<{ key: Hex; title: string } | null>(null);
 
-  
   useEffect(() => {
     if (!profileLoading && isConnected && isCorrectChain && !organizer) {
       router.push("/organizer/onboard");
@@ -95,7 +94,6 @@ export default function DashboardPage() {
       .catch(() => {});
   }, [eventsLoading]);
 
-  
   const statusMutation = useMutation({
     mutationFn: async ({
       entityKey,
@@ -117,7 +115,6 @@ export default function DashboardPage() {
     onError: (e) => toast.error(e instanceof Error ? e.message : "Status update failed"),
   });
 
-  
   const deleteMutation = useMutation({
     mutationFn: async (eventKey: Hex) => {
       if (!walletClient) throw new Error("Wallet not connected");
@@ -133,7 +130,6 @@ export default function DashboardPage() {
     onError: () => setDeletingKey(null),
   });
 
-  
   if (!isConnected || !isCorrectChain) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-zinc-950 p-6">
