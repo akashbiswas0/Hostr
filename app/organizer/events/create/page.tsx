@@ -578,13 +578,10 @@ export default function CreateEventPage() {
             for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
             const ext = mimeType.split("/")[1] ?? "jpg";
             const file = new File([bytes], `ai-generated.${ext}`, { type: mimeType });
-
-            const blob = await fetch(dataUrl).then((response) => response.blob());
-            const file = new File([blob], "ai-generated.png", { type: "image/png" });
             const mediaId = await uploadEventImage(file);
             setField("imageUrl", mediaId);
             toast.success("AI image uploaded ✓", { id: uploadToast });
-          } catch {
+          } catch (err) {
             console.error("[AI upload]", err);
             toast.error(
               `Upload failed: ${err instanceof Error ? err.message : String(err)}`,

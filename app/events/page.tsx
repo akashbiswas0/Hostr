@@ -12,8 +12,10 @@ import {
   Dumbbell,
   Flower2,
   Leaf,
+  Loader2,
   MapPin,
   Palette,
+  Sparkles,
   Soup,
   type LucideIcon,
 } from "lucide-react";
@@ -40,6 +42,13 @@ const CATEGORY_META: Record<Category, { icon: LucideIcon; iconClass: string }> =
   Fitness: { icon: Dumbbell, iconClass: "text-red-300" },
   Wellness: { icon: Flower2, iconClass: "text-cyan-300" },
   Crypto: { icon: Bitcoin, iconClass: "text-violet-300" },
+};
+
+type SearchMode = "ai" | "manual";
+
+type AiSearchResponse = {
+  filters?: FilterState;
+  error?: string;
 };
 
 function toUnixStartOfDay(date: string): number | undefined {
@@ -104,6 +113,10 @@ function PopularThumb({ event }: { event: Event }) {
 
 export default function EventsPage() {
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
+  const [searchMode, setSearchMode] = useState<SearchMode>("ai");
+  const [aiPrompt, setAiPrompt] = useState("");
+  const [isApplyingAi, setIsApplyingAi] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
   const defaultAppearance = resolveEventAppearance(null);
 
   const queryFilters = useMemo(() => {
@@ -169,6 +182,34 @@ export default function EventsPage() {
     setFilters(DEFAULT_FILTERS);
   }
 
+  async function applyAiSearch() {
+    const prompt = aiPrompt.trim();
+    if (!prompt || isApplyingAi) return;
+
+    setIsApplyingAi(true);
+    setAiError(null);
+
+    try {
+      const response = await fetch("/api/ai-event-search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt }),
+      });
+
+      const data = (await response.json()) as AiSearchResponse;
+      if (!response.ok || !data.filters) {
+        throw new Error(data.error || "AI search mapping failed.");
+      }
+
+      setFilters({ ...DEFAULT_FILTERS, ...data.filters });
+      setSearchMode("ai");
+    } catch (error) {
+      setAiError(error instanceof Error ? error.message : "AI search mapping failed.");
+    } finally {
+      setIsApplyingAi(false);
+    }
+  }
+
   return (
     <div
       className="relative min-h-screen overflow-hidden text-white"
@@ -183,17 +224,80 @@ export default function EventsPage() {
         <header className="max-w-4xl">
           <h1 className="text-4xl font-bold tracking-tight">Discover Events</h1>
           <p className="mt-2 text-zinc-300">
-            Explore with Arkiv-native filters and keyword search.
+            Ask in plain language, or switch to manual filters.
           </p>
         </header>
 
-        <div className="mt-6">
-          <FilterBar
-            filters={filters}
-            onChange={setFilters}
-            onClear={clearFilters}
-            showKeyword
-          />
+        <div className="mt-6 rounded-2xl border border-white/10 bg-transparent p-4">
+          <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_220px] sm:items-end">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-zinc-400">AI Search</label>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <div className="relative flex-1">
+                  <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-zinc-400">
+                    <Sparkles size={15} />
+                  </span>
+                  <input
+                    type="text"
+                    value={aiPrompt}
+                    onChange={(e) => setAiPrompt(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        void applyAiSearch();
+                      }
+                    }}
+                    placeholder='Try: "show me events in New Delhi about food"'
+                    className="w-full rounded-lg border border-white/10 bg-white/[0.03] py-2 pl-9 pr-3 text-sm text-white placeholder-zinc-500 focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500/30"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void applyAiSearch()}
+                  disabled={isApplyingAi || !aiPrompt.trim()}
+                  className="inline-flex min-w-[160px] items-center justify-center gap-2 rounded-lg border border-violet-400/30 bg-violet-500/20 px-4 py-2 text-sm font-semibold text-violet-100 transition-colors hover:bg-violet-500/30 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {isApplyingAi ? (
+                    <>
+                      <Loader2 size={14} className="animate-spin" />
+                      Applying...
+                    </>
+                  ) : (
+                    "Apply AI Search"
+                  )}
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label className="mb-1 block text-xs font-medium text-zinc-400">Search mode</label>
+              <select
+                value={searchMode}
+                onChange={(e) => setSearchMode(e.target.value as SearchMode)}
+                className="w-full rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-white focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500/30"
+              >
+                <option value="ai">AI search</option>
+                <option value="manual">Manual filters</option>
+              </select>
+            </div>
+          </div>
+
+          {aiError && (
+            <p className="mt-3 rounded-lg border border-rose-400/30 bg-rose-900/25 px-3 py-2 text-xs text-rose-200">
+              {aiError}
+            </p>
+          )}
+
+          {searchMode === "manual" ? (
+            <div className="mt-4">
+              <FilterBar
+                filters={filters}
+                onChange={setFilters}
+                onClear={clearFilters}
+                showKeyword
+              />
+            </div>
+          ) : null}
         </div>
 
         {error ? (

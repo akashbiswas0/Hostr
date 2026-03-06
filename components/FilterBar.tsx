@@ -39,10 +39,10 @@ export const DEFAULT_FILTERS: FilterState = {
 };
 
 const inputCls =
-  "w-full rounded-lg border border-white/10 bg-zinc-800 px-3 py-2 text-sm text-white placeholder-zinc-500 focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500/30 transition-colors";
+  "w-full rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-white placeholder-zinc-500 focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500/30 transition-colors";
 
 const selectCls =
-  "w-full rounded-lg border border-white/10 bg-zinc-800 px-3 py-2 text-sm text-white focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500/30 transition-colors appearance-none cursor-pointer";
+  "w-full rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-white focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500/30 transition-colors appearance-none cursor-pointer";
 
 export function FilterBar({ filters, onChange, onClear, showKeyword = true }: FilterBarProps) {
   const hasFilters =
@@ -62,7 +62,7 @@ export function FilterBar({ filters, onChange, onClear, showKeyword = true }: Fi
   }
 
   return (
-    <div className="rounded-2xl border border-white/5 bg-zinc-900 p-4">
+    <div className="rounded-2xl border border-white/10 bg-transparent p-4">
       {showKeyword && (
         <div className="mb-3">
           <div className="relative">

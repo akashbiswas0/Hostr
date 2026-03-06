@@ -142,7 +142,7 @@ export default function AIImageGenerator({
           </div>
           <div>
             <h2 className="text-base font-bold text-white">AI Cover Generator</h2>
-            <p className="text-xs text-[#ceb2d1]">Powered by Gemini</p>
+            
           </div>
         </div>
 
