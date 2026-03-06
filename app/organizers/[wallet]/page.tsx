@@ -32,6 +32,15 @@ function truncateAddress(addr: string) {
   return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
 }
 
+/** Supports both plain https:// URLs and imagedb media_ids (UUID). */
+function resolveAvatarSrc(url: string): string {
+  if (!url) return "";
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(url)) {
+    return `/api/imagedb/media/${url}`;
+  }
+  return url;
+}
+
 function AvatarPlaceholder({ name }: { name: string }) {
   const initials = name
     .split(" ")
@@ -175,7 +184,7 @@ export default function OrganizerProfilePage() {
               <div className="shrink-0">
                 {profile?.avatarUrl ? (
                   <img
-                    src={profile.avatarUrl}
+                    src={resolveAvatarSrc(profile.avatarUrl)}
                     alt={profile.name}
                     className="h-24 w-24 rounded-full object-cover ring-4 ring-white/10 sm:h-28 sm:w-28"
                     onError={(e) => {

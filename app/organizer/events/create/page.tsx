@@ -108,12 +108,20 @@ const EMPTY_FORM: FormState = {
   imageUrl: "",
 };
 
+function getValidationError(form: FormState): string | null {
+  if (!form.title.trim()) return "Event name is required.";
+  if (!form.description.trim()) return "Description is required.";
+  if (!form.category) return "Category is required.";
+  if (!form.date) return "Start date is required.";
+  if (!form.endDate) return "End date is required.";
+  if (new Date(form.date) >= new Date(form.endDate)) return "End time must be after start time.";
+  if (!form.location.trim() && !form.virtualLink?.trim()) return "Add a location or virtual link.";
+  if (!form.capacity || form.capacity < 1) return "Capacity must be at least 1.";
+  return null;
+}
+
 function isFormValid(form: FormState): boolean {
-  if (!form.title.trim() || !form.description.trim() || !form.category) return false;
-  if (!form.date || !form.endDate || form.date >= form.endDate) return false;
-  if (!form.location.trim() && !form.virtualLink?.trim()) return false;
-  if (form.capacity < 1) return false;
-  return true;
+  return getValidationError(form) === null;
 }
 
 function getUtcOffsetLabel(date = new Date()): string {
@@ -152,7 +160,8 @@ export default function CreateEventPage() {
     [],
   );
   const utcOffset = useMemo(() => getUtcOffsetLabel(), []);
-  const valid = useMemo(() => isFormValid(form), [form]);
+  const validationError = useMemo(() => getValidationError(form), [form]);
+  const valid = validationError === null;
   const selectedThemeMeta = useMemo(
     () => EVENT_THEME_OPTIONS.find((theme) => theme.id === selectedTheme) ?? EVENT_THEME_OPTIONS[0],
     [selectedTheme],
@@ -519,11 +528,17 @@ export default function CreateEventPage() {
               </div>
             )}
 
+            {!valid && validationError && (
+              <p className="mt-4 rounded-lg border border-amber-300/20 bg-amber-900/25 px-4 py-2 text-xs text-amber-200">
+                ⚠ {validationError}
+              </p>
+            )}
+
             <button
               type="button"
               onClick={handleSubmit}
               disabled={!valid || submitting}
-              className="mt-9 w-full rounded-xl bg-[#f4f2f6] py-3.5 text-3xl font-semibold text-[#2f1733] transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-50 sm:text-[2rem]"
+              className="mt-4 w-full rounded-xl bg-[#f4f2f6] py-3.5 text-3xl font-semibold text-[#2f1733] transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-50 sm:text-[2rem]"
             >
               {submitting ? (
                 <span className="inline-flex items-center gap-2 text-lg sm:text-xl">

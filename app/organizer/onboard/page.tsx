@@ -1,14 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import toast from "react-hot-toast";
-import { AlertTriangle, Lock, ArrowLeft, ArrowRight } from "lucide-react";
+import { AlertTriangle, Lock, ArrowLeft, ArrowRight, Camera, X } from "lucide-react";
 import { useOrganizer } from "@/hooks/useOrganizer";
 import { useWallet } from "@/hooks/useWallet";
 import { createOrganizerEntity } from "@/lib/arkiv/entities/organizer";
 import { ConnectButton } from "@/components/ConnectButton";
+import { uploadEventImage } from "@/lib/imagedb";
 import type { OrganizerProfile } from "@/lib/arkiv/types";
 
 const EMPTY: OrganizerProfile = {
@@ -36,9 +37,35 @@ export default function OnboardPage() {
   const [form, setForm] = useState<OrganizerProfile>(EMPTY);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [imageUploading, setImageUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   function set(key: keyof OrganizerProfile, value: string) {
     setForm((prev) => ({ ...prev, [key]: value }));
+  }
+
+  async function handleAvatarUpload(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 25 * 1024 * 1024) {
+      toast.error("Image must be under 25 MB");
+      return;
+    }
+    setImagePreview(URL.createObjectURL(file));
+    setImageUploading(true);
+    const t = toast.loading("Uploading avatar…");
+    try {
+      const mediaId = await uploadEventImage(file);
+      set("avatarUrl", mediaId);
+      toast.success("Avatar uploaded ✓", { id: t });
+    } catch (err) {
+      toast.error(`Upload failed: ${err instanceof Error ? err.message : String(err)}`, { id: t });
+      setImagePreview(null);
+      set("avatarUrl", "");
+    } finally {
+      setImageUploading(false);
+    }
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -125,13 +152,47 @@ export default function OnboardPage() {
               />
             </Field>
 
-            <Field label="Avatar URL">
+            <Field label="Profile Photo">
+              <div className="flex items-center gap-4">
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={imageUploading}
+                  className="relative h-20 w-20 shrink-0 overflow-hidden rounded-full border-2 border-dashed border-white/20 bg-zinc-800 transition-colors hover:border-violet-500 disabled:opacity-60"
+                >
+                  {imagePreview ? (
+                    <img src={imagePreview} alt="avatar preview" className="h-full w-full object-cover" />
+                  ) : (
+                    <Camera size={22} className="absolute inset-0 m-auto text-zinc-500" />
+                  )}
+                  {imageUploading && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/60">
+                      <SpinnerIcon />
+                    </div>
+                  )}
+                </button>
+                <div className="flex-1">
+                  <p className="text-xs text-zinc-400">
+                    {imagePreview ? "Click photo to change" : "Click to upload a profile photo"}
+                  </p>
+                  <p className="mt-0.5 text-[11px] text-zinc-600">PNG, JPG, WebP or GIF · max 25 MB</p>
+                  {imagePreview && (
+                    <button
+                      type="button"
+                      onClick={() => { setImagePreview(null); set("avatarUrl", ""); }}
+                      className="mt-1.5 inline-flex items-center gap-1 text-[11px] text-zinc-500 hover:text-rose-400 transition-colors"
+                    >
+                      <X size={11} /> Remove
+                    </button>
+                  )}
+                </div>
+              </div>
               <input
-                type="url"
-                placeholder="https://example.com/avatar.jpg"
-                value={form.avatarUrl}
-                onChange={(e) => set("avatarUrl", e.target.value)}
-                className={inputCls}
+                ref={fileInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/webp,image/gif"
+                className="hidden"
+                onChange={handleAvatarUpload}
               />
             </Field>
 

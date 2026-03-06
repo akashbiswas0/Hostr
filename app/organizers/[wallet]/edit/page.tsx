@@ -1,15 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState, type ChangeEvent } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import toast from "react-hot-toast";
-import { AlertTriangle, Lock, ShieldOff, ArrowLeft, ArrowRight, Check } from "lucide-react";
+import { AlertTriangle, Lock, ShieldOff, ArrowLeft, ArrowRight, Check, Camera, X } from "lucide-react";
 
 import { useOrganizer } from "@/hooks/useOrganizer";
 import { useWallet } from "@/hooks/useWallet";
 import { updateOrganizerEntity } from "@/lib/arkiv/entities/organizer";
 import { ConnectButton } from "@/components/ConnectButton";
+import { uploadEventImage } from "@/lib/imagedb";
 import type { OrganizerProfile } from "@/lib/arkiv/types";
 
 const inputCls =
@@ -36,6 +37,8 @@ export default function EditOrganizerPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
+  const [imageUploading, setImageUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const organizerForm: OrganizerProfile = organizer
     ? {
@@ -50,6 +53,35 @@ export default function EditOrganizerPage() {
 
   function set<K extends keyof OrganizerProfile>(key: K, value: OrganizerProfile[K]) {
     setForm((prev) => ({ ...(prev ?? organizerForm), [key]: value }));
+  }
+
+  /** Resolve a media_id or URL to a displayable src. */
+  function resolveAvatarSrc(url: string): string {
+    if (!url) return "";
+    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(url)) {
+      return `/api/imagedb/media/${url}`;
+    }
+    return url;
+  }
+
+  async function handleAvatarUpload(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 25 * 1024 * 1024) {
+      toast.error("Image must be under 25 MB");
+      return;
+    }
+    setImageUploading(true);
+    const t = toast.loading("Uploading avatar…");
+    try {
+      const mediaId = await uploadEventImage(file);
+      set("avatarUrl", mediaId);
+      toast.success("Avatar uploaded ✓", { id: t });
+    } catch (err) {
+      toast.error(`Upload failed: ${err instanceof Error ? err.message : String(err)}`, { id: t });
+    } finally {
+      setImageUploading(false);
+    }
   }
 
   if (!isConnected || !isCorrectChain) {
@@ -180,32 +212,61 @@ export default function EditOrganizerPage() {
               />
             </div>
 
-            {}
+            {/* Profile Photo */}
             <div>
-              <label className={labelCls}>Avatar URL</label>
-              <input
-                type="url"
-                placeholder="https://example.com/avatar.png"
-                value={formValue.avatarUrl}
-                onChange={(e) => set("avatarUrl", e.target.value)}
-                className={inputCls}
-              />
-              {formValue.avatarUrl && (
-                <div className="mt-2 flex items-center gap-2">
-                  <img
-                    src={formValue.avatarUrl}
-                    alt="preview"
-                    className="h-10 w-10 rounded-full object-cover ring-2 ring-white/10"
-                    onError={(e) => {
-                      (e.currentTarget as HTMLImageElement).style.opacity = "0.3";
-                    }}
-                  />
-                  <span className="text-xs text-zinc-500">Preview</span>
+              <label className={labelCls}>Profile Photo</label>
+              <div className="flex items-center gap-4">
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={imageUploading}
+                  className="relative h-20 w-20 shrink-0 overflow-hidden rounded-full border-2 border-dashed border-white/20 bg-zinc-800 transition-colors hover:border-violet-500 disabled:opacity-60"
+                >
+                  {formValue.avatarUrl ? (
+                    <img
+                      src={resolveAvatarSrc(formValue.avatarUrl)}
+                      alt="avatar"
+                      className="h-full w-full object-cover"
+                      onError={(e) => { (e.currentTarget as HTMLImageElement).style.opacity = "0.3"; }}
+                    />
+                  ) : (
+                    <Camera size={22} className="absolute inset-0 m-auto text-zinc-500" />
+                  )}
+                  {imageUploading && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/60">
+                      <SpinnerIcon />
+                    </div>
+                  )}
+                  <span className="absolute bottom-0 right-0 flex h-6 w-6 items-center justify-center rounded-full border border-white/20 bg-zinc-700">
+                    <Camera size={11} className="text-zinc-300" />
+                  </span>
+                </button>
+                <div className="flex-1">
+                  <p className="text-xs text-zinc-400">
+                    {formValue.avatarUrl ? "Click photo to change" : "Click to upload a profile photo"}
+                  </p>
+                  <p className="mt-0.5 text-[11px] text-zinc-600">PNG, JPG, WebP or GIF · max 25 MB</p>
+                  {formValue.avatarUrl && (
+                    <button
+                      type="button"
+                      onClick={() => set("avatarUrl", "")}
+                      className="mt-1.5 inline-flex items-center gap-1 text-[11px] text-zinc-500 hover:text-rose-400 transition-colors"
+                    >
+                      <X size={11} /> Remove photo
+                    </button>
+                  )}
                 </div>
-              )}
+              </div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/webp,image/gif"
+                className="hidden"
+                onChange={handleAvatarUpload}
+              />
             </div>
 
-            {}
+            {/* Website */}
             <div>
               <label className={labelCls}>Website</label>
               <input
