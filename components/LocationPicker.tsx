@@ -113,7 +113,9 @@ export default function LocationPicker({ value, onChange, onLocationChange }: Lo
           type="text"
           value={localValue}
           onChange={(e) => {
-            setLocalValue(e.target.value)
+            const val = e.target.value
+            setLocalValue(val)
+            onChange(val)
             if (selectedLocation) setSelectedLocation(null)
           }}
           placeholder="Search for a venue or address..."
