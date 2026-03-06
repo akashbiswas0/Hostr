@@ -28,16 +28,16 @@ const labelCls = "mb-1.5 block text-xs font-medium text-zinc-400";
 function toLocalInput(value: unknown): string {
   if (!value) return "";
   const str = String(value);
-  
+
   if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(str)) return str.slice(0, 16);
-  
+
   if (/^\d+$/.test(str)) {
     const ms = Number(str) * 1_000;
     return new Date(ms - new Date(ms).getTimezoneOffset() * 60_000)
       .toISOString()
       .slice(0, 16);
   }
-  
+
   const d = new Date(str);
   if (isNaN(d.getTime())) return "";
   return new Date(d.getTime() - d.getTimezoneOffset() * 60_000)
@@ -58,7 +58,6 @@ export default function EditEventPage() {
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
 
-  
   useEffect(() => {
     if (event) {
       setForm({
@@ -70,7 +69,6 @@ export default function EditEventPage() {
     }
   }, [event]);
 
-  
   if (!isConnected || !isCorrectChain) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-zinc-950 p-6">
@@ -102,7 +100,6 @@ export default function EditEventPage() {
     );
   }
 
-  
   if (
     address &&
     entity.owner &&

@@ -269,7 +269,7 @@ export default function CreateEventPage() {
               className="relative block aspect-square w-full overflow-hidden rounded-2xl border border-white/15 bg-[#633566] shadow-[0_18px_60px_-30px_rgba(0,0,0,0.75)]"
             >
               {imagePreview ? (
-                // eslint-disable-next-line @next/next/no-img-element
+
                 <img src={imagePreview} alt="Cover preview" className="h-full w-full object-cover" />
               ) : (
                 <div className="relative flex h-full w-full items-center justify-center p-6">

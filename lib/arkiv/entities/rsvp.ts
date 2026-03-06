@@ -12,20 +12,15 @@ import type { ArkivResult, RSVP, RSVPStatus } from "../types"
 
 const CONTENT_TYPE = "application/json" as const
 
-// Compute expiry for RSVP entities — differentiated by status:
-// - "pending" RSVPs auto-expire in 7 days if not approved
-// - "confirmed" / "waitlisted" RSVPs live until event end + 7 days
-// Result is rounded DOWN to a multiple of 2 (BLOCK_TIME) so that
-// `expiresIn / BLOCK_TIME` is always an integer when the SDK converts to blocks.
 function expiresInFromEventEnd(eventEndDate: number, status?: string): number {
   if (status === "pending") {
-    // Pending RSVPs auto-expire in 7 days
+
     const seconds = Math.floor(ExpirationTime.fromDays(7))
     return Math.floor(seconds / 2) * 2
   }
   const secondsFromNow =
     eventEndDate - Math.floor(Date.now() / 1_000)
-  // Add 7-day grace period after event end
+
   const gracePeriod = ExpirationTime.fromDays(7)
   const seconds = Math.floor(Math.max(secondsFromNow + gracePeriod, ExpirationTime.fromHours(1)))
   return Math.floor(seconds / 2) * 2
@@ -46,8 +41,7 @@ export async function createRsvpEntity(
       attributes: [
         { key: "type", value: ENTITY_TYPES.RSVP },
         { key: "eventKey", value: data.eventKey },
-        
-        
+
         { key: "attendeeWallet", value: walletClient.account.address },
         { key: "status", value: initialStatus },
       ],
@@ -70,7 +64,7 @@ export async function updateRsvpStatus(
   status: RSVPStatus,
 ): Promise<ArkivResult<{ entityKey: Hex; txHash: Hex }>> {
   try {
-    // Validate one-way status transitions
+
     const entity = await publicClient.getEntity(entityKey)
     const currentStatusAttr = entity.attributes.find((a) => a.key === "status")
     const currentStatus = currentStatusAttr?.value as string
@@ -91,7 +85,6 @@ export async function updateRsvpStatus(
       }
     }
 
-    // Use event-end-aware expiry (30 days for confirmed actions)
     const expiresIn = Math.floor(ExpirationTime.fromDays(30))
 
     const updatedAttrs = entity.attributes.map((a) =>
@@ -118,13 +111,6 @@ export async function updateRsvpStatus(
   }
 }
 
-/**
- * Deletes an attendee-owned RSVP entity.
- *
- * NOTE (Pattern C — hybrid ownership): Organizer-owned entities linked to this
- * RSVP (approvals, rejections, checkins) cannot be deleted by the attendee’s
- * wallet. They will expire naturally per their TTL settings.
- */
 export async function deleteRsvp(
   walletClient: WalletArkivClient<Transport, Chain, Account>,
   entityKey: Hex,
@@ -164,10 +150,6 @@ export async function getRsvpsByEvent(
   }
 }
 
-/**
- * Organizer creates an approval entity (owned by organizer) for a pending RSVP.
- * The RSVP entity itself is left untouched (owned by attendee — organizer cannot modify it).
- */
 export async function confirmRsvp(
   walletClient: WalletArkivClient<Transport, Chain, Account>,
   publicClient: PublicArkivClient,
@@ -177,7 +159,7 @@ export async function confirmRsvp(
   eventEndDate: number,
 ): Promise<ArkivResult<{ entityKey: Hex; txHash: Hex }>> {
   try {
-    // Create an approval entity owned by the organizer
+
     const result = await walletClient.createEntity({
       payload: jsonToPayload({ rsvpKey: rsvpEntityKey, attendeeWallet, eventKey: eventEntityKey, approvedAt: Math.floor(Date.now() / 1_000) }),
       contentType: CONTENT_TYPE,
@@ -193,11 +175,10 @@ export async function confirmRsvp(
       ) / 2) * 2,
     })
 
-    // Increment event rsvpCount — organizer owns the event so this works
     try {
       const { updateRsvpCount } = await import("./event")
       await updateRsvpCount(walletClient, publicClient, eventEntityKey, true)
-    } catch (_) { /* non-fatal */ }
+    } catch (_) {  }
 
     return { success: true, data: result as { entityKey: Hex; txHash: Hex } }
   } catch (error) {
@@ -205,10 +186,6 @@ export async function confirmRsvp(
   }
 }
 
-/**
- * Organizer creates a rejection entity (owned by organizer) for a pending RSVP.
- * The RSVP entity itself is left untouched (owned by attendee — organizer cannot delete it).
- */
 export async function rejectRsvp(
   walletClient: WalletArkivClient<Transport, Chain, Account>,
   rsvpEntityKey: Hex,
@@ -237,7 +214,6 @@ export async function rejectRsvp(
   }
 }
 
-/** Returns all organizer-created approval entities for a given event. */
 export async function getApprovalsByEvent(
   publicClient: PublicArkivClient,
   eventKey: Hex,
@@ -257,7 +233,6 @@ export async function getApprovalsByEvent(
   }
 }
 
-/** Returns all organizer-created rejection entities for a given event. */
 export async function getRejectionsByEvent(
   publicClient: PublicArkivClient,
   eventKey: Hex,
@@ -277,7 +252,6 @@ export async function getRejectionsByEvent(
   }
 }
 
-/** Returns the approval entity for a specific RSVP key (if any), used on attendee side. */
 export async function getApprovalForRsvp(
   publicClient: PublicArkivClient,
   rsvpKey: Hex,
@@ -297,7 +271,6 @@ export async function getApprovalForRsvp(
   }
 }
 
-/** Returns the rejection entity for a specific RSVP key (if any), used on attendee side. */
 export async function getRejectionForRsvp(
   publicClient: PublicArkivClient,
   rsvpKey: Hex,
@@ -344,13 +317,6 @@ export async function getRsvpByAttendee(
   }
 }
 
-/**
- * Promotes the first waitlisted attendee by creating an approval entity.
- * 
- * NOTE (Pattern C): The organizer cannot directly update the attendee-owned RSVP
- * entity. Instead, we create an RSVP_APPROVAL entity (owned by organizer) which
- * the UI interprets as an upgrade from "waitlisted" → "confirmed".
- */
 export async function promoteFirstWaitlisted(
   walletClient: WalletArkivClient<Transport, Chain, Account>,
   publicClient: PublicArkivClient,
@@ -377,7 +343,6 @@ export async function promoteFirstWaitlisted(
     const attendeeWalletAttr = first.attributes.find((a) => a.key === "attendeeWallet")
     const attendeeWallet = (attendeeWalletAttr?.value as Hex) ?? (first.owner as Hex)
 
-    // Create an approval entity — same pattern as confirmRsvp
     const endDate = eventEndDate ?? Math.floor(Date.now() / 1_000) + 86_400
     const approvalRes = await confirmRsvp(
       walletClient,

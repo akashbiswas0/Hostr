@@ -1,8 +1,3 @@
-/**
- * Proof-of-Attendance (PoA) entity — minted by organizer after attendee check-in.
- * Long-lived on-chain proof that an attendee was present at an event.
- */
-
 import { jsonToPayload } from "@arkiv-network/sdk"
 import { eq } from "@arkiv-network/sdk/query"
 import { ExpirationTime } from "@arkiv-network/sdk/utils"
@@ -25,11 +20,6 @@ export interface ProofOfAttendance {
   mintedAt: number
 }
 
-/**
- * Mints a proof-of-attendance entity after successful check-in.
- * Owned by the organizer on behalf of the attendee.
- * Expiration: 2 years (long-lived proof).
- */
 export async function createPoAEntity(
   walletClient: WalletArkivClient<Transport, Chain, Account>,
   eventKey: Hex,
@@ -57,7 +47,7 @@ export async function createPoAEntity(
         { key: "attendeeWallet", value: attendeeWallet },
         { key: "checkinKey", value: checkinKey },
       ],
-      // PoA is a long-lived proof — 2 years
+
       expiresIn: Math.floor(ExpirationTime.fromDays(730)),
     })
 
@@ -70,7 +60,6 @@ export async function createPoAEntity(
   }
 }
 
-/** Get all PoA entities for a specific attendee wallet. */
 export async function getPoAsByAttendee(
   publicClient: PublicArkivClient,
   attendeeWallet: Hex,
@@ -95,7 +84,6 @@ export async function getPoAsByAttendee(
   }
 }
 
-/** Get all PoA entities for a specific event. */
 export async function getPoAsByEvent(
   publicClient: PublicArkivClient,
   eventKey: Hex,

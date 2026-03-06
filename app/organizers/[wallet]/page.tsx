@@ -76,7 +76,6 @@ export default function OrganizerProfilePage() {
     !!connectedAddress &&
     connectedAddress.toLowerCase() === wallet.toLowerCase();
 
-  
   const {
     data: profileResult,
     isLoading: isProfileLoading,
@@ -93,7 +92,6 @@ export default function OrganizerProfilePage() {
     ? (profileEntity.toJson() as OrganizerProfile)
     : null;
 
-  
   const {
     data: eventsResult,
     isLoading: isEventsLoading,
@@ -106,7 +104,6 @@ export default function OrganizerProfilePage() {
   const allEventEntities: Entity[] =
     eventsResult?.success ? eventsResult.data : [];
 
-  
   const publicEntities = allEventEntities.filter((ent) => {
     const ev = ent.toJson() as Event;
     return ev.status !== "draft";
@@ -124,7 +121,6 @@ export default function OrganizerProfilePage() {
 
   const tabEntities = tab === "upcoming" ? upcomingEntities : pastEntities;
 
-  
   if (!isProfileLoading && !profile) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-zinc-950 px-6 py-24">

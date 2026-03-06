@@ -9,13 +9,8 @@ interface QrScannerProps {
 
 const ELEMENT_ID = "qr-scanner-region";
 
-/**
- * Camera-based QR code scanner.
- * Dynamically imports html5-qrcode at runtime (client-only).
- * Uses the rear camera on mobile ("environment" facing mode).
- */
 export function QrScanner({ onScan, onError }: QrScannerProps) {
-  // Keep refs so the effect closure always calls the latest callbacks
+
   const onScanRef = useRef(onScan);
   const onErrorRef = useRef(onError);
   onScanRef.current = onScan;
@@ -23,9 +18,9 @@ export function QrScanner({ onScan, onError }: QrScannerProps) {
 
   useEffect(() => {
     let unmounted = false;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
     let scanner: any = null;
-    // Only true between a successful .start() and a subsequent .stop()
+
     let isRunning = false;
 
     async function safeStop() {
@@ -34,7 +29,7 @@ export function QrScanner({ onScan, onError }: QrScannerProps) {
         try {
           await scanner.stop();
         } catch {
-          // Already stopped — ignore
+
         }
       }
     }
@@ -50,9 +45,8 @@ export function QrScanner({ onScan, onError }: QrScannerProps) {
         onScanRef.current(text);
         safeStop();
       };
-      const onFrameError = () => { /* per-frame errors are normal */ };
+      const onFrameError = () => {  };
 
-      // Try rear camera first (works on mobile), fall back to any camera (laptop)
       scanner
         .start({ facingMode: "environment" }, config, onSuccess, onFrameError)
         .then(() => {
@@ -60,7 +54,7 @@ export function QrScanner({ onScan, onError }: QrScannerProps) {
           else safeStop();
         })
         .catch(() => {
-          // Rear camera not available (laptop) — try default camera
+
           if (unmounted) return;
           scanner
             .start({ facingMode: "user" }, config, onSuccess, onFrameError)
@@ -78,7 +72,7 @@ export function QrScanner({ onScan, onError }: QrScannerProps) {
       unmounted = true;
       safeStop();
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+
   }, []);
 
   return (

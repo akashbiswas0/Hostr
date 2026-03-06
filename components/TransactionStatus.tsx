@@ -11,9 +11,9 @@ export interface TransactionStatusProps {
   state: TxState;
   successMessage?: string;
   error?: string;
-  
+
   entityKey?: Hex | null;
-  
+
   txHash?: Hex | null;
   onRetry?: () => void;
 }
@@ -51,7 +51,6 @@ export function TransactionStatus({
     );
   }
 
-  
   return (
     <div className="rounded-xl border border-red-800/30 bg-red-950/20 px-4 py-3 space-y-2">
       <div className="flex items-center gap-2">

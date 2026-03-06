@@ -9,17 +9,17 @@ import type { Hex } from "viem";
 import { useWallet } from "./useWallet";
 
 export interface UseOrganizerReturn {
-  
+
   organizer: OrganizerProfile | null;
-  
+
   entity: Entity | null;
-  
+
   entityKey: Hex | null;
-  
+
   isOrganizer: boolean;
-  
+
   isLoading: boolean;
-  
+
   refetch: () => void;
 }
 
@@ -37,7 +37,6 @@ export function useOrganizer(): UseOrganizerReturn {
         throw new Error(result.error);
       }
 
-      
       return result.data ?? null;
     },
     enabled: isConnected && !!address,

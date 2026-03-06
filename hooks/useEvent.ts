@@ -14,10 +14,9 @@ import type { Hex } from "viem";
 import { useWallet } from "./useWallet";
 
 export interface UseEventReturn {
-  
 
   event: Event | null;
-  
+
   entity: Entity | null;
   isLoading: boolean;
   error: string | null;

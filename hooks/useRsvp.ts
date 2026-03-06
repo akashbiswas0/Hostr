@@ -11,11 +11,11 @@ import type { Hex } from "viem";
 import { useWallet } from "./useWallet";
 
 export interface UseRsvpReturn {
-  
+
   hasRsvp: boolean;
-  
+
   rsvp: RSVP | null;
-  
+
   entity: Entity | null;
   isLoading: boolean;
   error: string | null;
@@ -28,7 +28,7 @@ export function useRsvp(eventKey: Hex | undefined): UseRsvpReturn {
   const query = useQuery({
     queryKey: ["rsvp", eventKey, address],
     queryFn: async () => {
-      
+
       if (!eventKey || !address) return null;
 
       const result = await getRsvpByAttendee(publicClient, eventKey, address);
@@ -37,7 +37,6 @@ export function useRsvp(eventKey: Hex | undefined): UseRsvpReturn {
         throw new Error(result.error);
       }
 
-      
       return result.data;
     },
     enabled: isConnected && !!address && !!eventKey,
@@ -58,7 +57,7 @@ export function useRsvp(eventKey: Hex | undefined): UseRsvpReturn {
 }
 
 export interface UseMyRsvpsReturn {
-  
+
   rsvpEntities: Entity[];
   isLoading: boolean;
   error: string | null;

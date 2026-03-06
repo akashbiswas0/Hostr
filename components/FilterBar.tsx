@@ -18,7 +18,7 @@ export interface FilterState {
   keyword: string;
   category: string;
   location: string;
-  dateFrom: string; 
+  dateFrom: string;
   dateTo: string;
   status: "upcoming" | "live" | "";
 }
@@ -27,7 +27,7 @@ interface FilterBarProps {
   filters: FilterState;
   onChange: (next: FilterState) => void;
   onClear: () => void;
-  /** When false, the keyword search field is omitted (use when a separate search bar exists on the page) */
+
   showKeyword?: boolean;
 }
 

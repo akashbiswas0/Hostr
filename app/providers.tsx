@@ -11,14 +11,13 @@ interface ProvidersProps {
 }
 
 export function Providers({ children }: ProvidersProps) {
-  
 
   const [queryClient] = useState(
     () =>
       new QueryClient({
         defaultOptions: {
           queries: {
-            
+
             staleTime: 30_000,
           },
         },

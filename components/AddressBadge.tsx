@@ -4,7 +4,7 @@ import { useState } from "react";
 
 interface AddressBadgeProps {
   address: string;
-  
+
   full?: boolean;
   className?: string;
 }

@@ -16,17 +16,17 @@ import { friendlyError } from "@/lib/arkiv/errors";
 import type { Event, RSVP } from "@/lib/arkiv/types";
 
 export interface RsvpModalProps {
-  
+
   open: boolean;
-  
+
   onClose: () => void;
-  
+
   entity: Entity;
-  
+
   event: Event;
-  
+
   isFull: boolean;
-  
+
   onSuccess: () => void;
 }
 
@@ -60,12 +60,10 @@ export function RsvpModal({
 }: RsvpModalProps) {
   const { address, isConnected, isCorrectChain, walletClient } = useWallet();
 
-  // Does this event require organizer approval before confirming RSVPs?
   const requiresRsvp = !!event.requiresRsvp;
-  // Is the event offline-only (has location but no virtual link)?
+
   const isOffline = !!event.location && !event.virtualLink;
 
-  
   const [step, setStep] = useState<Step>("form");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -74,10 +72,8 @@ export function RsvpModal({
   const [rsvpEntityKey, setRsvpEntityKey] = useState<Hex | null>(null);
   const [errorMsg, setErrorMsg] = useState("");
 
-  
   const dialogRef = useRef<HTMLDivElement>(null);
 
-  
   useEffect(() => {
     if (open) {
       setStep("form");
@@ -90,7 +86,6 @@ export function RsvpModal({
     }
   }, [open]);
 
-  
   useEffect(() => {
     if (!open) return;
     const handler = (e: KeyboardEvent) => {
@@ -100,7 +95,6 @@ export function RsvpModal({
     return () => window.removeEventListener("keydown", handler);
   }, [open, onClose]);
 
-  
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!walletClient || !address) return;
@@ -109,7 +103,7 @@ export function RsvpModal({
     setErrorMsg("");
 
     try {
-      // ── Duplicate RSVP prevention ──────────────────────────────────────
+
       const existingRsvp = await getRsvpByAttendee(
         publicClient,
         entity.key as Hex,
@@ -119,8 +113,7 @@ export function RsvpModal({
         const existingStatus = existingRsvp.data.attributes.find(
           (a) => a.key === "status",
         )?.value;
-        // Allow re-RSVPing only if the previous RSVP was withdrawn (not-going).
-        // All other active statuses (pending, confirmed, waitlisted, checked-in) block duplicates.
+
         if (existingStatus !== "not-going") {
           setErrorMsg("You've already RSVP'd to this event");
           setStep("error");
@@ -140,8 +133,6 @@ export function RsvpModal({
         message: message.trim() || undefined,
       };
 
-      // Re-derive capacity state from a fresh live count instead of the stale
-      // `isFull` prop (which could be wrong if another user RSVPed concurrently).
       const freshRsvpRes = await getRsvpsByEvent(publicClient, entity.key as Hex);
       const activeRsvpCount = freshRsvpRes.success
         ? freshRsvpRes.data.filter((e) => {
@@ -150,7 +141,7 @@ export function RsvpModal({
           }).length
         : 0;
       const isActuallyFull = event.capacity > 0 && activeRsvpCount >= event.capacity;
-      // All RSVPs start as pending — organizer must approve before attendee sees confirmed
+
       const status = isActuallyFull ? "waitlisted" : "pending";
 
       const createRes = await createRsvpEntity(
@@ -184,7 +175,7 @@ export function RsvpModal({
   if (!open) return null;
 
   return (
-    
+
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
       onClick={(e) => {

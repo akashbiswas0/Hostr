@@ -113,7 +113,6 @@ export function EventCard({ entity, event }: EventCardProps) {
   const isFull = rsvpCount >= event.capacity;
   const isEnded = event.status === "ended";
 
-  // prefer the organizerName attribute (populated on create), fall back to truncated wallet
   const organizerNameAttr = entity.attributes.find((a) => a.key === "organizerName")?.value as string | undefined;
   const organizer = organizerNameAttr || (entity.owner ? truncateAddress(entity.owner) : "Unknown");
 

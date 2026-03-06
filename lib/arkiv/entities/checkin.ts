@@ -12,13 +12,10 @@ import type { ArkivResult } from "../types"
 
 const CONTENT_TYPE = "application/json" as const
 
-// Checkin entities get a 1-day grace period after event end.
-// Result is rounded DOWN to a multiple of 2 (BLOCK_TIME) so that
-// `expiresIn / BLOCK_TIME` is always an integer when the SDK converts to blocks.
 function expiresInFromEventEnd(eventEndDate: number): number {
   const secondsFromNow =
     eventEndDate - Math.floor(Date.now() / 1_000)
-  // Add 1-day grace period after event end
+
   const gracePeriod = ExpirationTime.fromDays(1)
   const seconds = Math.floor(Math.max(secondsFromNow + gracePeriod, ExpirationTime.fromHours(1)))
   return Math.floor(seconds / 2) * 2
@@ -46,7 +43,7 @@ export async function createCheckinEntity(
         { key: "type", value: ENTITY_TYPES.CHECKIN },
         { key: "eventKey", value: eventKey },
         { key: "attendeeWallet", value: attendeeWallet },
-        // Entity relationship chain: eventKey → rsvpKey → checkin
+
         { key: "rsvpKey", value: rsvpKey ?? "" },
       ],
       expiresIn: expiresInFromEventEnd(eventEndDate),

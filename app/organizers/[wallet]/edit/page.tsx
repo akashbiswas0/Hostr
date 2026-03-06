@@ -52,8 +52,6 @@ export default function EditOrganizerPage() {
     setForm((prev) => ({ ...(prev ?? organizerForm), [key]: value }));
   }
 
-  
-
   if (!isConnected || !isCorrectChain) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-zinc-950 p-6">
@@ -75,7 +73,6 @@ export default function EditOrganizerPage() {
     );
   }
 
-  
   if (
     address &&
     address.toLowerCase() !== profileWallet
@@ -102,8 +99,6 @@ export default function EditOrganizerPage() {
   }
 
   if (isLoading) return <PageSkeleton />;
-
-  
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();

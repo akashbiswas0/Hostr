@@ -1,16 +1,9 @@
-/**
- * RSVP / approval / rejection query functions — read-only Arkiv queries.
- */
-
 import { eq } from "@arkiv-network/sdk/query"
 import type { Entity, PublicArkivClient } from "@arkiv-network/sdk"
 import type { Hex } from "viem"
 import { ENTITY_TYPES } from "../constants"
 import type { ArkivResult, RSVPStatus } from "../types"
 
-// ─── RSVPs ───────────────────────────────────────────────────────────────────
-
-/** All RSVPs for a given event. */
 export async function getRsvpsByEvent(
   publicClient: PublicArkivClient,
   eventKey: Hex,
@@ -35,7 +28,6 @@ export async function getRsvpsByEvent(
   }
 }
 
-/** RSVPs for a given event filtered by status (multi-filter query). */
 export async function getRsvpsByEventAndStatus(
   publicClient: PublicArkivClient,
   eventKey: Hex,
@@ -62,7 +54,6 @@ export async function getRsvpsByEventAndStatus(
   }
 }
 
-/** Confirmed RSVPs for a given event. */
 export async function getConfirmedRsvpsByEvent(
   publicClient: PublicArkivClient,
   eventKey: Hex,
@@ -70,7 +61,6 @@ export async function getConfirmedRsvpsByEvent(
   return getRsvpsByEventAndStatus(publicClient, eventKey, "confirmed")
 }
 
-/** Pending RSVPs for a given event. */
 export async function getPendingRsvpsByEvent(
   publicClient: PublicArkivClient,
   eventKey: Hex,
@@ -78,7 +68,6 @@ export async function getPendingRsvpsByEvent(
   return getRsvpsByEventAndStatus(publicClient, eventKey, "pending")
 }
 
-/** A specific attendee's RSVP for an event (using ownedBy filter). */
 export async function getRsvpByAttendee(
   publicClient: PublicArkivClient,
   eventKey: Hex,
@@ -106,9 +95,6 @@ export async function getRsvpByAttendee(
   }
 }
 
-// ─── Approvals ───────────────────────────────────────────────────────────────
-
-/** All organizer-created approval entities for a given event. */
 export async function getApprovalsByEvent(
   publicClient: PublicArkivClient,
   eventKey: Hex,
@@ -128,7 +114,6 @@ export async function getApprovalsByEvent(
   }
 }
 
-/** Approval entity for a specific RSVP key (if any). */
 export async function getApprovalForRsvp(
   publicClient: PublicArkivClient,
   rsvpKey: Hex,
@@ -148,9 +133,6 @@ export async function getApprovalForRsvp(
   }
 }
 
-// ─── Rejections ──────────────────────────────────────────────────────────────
-
-/** All organizer-created rejection entities for a given event. */
 export async function getRejectionsByEvent(
   publicClient: PublicArkivClient,
   eventKey: Hex,
@@ -170,7 +152,6 @@ export async function getRejectionsByEvent(
   }
 }
 
-/** Rejection entity for a specific RSVP key (if any). */
 export async function getRejectionForRsvp(
   publicClient: PublicArkivClient,
   rsvpKey: Hex,

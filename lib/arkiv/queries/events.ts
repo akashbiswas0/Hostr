@@ -1,32 +1,23 @@
-/**
- * Event query functions — read-only Arkiv queries.
- * All filtering, sorting, and multi-predicate composition lives here.
- */
-
 import { eq, gte, lte } from "@arkiv-network/sdk/query"
 import type { Entity, PublicArkivClient } from "@arkiv-network/sdk"
 import type { Hex } from "viem"
 import { ENTITY_TYPES } from "../constants"
 import type { ArkivResult, EventStatus } from "../types"
 
-// ─── Filter types ────────────────────────────────────────────────────────────
-
 export interface EventFilters {
-  /** Exact-match category */
+
   category?: string
-  /** Exact-match location (use client-side substring for fuzzy) */
+
   location?: string
-  /** Unix seconds lower-bound for event date */
+
   dateFrom?: number
-  /** Unix seconds upper-bound for event date */
+
   dateTo?: number
-  /** Exact-match status */
+
   status?: EventStatus
-  /** Filter online-only events (1 = online, 0 = offline) */
+
   isOnline?: number
 }
-
-// ─── Single entity ───────────────────────────────────────────────────────────
 
 export async function getEventByKey(
   publicClient: PublicArkivClient,
@@ -43,12 +34,6 @@ export async function getEventByKey(
   }
 }
 
-// ─── Multi-filter query ──────────────────────────────────────────────────────
-
-/**
- * Compose all supplied filters into Arkiv-level predicates.
- * Always sorts by `date` ascending.
- */
 export async function getEventsMultiFilter(
   publicClient: PublicArkivClient,
   filters?: EventFilters,
@@ -81,23 +66,16 @@ export async function getEventsMultiFilter(
   }
 }
 
-// ─── Upcoming + live (default browse) ────────────────────────────────────────
-
-/**
- * Returns both "upcoming" and "live" events merged and sorted by date.
- * Accepts optional filters composed into Arkiv-level predicates.
- */
 export async function getAllUpcomingEvents(
   publicClient: PublicArkivClient,
   filters?: EventFilters,
 ): Promise<ArkivResult<Entity[]>> {
   try {
-    // When a specific status filter is requested, use it directly
+
     if (filters?.status) {
       return getEventsMultiFilter(publicClient, filters)
     }
 
-    // Default: show both "upcoming" and "live" events
     const sharedPredicates = [
       ...(filters?.category ? [eq("category", filters.category)] : []),
       ...(filters?.location ? [eq("location", filters.location)] : []),
@@ -131,7 +109,6 @@ export async function getAllUpcomingEvents(
         .fetch(),
     ])
 
-    // Merge and sort by date attribute
     const allEntities = [...upcomingResult.entities, ...liveResult.entities]
     allEntities.sort((a, b) => {
       const dateA = Number(a.attributes.find((attr) => attr.key === "date")?.value ?? 0)
@@ -148,9 +125,6 @@ export async function getAllUpcomingEvents(
   }
 }
 
-// ─── Convenience queries ─────────────────────────────────────────────────────
-
-/** Events filtered by category + status, sorted by date ascending. */
 export async function getEventsByCategoryAndStatus(
   publicClient: PublicArkivClient,
   category: string,
@@ -159,14 +133,11 @@ export async function getEventsByCategoryAndStatus(
   return getEventsMultiFilter(publicClient, { category, status })
 }
 
-/** Online-only events, sorted by date ascending. */
 export async function getOnlineEvents(
   publicClient: PublicArkivClient,
 ): Promise<ArkivResult<Entity[]>> {
   return getEventsMultiFilter(publicClient, { isOnline: 1 })
 }
-
-// ─── By organizer ────────────────────────────────────────────────────────────
 
 export async function getEventsByOrganizer(
   publicClient: PublicArkivClient,

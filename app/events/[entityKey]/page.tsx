@@ -69,7 +69,6 @@ export default function EventDetailPage() {
     useRsvp(entityKey);
   const { isConnected, isCorrectChain } = useWallet();
 
-  
   const attendeeQuery = useQuery({
     queryKey: ["attendees", entityKey],
     queryFn: async () => {
@@ -78,10 +77,9 @@ export default function EventDetailPage() {
       return res.data;
     },
     enabled: !!entityKey,
-    staleTime: 0, // always fetch fresh so cancellations / new RSVPs appear immediately
+    staleTime: 0,
   });
 
-  // Fetch checkin entities to show who has been physically checked in
   const checkinQuery = useQuery({
     queryKey: ["checkins", entityKey],
     queryFn: async () => {
@@ -92,7 +90,6 @@ export default function EventDetailPage() {
     staleTime: 0,
   });
 
-  // Fetch approval entities so we can show organizer-approved RSVPs as confirmed
   const approvalsQuery = useQuery({
     queryKey: ["rsvp-approvals-public", entityKey],
     queryFn: async () => {
@@ -103,7 +100,6 @@ export default function EventDetailPage() {
     staleTime: 0,
   });
 
-  // Set of attendee wallets that have checked in (from checkin entities)
   const checkedInWallets = useMemo(() => {
     return new Set(
       (checkinQuery.data ?? []).map((e) => {
@@ -113,7 +109,6 @@ export default function EventDetailPage() {
     );
   }, [checkinQuery.data]);
 
-  // Set of rsvpKeys that have an organizer-created approval entity
   const approvedRsvpKeys = useMemo(() => {
     return new Set(
       (approvalsQuery.data ?? []).map((e) => {
@@ -123,9 +118,6 @@ export default function EventDetailPage() {
     );
   }, [approvalsQuery.data]);
 
-  // Only show confirmed attendees on the public page:
-  // - status === "confirmed" (direct / auto-approved)
-  // - status === "pending" but organizer created an approval entity
   const confirmedAttendees = useMemo(() => {
     return (attendeeQuery.data ?? []).filter((ent) => {
       const statusAttr = ent.attributes.find((a) => a.key === "status");
@@ -136,7 +128,6 @@ export default function EventDetailPage() {
     });
   }, [attendeeQuery.data, approvedRsvpKeys]);
 
-  
   const organizerQuery = useQuery({
     queryKey: ["organizer-profile", entity?.owner],
     queryFn: async () => {
@@ -151,11 +142,8 @@ export default function EventDetailPage() {
     ? (organizerQuery.data.toJson() as OrganizerProfile)
     : null;
 
-  
   const [rsvpModalOpen, setRsvpModalOpen] = useState(false);
 
-  // Use the live confirmedAttendees count once loaded (staleTime:0),
-  // otherwise fall back to the on-chain rsvpCount attribute from the event entity.
   const onChainRsvpCount = Number(
     entity?.attributes.find((a) => a.key === "rsvpCount")?.value ?? 0,
   );
@@ -168,13 +156,12 @@ export default function EventDetailPage() {
   const isEnded = event?.status === "ended";
   const gradient =
     CATEGORY_GRADIENT[event?.category ?? ""] ?? "from-zinc-800 to-zinc-900";
-  // Is the event offline-only (has physical location, no virtual link)?
+
   const isOffline = !!(event?.location && !event?.virtualLink);
-  // Current user's RSVP status (raw, from attendee-owned entity)
+
   const myRsvpStatus =
     (rsvpEntity?.attributes.find((a) => a.key === "status")?.value as string) ?? null;
 
-  // For pending RSVPs, check if the organizer has approved/rejected via separate entities
   const { data: myApprovalEntity } = useQuery({
     queryKey: ["rsvp-approval", rsvpEntity?.key],
     queryFn: async () => {
@@ -195,7 +182,6 @@ export default function EventDetailPage() {
     staleTime: 30_000,
   });
 
-  // Effective status: organizer approval/rejection overrides raw pending
   const effectiveMyRsvpStatus =
     myRsvpStatus === "pending" && myApprovalEntity
       ? "confirmed"
@@ -203,7 +189,6 @@ export default function EventDetailPage() {
       ? "rejected"
       : myRsvpStatus;
 
-  
   if (isLoading) return <PageSkeleton />;
 
   if (error || !event || !entity) {
@@ -235,7 +220,7 @@ export default function EventDetailPage() {
         className={`relative h-48 border-b border-white/5 flex items-end overflow-hidden ${event.imageUrl ? "" : `bg-gradient-to-br ${gradient}`}`}
       >
         {event.imageUrl && (
-          // eslint-disable-next-line @next/next/no-img-element
+
           <img
             src={event.imageUrl}
             alt={event.title}
@@ -446,7 +431,7 @@ export default function EventDetailPage() {
                   {myRsvp?.attendeeName && (
                     <p className="text-sm text-white">{myRsvp.attendeeName}</p>
                   )}
-                  {/* QR code for confirmed offline events */}
+                  {}
                   {effectiveMyRsvpStatus !== "pending" && effectiveMyRsvpStatus !== "waitlisted" && effectiveMyRsvpStatus !== "rejected" && isOffline && (
                     <div className="flex flex-col items-center gap-1.5 pt-2">
                       <p className="text-xs text-zinc-500 uppercase tracking-wide">Entry QR</p>

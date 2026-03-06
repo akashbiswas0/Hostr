@@ -14,14 +14,9 @@ const CONTENT_TYPE = "application/json" as const
 
 const MIN_EXPIRY_SECONDS = ExpirationTime.fromDays(1)
 
-// Compute seconds from now until isoDate + 30-day grace period without relying
-// on ExpirationTime.fromDate, which can return a fractional number that the SDK
-// fails to convert to BigInt.
-// Result is always rounded DOWN to a multiple of 2 (BLOCK_TIME) so that
-// `expiresIn / BLOCK_TIME` is an integer when the SDK converts to blocks.
 function secondsUntil(isoDate: string): number {
   const diffMs = new Date(isoDate).getTime() - Date.now()
-  // Add 30-day grace period after end date so event data remains queryable
+
   const gracePeriod = ExpirationTime.fromDays(30)
   const seconds = Math.floor(Math.max(diffMs / 1_000 + gracePeriod, MIN_EXPIRY_SECONDS))
   return Math.floor(seconds / 2) * 2
@@ -53,11 +48,11 @@ export async function createEventEntity(
         { key: "rsvpCount", value: 0 },
         { key: "requiresRsvp", value: data.requiresRsvp ? 1 : 0 },
         { key: "isOnline", value: data.virtualLink ? 1 : 0 },
-        // entity relationship: reference to the organizer_profile entity
+
         { key: "organizerKey", value: organizerKey ?? "" },
         { key: "organizerName", value: organizerName ?? "" },
       ],
-      
+
       expiresIn: secondsUntil(data.endDate),
     })
 
@@ -80,12 +75,10 @@ export async function updateEventStatus(
   try {
     const updated: Event = { ...currentPayload, status: newStatus }
 
-    
     const entity = await publicClient.getEntity(entityKey)
     const rsvpAttr = entity.attributes.find((a) => a.key === "rsvpCount")
     const rsvpCount = Number(rsvpAttr?.value ?? 0)
 
-    // preserve optional entity-reference attributes
     const existingOrgKey = entity.attributes.find((a) => a.key === "organizerKey")?.value as Hex | undefined
     const existingOrgName = entity.attributes.find((a) => a.key === "organizerName")?.value as string | undefined
     const existingRequiresRsvp = Number(entity.attributes.find((a) => a.key === "requiresRsvp")?.value ?? 0)
@@ -128,12 +121,11 @@ export async function updateEventDetails(
   updatedData: Event,
 ): Promise<ArkivResult<{ entityKey: Hex; txHash: Hex }>> {
   try {
-    
+
     const entity = await publicClient.getEntity(entityKey)
     const rsvpAttr = entity.attributes.find((a) => a.key === "rsvpCount")
     const rsvpCount = Number(rsvpAttr?.value ?? 0)
 
-    // preserve entity-reference attributes
     const existingOrgKey = entity.attributes.find((a) => a.key === "organizerKey")?.value as Hex | undefined
     const existingOrgName = entity.attributes.find((a) => a.key === "organizerName")?.value as string | undefined
 
@@ -168,16 +160,6 @@ export async function updateEventDetails(
   }
 }
 
-/**
- * Updates the rsvpCount attribute on the event entity by deriving the real count
- * from actual RSVP child entities (source-of-truth approach).
- *
- * The old read-increment-write pattern had a TOCTOU race: two simultaneous RSVPs
- * could both read rsvpCount=N and both write N+1, silently losing one increment
- * and corrupting capacity enforcement. By querying the live RSVP entity set and
- * counting them, concurrent writes all converge to the same correct value instead
- * of diverging. The `_increment` parameter is retained for API compatibility.
- */
 export async function updateRsvpCount(
   walletClient: WalletArkivClient<Transport, Chain, Account>,
   publicClient: PublicArkivClient,
@@ -185,7 +167,7 @@ export async function updateRsvpCount(
   _increment: boolean,
 ): Promise<ArkivResult<{ entityKey: Hex; txHash: Hex }>> {
   try {
-    // Fetch the event entity and all its RSVP children in parallel
+
     const [entity, rsvpResult] = await Promise.all([
       publicClient.getEntity(entityKey),
       publicClient
@@ -198,7 +180,6 @@ export async function updateRsvpCount(
         .fetch(),
     ])
 
-    // Count only active RSVPs — exclude "not-going" (cancelled) entries
     const actualCount = rsvpResult.entities.filter((e) => {
       const status = e.attributes.find((a) => a.key === "status")?.value
       return status !== "not-going"
@@ -228,20 +209,13 @@ export async function updateRsvpCount(
   }
 }
 
-/**
- * Cascade-deletes the event entity and all organizer-owned child entities
- * (approvals, rejections, checkins) in a single mutateEntities call.
- *
- * NOTE (Pattern C): Attendee-owned RSVPs cannot be deleted by the organizer
- * due to on-chain ownership. These will expire naturally per their TTL.
- */
 export async function deleteEvent(
   walletClient: WalletArkivClient<Transport, Chain, Account>,
   publicClient: PublicArkivClient,
   eventKey: Hex,
 ): Promise<ArkivResult<{ txHash: Hex; deletedCount: number }>> {
   try {
-    // Query all child entities for this event in parallel
+
     const [approvalResult, rejectionResult, checkinResult] = await Promise.all([
       publicClient
         .buildQuery()
@@ -269,7 +243,6 @@ export async function deleteEvent(
         .fetch(),
     ])
 
-    // Also query PoA entities if they exist
     let poaEntities: { key: string | import("viem").Hex }[] = []
     try {
       const poaResult = await publicClient
@@ -282,10 +255,9 @@ export async function deleteEvent(
         .fetch()
       poaEntities = poaResult.entities
     } catch {
-      // PoA entity type may not exist yet — ignore
+
     }
 
-    // Build cascade delete: event + all organizer-owned children
     const deletes = [
       { entityKey: eventKey },
       ...approvalResult.entities.map((e) => ({ entityKey: e.key as Hex })),
@@ -327,15 +299,15 @@ export async function getEventByKey(
 }
 
 export interface EventFilters {
-  
+
   category?: string
-  
+
   location?: string
-  
+
   dateFrom?: number
-  
+
   dateTo?: number
-  
+
   status?: EventStatus
 }
 
@@ -344,7 +316,7 @@ export async function getAllUpcomingEvents(
   filters?: EventFilters,
 ): Promise<ArkivResult<Entity[]>> {
   try {
-    // When a specific status filter is requested, use it directly
+
     if (filters?.status) {
       const predicates = [
         eq("type", ENTITY_TYPES.EVENT),
@@ -364,8 +336,6 @@ export async function getAllUpcomingEvents(
       return { success: true, data: result.entities }
     }
 
-    // Default: show both "upcoming" and "live" events so full-capacity events
-    // (auto-promoted to "live") are still discoverable for waitlisting
     const [upcomingResult, liveResult] = await Promise.all([
       publicClient
         .buildQuery()
@@ -397,7 +367,6 @@ export async function getAllUpcomingEvents(
         .fetch(),
     ])
 
-    // Merge and sort by date attribute
     const allEntities = [...upcomingResult.entities, ...liveResult.entities]
     allEntities.sort((a, b) => {
       const dateA = Number(a.attributes.find((attr) => attr.key === "date")?.value ?? 0)

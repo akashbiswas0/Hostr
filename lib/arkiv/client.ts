@@ -1,5 +1,3 @@
-
-
 import {
   createPublicClient,
   createWalletClient,
@@ -26,10 +24,6 @@ export function getWalletClient(
   });
 }
 
-/**
- * Asserts the connected wallet owns the given entity.
- * Throws a clear error before any on-chain mutation attempt if ownership doesn't match.
- */
 export function assertOwnership(entity: Entity, walletAddress: Hex): void {
   const owner = (entity.owner ?? "").toLowerCase();
   const wallet = walletAddress.toLowerCase();
