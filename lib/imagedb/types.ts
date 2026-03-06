@@ -11,7 +11,7 @@ export interface ChunkEntity {
 export interface MediaChunk {
   media_id: string;
   chunk_index: number;
-  data: string; // Base64 encoded data
+  data: string; // Base64 encoded
   checksum: string;
   expiration_block: number;
 }
@@ -36,18 +36,12 @@ export interface UploadSession {
   completed: boolean;
 }
 
-export interface QuotaInfo {
-  used_bytes: number;
-  max_bytes: number;
-  uploads_today: number;
-  max_uploads_per_day: number;
-}
-
-export const CONFIG = {
+export const CONFIG: {
+  MAX_FILE_SIZE: number;
+  CHUNK_SIZE: number;
+  DEFAULT_BTL_DAYS: number;
+} = {
   MAX_FILE_SIZE: 25 * 1024 * 1024, // 25 MB
-  CHUNK_SIZE: 64 * 1024, // 64 KB per chunk
-  DEFAULT_BTL_DAYS: 7,
-  FREE_TIER_MAX_BYTES: 100 * 1024 * 1024, // 100 MB
-  FREE_TIER_MAX_UPLOADS_PER_DAY: 10,
-  BLOCKS_PER_DAY: 43200 // Arkiv block timing (2-second blocks)
+  CHUNK_SIZE: 64 * 1024,           // 64 KB per chunk
+  DEFAULT_BTL_DAYS: 30,
 };

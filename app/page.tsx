@@ -410,14 +410,18 @@ export default function HomePage() {
 
 function EventImage({ event }: { event: Event }) {
   const imgUrl = useEventImage(event.imageUrl);
+  const [imgError, setImgError] = useState(false);
+
+  const showImage = imgUrl && !imgError;
 
   return (
     <div className="relative h-24 w-full shrink-0 overflow-hidden rounded-xl border border-white/10 sm:w-36">
-      {imgUrl ? (
+      {showImage ? (
         <img
           src={imgUrl}
           alt={event.title}
           className="h-full w-full object-cover"
+          onError={() => setImgError(true)}
         />
       ) : (
         <div

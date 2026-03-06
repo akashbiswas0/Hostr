@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { Calendar, MapPin, Users } from "lucide-react";
 import type { Entity } from "@arkiv-network/sdk";
@@ -75,6 +76,7 @@ export function EventCardSkeleton() {
 export function EventCard({ entity, event }: EventCardProps) {
   const { cardGradient, badge } = getCategoryStyle(event.category);
   const imgUrl = useEventImage(event.imageUrl);
+  const [imgError, setImgError] = useState(false);
 
   const rsvpCount = Number(
     entity.attributes.find((a) => a.key === "rsvpCount")?.value ?? 0,
@@ -96,11 +98,12 @@ export function EventCard({ entity, event }: EventCardProps) {
     >
       {}
       <div className={`relative h-28 bg-gradient-to-br ${cardGradient} overflow-hidden`}>
-        {imgUrl && (
+        {imgUrl && !imgError && (
           <img
             src={imgUrl}
             alt={event.title}
             className="absolute inset-0 h-full w-full object-cover opacity-80"
+            onError={() => setImgError(true)}
           />
         )}
         {}

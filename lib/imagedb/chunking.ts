@@ -1,5 +1,5 @@
-import crypto from 'crypto';
-import { CONFIG, ChunkEntity, MediaMetadata } from '../types';
+import crypto from "crypto";
+import { CONFIG, ChunkEntity, MediaMetadata } from "./types";
 
 export class ChunkingService {
   static generateMediaId(): string {
@@ -7,10 +7,14 @@ export class ChunkingService {
   }
 
   static calculateChecksum(data: Buffer): string {
-    return crypto.createHash('sha256').update(data).digest('hex');
+    return crypto.createHash("sha256").update(data).digest("hex");
   }
 
-  static chunkFile(fileBuffer: Buffer, media_id: string, expiration_block: number): ChunkEntity[] {
+  static chunkFile(
+    fileBuffer: Buffer,
+    media_id: string,
+    expiration_block: number,
+  ): ChunkEntity[] {
     const chunks: ChunkEntity[] = [];
     const chunkSize = CONFIG.CHUNK_SIZE;
 
@@ -18,17 +22,15 @@ export class ChunkingService {
       const chunkData = fileBuffer.subarray(i, i + chunkSize);
       const chunk_index = Math.floor(i / chunkSize);
 
-      const chunk: ChunkEntity = {
+      chunks.push({
         id: crypto.randomUUID(),
         media_id,
         chunk_index,
         data: chunkData,
         checksum: this.calculateChecksum(chunkData),
         created_at: new Date(),
-        expiration_block
-      };
-
-      chunks.push(chunk);
+        expiration_block,
+      });
     }
 
     return chunks;
@@ -40,10 +42,9 @@ export class ChunkingService {
     content_type: string,
     fileBuffer: Buffer,
     btl_days: number,
-    expiration_block: number
+    expiration_block: number,
   ): MediaMetadata {
     const chunk_count = Math.ceil(fileBuffer.length / CONFIG.CHUNK_SIZE);
-
     return {
       media_id,
       filename: original_filename,
@@ -53,19 +54,19 @@ export class ChunkingService {
       checksum: this.calculateChecksum(fileBuffer),
       created_at: new Date(),
       expiration_block,
-      btl_days
+      btl_days,
     };
   }
 
   static reassembleFile(chunks: ChunkEntity[]): Buffer {
     chunks.sort((a, b) => a.chunk_index - b.chunk_index);
-
-    const buffers = chunks.map(chunk => chunk.data);
-    return Buffer.concat(buffers);
+    return Buffer.concat(chunks.map((c) => c.data));
   }
 
-  static validateFileIntegrity(originalChecksum: string, reassembledBuffer: Buffer): boolean {
-    const reassembledChecksum = this.calculateChecksum(reassembledBuffer);
-    return originalChecksum === reassembledChecksum;
+  static validateFileIntegrity(
+    originalChecksum: string,
+    reassembledBuffer: Buffer,
+  ): boolean {
+    return originalChecksum === this.calculateChecksum(reassembledBuffer);
   }
 }

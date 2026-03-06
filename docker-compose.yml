@@ -4,9 +4,6 @@ services:
     container_name: imagedb
     ports:
       - "3001:3000"
-    env_file:
-      - path: .env
-        required: false
     environment:
       - NODE_ENV=production
       - PORT=3000
