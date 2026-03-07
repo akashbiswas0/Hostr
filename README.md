@@ -1,5 +1,7 @@
 # Hostr
 
+DEMO: [https://youtu.be/A30xTadaVnQ](https://youtu.be/A30xTadaVnQ)
+
 Hostr is a wallet-native event app built on Arkiv. Organizers create and run events on-chain, attendees request tickets, rsvp and attendance/POA flows are recorded as linked Arkiv entities.
 
 ## Setup Guide
